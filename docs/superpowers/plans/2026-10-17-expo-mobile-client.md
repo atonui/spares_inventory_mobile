@@ -2,7 +2,7 @@
 
 > Execution method: native implementation in this session. The user selected React Native with Expo; this replaces the previous Flutter plan before app code existed.
 
-**Goal:** Build the first SparesFlow mobile slice: invitation-only sign-in, secure session handling, and read-only tenant inventory with local search and cursor pagination.
+**Goal:** Build the first Spares Tracker mobile slice: invitation-only sign-in, secure session handling, and read-only tenant inventory with local search and cursor pagination.
 
 **Architecture:** Expo SDK + React Native + TypeScript, Expo Router, repository interfaces, mock-first development, `expo-secure-store` for credentials, and an HTTPS implementation of the six generated v1 endpoints.
 
@@ -10,7 +10,7 @@
 
 ## Constraints
 
-- Preserve repository and technical identifiers; display name SparesFlow is provisional.
+- Preserve repository and technical identifiers; display name Spares Tracker.
 - No tenant IDs in requests; the authenticated server session determines tenant scope.
 - Mock API only in development/tests; release requires explicit HTTPS SaaS URL.
 - Never select production SQLite or commit API credentials.
@@ -19,7 +19,7 @@
 
 ## Task 1: Expo scaffold, config safety, branding — complete
 
-Create Expo TypeScript project files, Expo Router setup, app config validation, SparesFlow SVG source and icon exports. Write config tests first for development mocks, missing release URL rejection, non-HTTPS rejection, and URL normalization. Verify with Jest and `tsc`.
+Create Expo TypeScript project files, Expo Router setup, app config validation, Spares Tracker SVG source and icon exports. Write config tests first for development mocks, missing release URL rejection, non-HTTPS rejection, and URL normalization. Verify with Jest and `tsc`.
 
 ## Task 2: API transport and authentication — initial slice complete
 

@@ -3,13 +3,13 @@
 **Status:** Approved direction; implementation underway  
 **Date:** 2026-10-17  
 **Project:** `atonui/spares_inventory_mobile`  
-**Display name:** SparesFlow (provisional; do not rename repository or technical identifiers)
+**Display name:** Spares Tracker (do not rename repository or technical identifiers)
 
 ## Purpose and first slice
 
-Build one iOS and Android client for inventory staff and field-service engineers. The first usable slice covers invitation-only sign-in, secure session restoration and logout, and read-only company inventory browsing with search and cursor pagination. Carry the approved SparesFlow visual design into the native app without adding workflows or changing backend behavior.
+Build one iOS and Android client for inventory staff and field-service engineers. The first usable slice covers invitation-only sign-in, secure session restoration and logout, and read-only company inventory browsing with search and cursor pagination. Carry the approved Spares Tracker visual design into the native app without adding workflows or changing backend behavior.
 
-Use React Native with Expo and TypeScript. The existing Expo client in `atonui/spares_inventory` was reviewed for API and session edge cases; its tested transport behavior was selectively carried over, while the SparesFlow screen and preview data are implemented here.
+Use React Native with Expo and TypeScript. The existing Expo client in `atonui/spares_inventory` was reviewed for API and session edge cases; its tested transport behavior was selectively carried over, while the Spares Tracker screen and preview data are implemented here.
 
 ## Goals and non-goals
 
@@ -63,7 +63,7 @@ The v1 contract has no search query. Search is local over the complete fetched d
 
 ## Visual design and accessibility
 
-Use navy `#15263B`, amber `#E9A23B`, slate `#64748B`, pale neutral `#F5F7FA`, and white surfaces. Use live “SparesFlow” text with a geometric shelf icon containing one amber stock block; app icons remain icon-only. Preserve semantic stock, error, warning, and success colors and labels. Amber primary actions use navy text. Support platform touch targets, focus, text scaling, and non-color status cues.
+Use navy `#15263B`, amber `#E9A23B`, slate `#64748B`, pale neutral `#F5F7FA`, and white surfaces. Use live “Spares Tracker” text with a geometric shelf icon containing one amber stock block; app icons remain icon-only. Preserve semantic stock, error, warning, and success colors and labels. Amber primary actions use navy text. Support platform touch targets, focus, text scaling, and non-color status cues.
 
 ## Verification and delivery
 

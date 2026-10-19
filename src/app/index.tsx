@@ -181,7 +181,7 @@ export default function InventoryScreen() {
           <View style={styles.topBar}>
             <View style={styles.brandMark}><Image source={require('../../assets/android-icon-foreground.png')} style={styles.brandIcon} /></View>
             <View style={styles.brandCopy}>
-              <Text style={styles.wordmark}>SparesFlow</Text>
+              <Text style={styles.wordmark}>Spares Tracker</Text>
               <Text style={styles.pageTitle}>Inventory</Text>
             </View>
             <Pressable accessibilityRole="button" onPress={signOut} disabled={loading} style={styles.signOutButton}>
@@ -263,7 +263,7 @@ export default function InventoryScreen() {
           <View style={styles.hero}>
             <View style={styles.heroBrandRow}>
               <View style={styles.heroMark}><Image source={require('../../assets/android-icon-foreground.png')} style={styles.heroBrandIcon} /></View>
-              <Text style={styles.heroWordmark}>SparesFlow</Text>
+              <Text style={styles.heroWordmark}>Spares Tracker</Text>
             </View>
             <Text style={styles.heroLabel}>INVENTORY MANAGEMENT</Text>
             <Text style={styles.heroTitle}>Everything in its place.</Text>
