@@ -64,6 +64,61 @@ function safeMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isDateTime(value: unknown): value is string {
+  return isNonEmptyString(value) &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value) &&
+    !Number.isNaN(Date.parse(value));
+}
+
+function parseNativeSessionResponse(value: unknown): NativeSession {
+  if (!isRecord(value) || value.success !== true || value.token_type !== 'Bearer' ||
+      !isNonEmptyString(value.access_token) || !isNonEmptyString(value.refresh_token) ||
+      !isDateTime(value.expires_at)) {
+    throw new ApiError('The server returned an invalid session response.', 0);
+  }
+  return {
+    access_token: value.access_token,
+    refresh_token: value.refresh_token,
+    expires_at: value.expires_at,
+  };
+}
+
+function parseNativeLoginResponse(value: unknown): NativeLogin {
+  const session = parseNativeSessionResponse(value);
+  if (!isRecord(value) || !isRecord(value.user)) {
+    throw new ApiError('The server returned an invalid session response.', 0);
+  }
+
+  const user = value.user;
+  if (typeof user.id !== 'number' || !Number.isInteger(user.id) ||
+      !isNonEmptyString(user.email) || !isNonEmptyString(user.name) ||
+      !isNonEmptyString(user.role) ||
+      !(user.territory === undefined || user.territory === null || typeof user.territory === 'string')) {
+    throw new ApiError('The server returned an invalid session response.', 0);
+  }
+
+  return {
+    ...session,
+    success: true,
+    token_type: 'Bearer',
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      territory: user.territory ?? null,
+    },
+  };
+}
+
 function makeRequestId(): string {
   return `mobile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
@@ -125,13 +180,8 @@ export function createApiClient({
       extraHeaders: {'X-Request-ID': requestId},
     };
     const send = async () => {
-      const result = await request<NativeSession & {success: boolean; token_type: string}>(
-        '/api/v1/auth/native/refresh', options,
-      );
-      if (result.token_type !== 'Bearer' || !result.access_token || !result.refresh_token || !result.expires_at) {
-        throw new ApiError('The server returned an invalid session response.', 0);
-      }
-      return {access_token: result.access_token, refresh_token: result.refresh_token, expires_at: result.expires_at};
+      const result = await request<unknown>('/api/v1/auth/native/refresh', options);
+      return parseNativeSessionResponse(result);
     };
     try {
       return await send();
@@ -193,15 +243,12 @@ export function createApiClient({
     async login({email, password, rememberMe = false}: {email: string; password: string; rememberMe?: boolean}) {
       const {csrf_token: csrfToken} = await request<{csrf_token: string}>('/api/v1/csrf-token');
       if (!csrfToken) throw new ApiError('The server did not provide a security token.', 0);
-      const result = await request<NativeLogin>('/api/v1/auth/native/login', {
+      const result = await request<unknown>('/api/v1/auth/native/login', {
         method: 'POST',
         body: {email: email.trim(), password, remember_me: rememberMe},
         extraHeaders: {'X-CSRF-Token': csrfToken},
       });
-      if (result.token_type !== 'Bearer' || !result.access_token || !result.refresh_token || !result.expires_at) {
-        throw new ApiError('The server returned an invalid session response.', 0);
-      }
-      return result;
+      return parseNativeLoginResponse(result);
     },
     refresh,
     getSession() {

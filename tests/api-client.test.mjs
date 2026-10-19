@@ -23,6 +23,24 @@ function inventoryItem(id) {
   };
 }
 
+function nativeLoginResponse(overrides = {}) {
+  return {
+    success: true,
+    token_type: 'Bearer',
+    access_token: 'opaque-secret',
+    refresh_token: 'refresh-secret',
+    expires_at: '2026-10-16T00:00:00Z',
+    user: {
+      id: 7,
+      email: 'member@example.test',
+      name: 'Member',
+      role: 'manager',
+      territory: null,
+    },
+    ...overrides,
+  };
+}
+
 test('native login obtains a CSRF token before sending credentials', async () => {
   const calls = [];
   const client = createApiClient({
@@ -31,7 +49,7 @@ test('native login obtains a CSRF token before sending credentials', async () =>
       calls.push({url, options});
       return calls.length === 1
         ? jsonResponse({csrf_token: 'csrf-value'})
-        : jsonResponse({success: true, token_type: 'Bearer', access_token: 'opaque-secret', refresh_token: 'refresh-secret', expires_at: '2026-10-16T00:00:00Z', user: {id: 7}});
+        : jsonResponse(nativeLoginResponse());
     },
   });
 
@@ -44,6 +62,52 @@ test('native login obtains a CSRF token before sending credentials', async () =>
   assert.equal(calls[0].options.credentials, 'omit');
   assert.equal(calls[1].options.credentials, 'omit');
   assert.equal(session.refresh_token, 'refresh-secret');
+});
+
+test('native login accepts an omitted optional territory as null', async () => {
+  const loginResponse = nativeLoginResponse({
+    user: {id: 7, email: 'member@example.test', name: 'Member', role: 'manager'},
+  });
+  const client = createApiClient({
+    baseUrl: 'https://inventory.example',
+    fetchImpl: async url => url.endsWith('/csrf-token')
+      ? jsonResponse({csrf_token: 'csrf-value'})
+      : jsonResponse(loginResponse),
+  });
+
+  const session = await client.login({email: 'member@example.test', password: 'correct horse'});
+
+  assert.equal(session.user.territory, null);
+});
+
+test('native login rejects incomplete or malformed success responses', async t => {
+  const invalidResponses = [
+    ['unsuccessful envelope', nativeLoginResponse({success: false})],
+    ['invalid expiry', nativeLoginResponse({expires_at: 'soon'})],
+    ['non-date expiry', nativeLoginResponse({expires_at: '1'})],
+    ['missing user name', nativeLoginResponse({user: {id: 7, email: 'member@example.test', role: 'manager', territory: null}})],
+    ['invalid user id', nativeLoginResponse({user: {id: '7', email: 'member@example.test', name: 'Member', role: 'manager', territory: null}})],
+    ['invalid territory', nativeLoginResponse({user: {id: 7, email: 'member@example.test', name: 'Member', role: 'manager', territory: 4}})],
+    ['non-string access token', nativeLoginResponse({access_token: 22})],
+  ];
+
+  for (const [label, loginResponse] of invalidResponses) {
+    await t.test(label, async () => {
+      const client = createApiClient({
+        baseUrl: 'https://inventory.example',
+        fetchImpl: async url => url.endsWith('/csrf-token')
+          ? jsonResponse({csrf_token: 'csrf-value'})
+          : jsonResponse(loginResponse),
+      });
+
+      await assert.rejects(client.login({email: 'member@example.test', password: 'correct horse'}), error => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.status, 0);
+        assert.match(error.message, /invalid session response/i);
+        return true;
+      });
+    });
+  }
 });
 
 test('authenticated requests send the server session only as a bearer header', async () => {
@@ -146,6 +210,30 @@ test('native refresh rejects incomplete rotated credentials', async () => {
     assert.match(error.message, /invalid session response/i);
     return true;
   });
+});
+
+test('native refresh rejects unsuccessful envelopes and invalid expiries', async t => {
+  const responses = [
+    ['unsuccessful envelope', {success: false, token_type: 'Bearer', access_token: 'access-2', refresh_token: 'refresh-2', expires_at: '2026-10-17T00:15:00Z'}],
+    ['invalid expiry', {success: true, token_type: 'Bearer', access_token: 'access-2', refresh_token: 'refresh-2', expires_at: 'soon'}],
+    ['non-date expiry', {success: true, token_type: 'Bearer', access_token: 'access-2', refresh_token: 'refresh-2', expires_at: '1'}],
+  ];
+
+  for (const [label, response] of responses) {
+    await t.test(label, async () => {
+      const client = createApiClient({
+        baseUrl: 'https://inventory.example',
+        fetchImpl: async () => jsonResponse(response),
+      });
+
+      await assert.rejects(client.refresh('refresh-1'), error => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.status, 0);
+        assert.match(error.message, /invalid session response/i);
+        return true;
+      });
+    });
+  }
 });
 
 test('inventory follows opaque next cursors until the final page', async () => {
