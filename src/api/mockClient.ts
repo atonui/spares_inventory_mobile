@@ -3,7 +3,7 @@ import type {InventoryItem} from '../features/inventory/inventoryRepository';
 
 const previewUser: NativeUser = {
   id: 1,
-  email: 'preview@sparesflow.example',
+  email: 'preview@sparestracker.example',
   name: 'Preview Engineer',
   role: 'engineer',
   territory: 'Preview workspace',

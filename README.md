@@ -1,4 +1,4 @@
-# SparesFlow Mobile
+# Spares Tracker Mobile
 
 React Native and Expo client for inventory staff and field-service engineers. The first slice includes invitation-based sign-in, secure session restore/logout, and read-only inventory browsing with local search and refresh.
 
