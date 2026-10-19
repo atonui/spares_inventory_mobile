@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useRouter} from 'expo-router';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
 
@@ -23,6 +24,7 @@ function responseMessage(error: unknown): string {
 }
 
 export default function InventoryScreen() {
+  const router = useRouter();
   const [hasSession, setHasSession] = useState(false);
   const [user, setUser] = useState<NativeUser | null>(null);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
@@ -226,10 +228,17 @@ export default function InventoryScreen() {
                 <Text style={styles.emptyTitle}>{search ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>{search ? 'Try another part number or store.' : 'Pull down to refresh your inventory.'}</Text>
               </View>
-            ) : visibleInventory.map(row => {
+                ) : visibleInventory.map(row => {
               const lowStock = row.quantity <= row.minThreshold;
               return (
-                <View key={row.id} style={styles.stockCard}>
+                    <Pressable
+                      key={row.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${row.partNumber}, ${row.description}`}
+                      accessibilityHint="Opens stock details"
+                      onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}})}
+                      style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
+                    >
                   <View style={styles.cardTop}>
                     <Text style={styles.partNumber}>{row.partNumber}</Text>
                     <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge]}>
@@ -247,7 +256,7 @@ export default function InventoryScreen() {
                       {row.isAllocated ? `Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : 'Available'}
                     </Text>
                   </View>
-                </View>
+                    </Pressable>
               );
             })}
           </ScrollView>
@@ -381,6 +390,7 @@ const styles = StyleSheet.create({
   searchInput: {flex: 1, paddingVertical: 10, fontSize: 14, color: palette.text},
   listContent: {paddingTop: 13, paddingBottom: 28, gap: 10},
   stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 15, padding: 15, shadowColor: '#152D43', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.045, shadowRadius: 9, elevation: 1},
+  stockCardPressed: {opacity: 0.72},
   cardTop: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10},
   partNumber: {flex: 1, marginTop: 2, fontSize: 15, fontWeight: '800', letterSpacing: 0.2, color: palette.navy},
   description: {marginTop: 5, fontSize: 14, lineHeight: 20, fontWeight: '500', color: palette.text},
