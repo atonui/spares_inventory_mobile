@@ -2,15 +2,41 @@
 
 React Native and Expo client for inventory staff and field-service engineers. The first slice includes invitation-based sign-in, secure session restore/logout, and read-only inventory browsing with local search and refresh.
 
-## Run on a phone
+## Run during development
 
-1. Install Node.js 22.13 or newer and the Expo Go app on your phone.
-2. Run `npm ci` and `npm start` in this directory.
-3. Scan the Expo QR code with Expo Go. The phone and development machine need to be able to reach one another on the network.
+Install Node.js 22.13 or newer, run `npm ci`, then start the development server with `npm start`. Development uses deterministic preview data when `EXPO_PUBLIC_API_BASE_URL` is unset. Enter a valid-looking email address and any non-empty password to try the interface. This mode never sends credentials or stores preview tokens in device secure storage.
 
-With `EXPO_PUBLIC_API_BASE_URL` unset, development uses deterministic preview data. Enter a valid-looking email address and any non-empty password to try the interface. This mode never sends credentials or stores preview tokens in device secure storage.
+## Install a native build on a phone
 
-To connect a SaaS/PostgreSQL environment, set `EXPO_PUBLIC_API_BASE_URL` to its HTTPS API base URL, then restart Expo. The app adds `/api/v1/...` paths. Do not use the production SQLite URL and do not put tokens or passwords in this variable. Release bundles fail closed when the URL is missing or not HTTPS.
+This project includes EAS Build profiles so iOS and Android binaries can be built in the cloud without a local Xcode or Android Studio setup.
+
+1. Sign in to Expo and link this repository to an EAS project once:
+
+   ```sh
+   npx eas-cli@latest login
+   npx eas-cli@latest init
+   ```
+
+2. Build and install a development client. It uses preview data by default and connects to a running Expo development server:
+
+   ```sh
+   npx eas-cli@latest build --profile development --platform android
+   npx expo start --dev-client
+   ```
+
+   Use `--platform ios` for an iPhone build. Internal iOS installation requires an Apple Developer account and registered test devices.
+
+3. Build a standalone Android preview for testing against the SaaS API:
+
+   ```sh
+   npx eas-cli@latest build --profile preview --platform android
+   ```
+
+   Before building, set `EXPO_PUBLIC_API_BASE_URL` in the EAS `preview` environment to the HTTPS SaaS/PostgreSQL API base URL. Do the same in the EAS `production` environment before a store build. The release app fails closed at startup if the URL is missing or is not HTTPS, rather than switching to mock data. Never set the SQLite production URL. The variable is public app configuration, so do not put credentials or tokens in it.
+
+The `development` profile creates an internal development client. The `preview` profile creates an installable internal Android APK. The `production` profile creates store-distributed builds and increments the app build number.
+
+For local development against a SaaS/PostgreSQL environment, set `EXPO_PUBLIC_API_BASE_URL` to its HTTPS API base URL before starting Expo. The app adds `/api/v1/...` paths. Never use the production SQLite URL or put tokens or passwords in this variable.
 
 ## Checks
 
