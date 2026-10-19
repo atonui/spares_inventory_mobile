@@ -14,6 +14,22 @@ describe('resolveAppConfig', () => {
     );
   });
 
+  it('uses deterministic mock data in an explicitly marked demo build', () => {
+    expect(
+      resolveAppConfig({ isRelease: true, apiBaseUrl: undefined, forceMockData: true }),
+    ).toEqual({ useMockApi: true, apiBaseUrl: null });
+  });
+
+  it('never contacts the API from an explicitly marked demo build', () => {
+    expect(
+      resolveAppConfig({
+        isRelease: true,
+        apiBaseUrl: 'https://inventory.example',
+        forceMockData: true,
+      }),
+    ).toEqual({ useMockApi: true, apiBaseUrl: null });
+  });
+
   it('rejects non-HTTPS real API URLs', () => {
     expect(() =>
       resolveAppConfig({ isRelease: false, apiBaseUrl: 'http://inventory.example' }),

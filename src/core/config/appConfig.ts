@@ -6,9 +6,14 @@ export type AppConfig = {
 export type AppConfigInput = {
   isRelease: boolean;
   apiBaseUrl: string | undefined;
+  forceMockData?: boolean;
 };
 
-export function resolveAppConfig({ isRelease, apiBaseUrl }: AppConfigInput): AppConfig {
+export function resolveAppConfig({ isRelease, apiBaseUrl, forceMockData }: AppConfigInput): AppConfig {
+  if (forceMockData) {
+    return { useMockApi: true, apiBaseUrl: null };
+  }
+
   const configuredUrl = apiBaseUrl?.trim();
 
   if (!configuredUrl) {
