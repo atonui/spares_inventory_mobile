@@ -53,4 +53,35 @@ describe('inventory sign-in flow', () => {
       params: {itemId: '2'},
     });
   });
+
+  it('filters inventory status and combines the filter with local search', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Allocated'}));
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Available'}));
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeNull();
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), '6190901970');
+    expect(screen.getByText('No matching stock')).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'All'}));
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+  });
 });
