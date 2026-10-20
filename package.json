@@ -38,6 +38,7 @@
     "web": "expo start --web",
     "test": "jest --runInBand",
     "test:api": "node --experimental-strip-types --test tests/*.test.mjs",
+    "check:mobile-api-contract": "node scripts/check-mobile-api-contract.mjs",
     "typecheck": "tsc --noEmit",
     "bundle:native": "expo export --platform android --platform ios",
     "lint": "expo lint"

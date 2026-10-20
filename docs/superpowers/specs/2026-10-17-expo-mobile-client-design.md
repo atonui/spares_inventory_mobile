@@ -32,6 +32,8 @@ The backend generates its OpenAPI document at `<API_BASE_URL>/api/v1/openapi.jso
 
 `EXPO_PUBLIC_API_BASE_URL` is configuration, not a secret. Real API mode requires an explicit HTTPS SaaS/PostgreSQL base URL. If absent, development/test uses deterministic mock repositories; release configuration fails rather than silently using mock data. Do not commit environment values or credentials.
 
+Before a live mobile smoke test, compare the backend's generated contract with the six required routes using `SAAS_API_BASE_URL="https://your-saas-postgres-api.example" npm run check:mobile-api-contract`. This reads only `/api/v1/openapi.json`; it does not send credentials or call data endpoints. Never point it at the production SQLite service.
+
 ## Architecture
 
 Use Expo Router and TypeScript. The first slice currently uses a single routed screen plus a typed API client and inventory repository:
