@@ -228,8 +228,19 @@ export default function InventoryScreen() {
               placeholderTextColor={palette.placeholder}
               style={styles.searchInput}
               returnKeyType="search"
-              clearButtonMode="while-editing"
             />
+            {search.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                accessibilityHint="Clears the inventory search"
+                onPress={() => setSearch('')}
+                style={styles.clearSearchButton}
+                hitSlop={4}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={styles.filterRow} accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
@@ -427,6 +438,8 @@ const styles = StyleSheet.create({
   searchBox: {height: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, backgroundColor: palette.white, borderRadius: 13, borderWidth: 1, borderColor: palette.border},
   searchIcon: {fontSize: 24, color: palette.muted, transform: [{rotate: '-20deg'}]},
   searchInput: {flex: 1, paddingVertical: 10, fontSize: 14, color: palette.text},
+  clearSearchButton: {width: 40, height: 40, alignItems: 'center', justifyContent: 'center'},
+  clearSearchText: {fontSize: 25, lineHeight: 29, color: palette.muted},
   filterRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10},
   filterChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
   filterChipSelected: {borderColor: palette.amber, backgroundColor: palette.amber},
