@@ -92,6 +92,36 @@ describe('inventory sign-in flow', () => {
     expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
   });
 
+  it('sorts inventory by lowest quantity without breaking search and filters', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Lowest stock'}));
+    const inventoryLabels = screen.getAllByRole('button')
+      .map(button => button.props.accessibilityLabel)
+      .filter((label): label is string => typeof label === 'string' && label.startsWith('View '));
+    expect(inventoryLabels).toEqual([
+      'View D-008214, Cooling fan assembly',
+      'View 110245012, PCB THYRATRON GRID CONTROL',
+      'View M-410720, Magnetron control cable',
+      'View 6190901970, THYRATRON CX1140LG',
+    ]);
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
+
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'cooling');
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeNull();
+  });
+
   it('shows an accessible clear-search action and restores all matching rows', async () => {
     const screen = await render(<InventoryScreen />);
 
