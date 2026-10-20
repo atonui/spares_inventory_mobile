@@ -6,9 +6,9 @@ const SESSION_KEY = 'native-session-token';
 function isNativeSession(value: unknown): value is NativeSession {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
-  return typeof candidate.access_token === 'string' &&
-    typeof candidate.refresh_token === 'string' &&
-    typeof candidate.expires_at === 'string';
+  return typeof candidate.access_token === 'string' && candidate.access_token.trim().length > 0 &&
+    typeof candidate.refresh_token === 'string' && candidate.refresh_token.trim().length > 0 &&
+    typeof candidate.expires_at === 'string' && candidate.expires_at.trim().length > 0;
 }
 
 export const secureSessionStore: SessionStore = {
