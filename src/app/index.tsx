@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
