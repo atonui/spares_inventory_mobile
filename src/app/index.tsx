@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 6219)
-Total output lines: 530
-
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
@@ -280,7 +277,100 @@ export default function InventoryScreen() {
                 const selected = inventorySort === option.value;
                 return (
                   <Pressable
-            …1219 tokens truncated…ne"
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityLabel={option.label}
+                    accessibilityState={{checked: selected}}
+                    onPress={() => setInventorySort(option.value)}
+                    style={[styles.sortChip, selected && styles.filterChipSelected]}
+                  >
+                    <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {!!error && <ErrorNotice message={error} onRetry={refresh} />}
+
+          <FlatList
+            data={visibleInventory}
+            keyExtractor={row => String(row.id)}
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.navy} />}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{search || inventoryFilter !== 'all' ? 'No matching stock' : 'No stock to show'}</Text>
+                <Text style={styles.muted}>
+                  {search || inventoryFilter !== 'all'
+                    ? 'Try changing your search or filter.'
+                    : 'Pull down to refresh your inventory.'}
+                </Text>
+              </View>
+            }
+            renderItem={({item: row}) => {
+              const lowStock = row.quantity <= row.minThreshold;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${row.partNumber}, ${row.description}`}
+                  accessibilityHint="Opens stock details"
+                  onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}})}
+                  style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
+                >
+                  <View style={styles.cardTop}>
+                    <Text style={styles.partNumber}>{row.partNumber}</Text>
+                    <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge]}>
+                      <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText]}>{row.quantity}</Text>
+                      <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText]}>{lowStock ? 'LOW STOCK' : 'IN STOCK'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.description}>{row.description}</Text>
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.storeName}>{row.storeName}</Text>
+                    <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
+                  </View>
+                  <View style={styles.statusRow}>
+                    <Text style={row.isAllocated ? styles.allocatedStatus : styles.availableStatus}>
+                      {row.isAllocated ? `Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : 'Available'}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView style={styles.loginScreen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.loginContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.hero}>
+            <View style={styles.heroBrandRow}>
+              <View style={styles.heroMark}><Image source={require('../../assets/android-icon-foreground.png')} style={styles.heroBrandIcon} /></View>
+              <Text style={styles.heroWordmark}>Spares Tracker</Text>
+            </View>
+            <Text style={styles.heroLabel}>INVENTORY MANAGEMENT</Text>
+            <Text style={styles.heroTitle}>Everything in its place.</Text>
+            <Text style={styles.heroSubtitle}>Keep track of your stock, wherever the work takes you.</Text>
+          </View>
+          <View style={styles.loginCard}>
+            <Text style={styles.loginTitle}>Welcome back</Text>
+            <Text style={styles.loginSubtitle}>Sign in to manage your inventory.</Text>
+            {!!error && <ErrorNotice message={error} onRetry={hasSession ? restoreSession : undefined} />}
+            <Text style={styles.inputLabel}>Email address</Text>
+            <TextInput
+              accessibilityLabel="Email address"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@company.com"
+              placeholderTextColor={palette.placeholder}
+              style={styles.input}
+              autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
               textContentType="emailAddress"
