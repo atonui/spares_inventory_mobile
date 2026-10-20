@@ -23,6 +23,15 @@ function responseMessage(error: unknown): string {
   return 'Could not reach the server. Check your connection and try again.';
 }
 
+type InventoryFilter = 'all' | 'lowStock' | 'available' | 'allocated';
+
+const inventoryFilterOptions: Array<{value: InventoryFilter; label: string}> = [
+  {value: 'all', label: 'All'},
+  {value: 'lowStock', label: 'Low stock'},
+  {value: 'available', label: 'Available'},
+  {value: 'allocated', label: 'Allocated'},
+];
+
 export default function InventoryScreen() {
   const router = useRouter();
   const [hasSession, setHasSession] = useState(false);
@@ -36,6 +45,7 @@ export default function InventoryScreen() {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [search, setSearch] = useState('');
+  const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
 
   const loadInventory = useCallback(async () => {
     const rows = await api.getInventory();
@@ -166,11 +176,16 @@ export default function InventoryScreen() {
 
   const visibleInventory = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    if (!query) return inventory;
-    return inventory.filter(row =>
-      `${row.partNumber} ${row.description} ${row.storeName}`.toLocaleLowerCase().includes(query),
-    );
-  }, [inventory, search]);
+    return inventory.filter(row => {
+      const matchesSearch = !query ||
+        `${row.partNumber} ${row.description} ${row.storeName}`.toLocaleLowerCase().includes(query);
+      const matchesFilter = inventoryFilter === 'all' ||
+        (inventoryFilter === 'lowStock' && row.quantity <= row.minThreshold) ||
+        (inventoryFilter === 'available' && !row.isAllocated) ||
+        (inventoryFilter === 'allocated' && row.isAllocated);
+      return matchesSearch && matchesFilter;
+    });
+  }, [inventory, search, inventoryFilter]);
 
   if (!isReady || (loading && !user && hasSession)) {
     return <LoadingScreen message="Checking your session…" />;
@@ -216,6 +231,24 @@ export default function InventoryScreen() {
             />
           </View>
 
+          <View style={styles.filterRow} accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
+            {inventoryFilterOptions.map(option => {
+              const selected = inventoryFilter === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="radio"
+                  accessibilityLabel={option.label}
+                  accessibilityState={{checked: selected}}
+                  onPress={() => setInventoryFilter(option.value)}
+                  style={[styles.filterChip, selected && styles.filterChipSelected]}
+                >
+                  <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
 
           <FlatList
@@ -226,8 +259,12 @@ export default function InventoryScreen() {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>{search ? 'No matching stock' : 'No stock to show'}</Text>
-                <Text style={styles.muted}>{search ? 'Try another part number or store.' : 'Pull down to refresh your inventory.'}</Text>
+                <Text style={styles.emptyTitle}>{search || inventoryFilter !== 'all' ? 'No matching stock' : 'No stock to show'}</Text>
+                <Text style={styles.muted}>
+                  {search || inventoryFilter !== 'all'
+                    ? 'Try changing your search or filter.'
+                    : 'Pull down to refresh your inventory.'}
+                </Text>
               </View>
             }
             renderItem={({item: row}) => {
@@ -389,6 +426,11 @@ const styles = StyleSheet.create({
   searchBox: {height: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, backgroundColor: palette.white, borderRadius: 13, borderWidth: 1, borderColor: palette.border},
   searchIcon: {fontSize: 24, color: palette.muted, transform: [{rotate: '-20deg'}]},
   searchInput: {flex: 1, paddingVertical: 10, fontSize: 14, color: palette.text},
+  filterRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10},
+  filterChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
+  filterChipSelected: {borderColor: palette.amber, backgroundColor: palette.amber},
+  filterLabel: {fontSize: 12, fontWeight: '700', color: palette.muted},
+  filterLabelSelected: {color: palette.navy},
   listContent: {paddingTop: 13, paddingBottom: 28, gap: 10},
   stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 15, padding: 15, shadowColor: '#152D43', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.045, shadowRadius: 9, elevation: 1},
   stockCardPressed: {opacity: 0.72},
