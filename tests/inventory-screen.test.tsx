@@ -91,4 +91,27 @@ describe('inventory sign-in flow', () => {
     await fireEvent.press(screen.getByRole('radio', {name: 'All'}));
     expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
   });
+
+  it('shows an accessible clear-search action and restores all matching rows', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), '6190901970');
+
+    expect(screen.getByRole('button', {name: 'Clear search'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Clear search'}));
+
+    expect(screen.getByLabelText('Search inventory').props.value).toBe('');
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'Clear search'})).toBeNull();
+  });
 });
