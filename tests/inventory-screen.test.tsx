@@ -12,6 +12,13 @@ jest.mock('expo-router', () => ({
 }));
 
 describe('inventory sign-in flow', () => {
+  it('renders the sign-in screen on initial load', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    expect(screen.getByText('Everything in its place.')).toBeTruthy();
+  });
+
   beforeEach(async () => {
     await api.clearSession();
     mockPush.mockClear();
