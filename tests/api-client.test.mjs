@@ -80,6 +80,23 @@ test('native login accepts an omitted optional territory as null', async () => {
   assert.equal(session.user.territory, null);
 });
 
+test('native login ignores malformed optional account flags', async () => {
+  const loginResponse = nativeLoginResponse({
+    user: {...nativeLoginResponse().user, is_platform_admin: 'false', saas_mode: 1},
+  });
+  const client = createApiClient({
+    baseUrl: 'https://inventory.example',
+    fetchImpl: async url => url.endsWith('/csrf-token')
+      ? jsonResponse({csrf_token: 'csrf-value'})
+      : jsonResponse(loginResponse),
+  });
+
+  const session = await client.login({email: 'member@example.test', password: 'correct horse'});
+
+  assert.equal('is_platform_admin' in session.user, false);
+  assert.equal('saas_mode' in session.user, false);
+});
+
 test('native login rejects incomplete or malformed success responses', async t => {
   const invalidResponses = [
     ['unsuccessful envelope', nativeLoginResponse({success: false})],
@@ -122,7 +139,8 @@ test('authenticated requests send the server session only as a bearer header', a
     },
     fetchImpl: async (url, options) => {
       calls.push({url, options});
-      if (url.includes('/inventory')) return jsonResponse({items: [], page: {limit: 50, next_cursor: null}});
+      if (url.includes('/api/v1/inventory')) return jsonResponse({items: [], page: {limit: 50, next_cursor: null}});
+      if (url.endsWith('/me')) return jsonResponse({id: 7, email: 'member@example.test', name: 'Member', role: 'manager', territory: null});
       return jsonResponse({success: true});
     },
   });
@@ -141,6 +159,25 @@ test('authenticated requests send the server session only as a bearer header', a
     assert.equal(call.options.credentials, 'omit');
   }
   assert.equal(calls[2].options.method, 'POST');
+});
+
+test('current-user responses reject malformed records before returning them', async () => {
+  const client = createApiClient({
+    baseUrl: 'https://inventory.example',
+    sessionStore: {
+      async getSession() { return {access_token: 'access-1', refresh_token: 'refresh-1', expires_at: '2026-10-17T00:15:00Z'}; },
+      async setSession() {},
+      async clearSession() {},
+    },
+    fetchImpl: async () => jsonResponse({id: 7, email: 'member@example.test', name: null, role: 'manager', territory: null}),
+  });
+
+  await assert.rejects(client.getMe(), error => {
+    assert.ok(error instanceof ApiError);
+    assert.equal(error.status, 0);
+    assert.equal(error.message, 'The server returned an invalid user response.');
+    return true;
+  });
 });
 
 test('API failures retain status and a safe server message', async () => {

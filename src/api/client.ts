@@ -91,17 +91,34 @@ function parseNativeSessionResponse(value: unknown): NativeSession {
   };
 }
 
-function parseNativeLoginResponse(value: unknown): NativeLogin {
-  const session = parseNativeSessionResponse(value);
-  if (!isRecord(value) || !isRecord(value.user)) {
-    throw new ApiError('The server returned an invalid session response.', 0);
+function parseNativeUser(
+  value: unknown,
+  errorMessage = 'The server returned an invalid user response.',
+  validateOptionalFlags = true,
+): NativeUser {
+  if (!isRecord(value) || typeof value.id !== 'number' || !Number.isInteger(value.id) ||
+      !isNonEmptyString(value.email) || !isNonEmptyString(value.name) ||
+      !isNonEmptyString(value.role) ||
+      !(value.territory === undefined || value.territory === null || typeof value.territory === 'string') ||
+      (validateOptionalFlags && !(value.is_platform_admin === undefined || typeof value.is_platform_admin === 'boolean')) ||
+      (validateOptionalFlags && !(value.saas_mode === undefined || typeof value.saas_mode === 'boolean'))) {
+    throw new ApiError(errorMessage, 0);
   }
 
-  const user = value.user;
-  if (typeof user.id !== 'number' || !Number.isInteger(user.id) ||
-      !isNonEmptyString(user.email) || !isNonEmptyString(user.name) ||
-      !isNonEmptyString(user.role) ||
-      !(user.territory === undefined || user.territory === null || typeof user.territory === 'string')) {
+  return {
+    id: value.id,
+    email: value.email,
+    name: value.name,
+    role: value.role,
+    territory: value.territory ?? null,
+    ...(typeof value.is_platform_admin === 'boolean' ? {is_platform_admin: value.is_platform_admin} : {}),
+    ...(typeof value.saas_mode === 'boolean' ? {saas_mode: value.saas_mode} : {}),
+  };
+}
+
+function parseNativeLoginResponse(value: unknown): NativeLogin {
+  const session = parseNativeSessionResponse(value);
+  if (!isRecord(value)) {
     throw new ApiError('The server returned an invalid session response.', 0);
   }
 
@@ -109,13 +126,7 @@ function parseNativeLoginResponse(value: unknown): NativeLogin {
     ...session,
     success: true,
     token_type: 'Bearer',
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      territory: user.territory ?? null,
-    },
+    user: parseNativeUser(value.user, 'The server returned an invalid session response.', false),
   };
 }
 
@@ -266,7 +277,10 @@ export function createApiClient({
       return sessionStore?.clearSession() ?? Promise.resolve();
     },
     getMe() {
-      return authenticated(token => request<NativeUser>('/api/v1/me', {token}));
+      return authenticated(async token => {
+        const response = await request<unknown>('/api/v1/me', {token});
+        return parseNativeUser(response);
+      });
     },
     async getInventory(): Promise<InventoryRow[]> {
       return authenticated(token => fetchAllInventory({
