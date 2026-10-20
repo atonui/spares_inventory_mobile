@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -218,27 +218,28 @@ export default function InventoryScreen() {
 
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
 
-          <ScrollView
+          <FlatList
+            data={visibleInventory}
+            keyExtractor={row => String(row.id)}
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.navy} />}
             keyboardShouldPersistTaps="handled"
-          >
-            {visibleInventory.length === 0 ? (
+            ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{search ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>{search ? 'Try another part number or store.' : 'Pull down to refresh your inventory.'}</Text>
               </View>
-                ) : visibleInventory.map(row => {
+            }
+            renderItem={({item: row}) => {
               const lowStock = row.quantity <= row.minThreshold;
               return (
-                    <Pressable
-                      key={row.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={`View ${row.partNumber}, ${row.description}`}
-                      accessibilityHint="Opens stock details"
-                      onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}})}
-                      style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
-                    >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${row.partNumber}, ${row.description}`}
+                  accessibilityHint="Opens stock details"
+                  onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}})}
+                  style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
+                >
                   <View style={styles.cardTop}>
                     <Text style={styles.partNumber}>{row.partNumber}</Text>
                     <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge]}>
@@ -256,10 +257,10 @@ export default function InventoryScreen() {
                       {row.isAllocated ? `Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : 'Available'}
                     </Text>
                   </View>
-                    </Pressable>
+                </Pressable>
               );
-            })}
-          </ScrollView>
+            }}
+          />
         </View>
       </SafeAreaView>
     );
