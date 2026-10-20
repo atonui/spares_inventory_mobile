@@ -69,6 +69,15 @@ describe('inventory sign-in flow', () => {
     expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
     expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
 
+    await fireEvent.press(screen.getByRole('radio', {name: 'Allocated'}));
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Available'}));
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeNull();
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), '6190901970');
     expect(screen.getByText('No matching stock')).toBeTruthy();
 
