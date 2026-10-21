@@ -53,6 +53,28 @@ describe('inventory sign-in flow', () => {
     expect(getCachedInventoryItem(2)).toBeUndefined();
   });
 
+  it('does not report empty stock when the inventory request fails, and retries cleanly', async () => {
+    const inventoryRequest = jest.spyOn(api, 'getInventory')
+      .mockRejectedValueOnce(new Error('Inventory service unavailable'));
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+
+    await waitFor(() => expect(screen.getByText('Inventory service unavailable')).toBeTruthy());
+    expect(screen.queryByText('No stock to show')).toBeNull();
+    expect(screen.queryByText('No matching stock')).toBeNull();
+    expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
+
+    await fireEvent.press(screen.getByText('Retry'));
+
+    await waitFor(() => expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy());
+    expect(screen.queryByText('Inventory service unavailable')).toBeNull();
+    inventoryRequest.mockRestore();
+  });
+
   it('navigates to an inventory item detail using the item ID', async () => {
     const screen = await render(<InventoryScreen />);
 
