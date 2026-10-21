@@ -22,6 +22,16 @@ describe('inventory sign-in flow', () => {
     expect(screen.getByText('Everything in its place.')).toBeTruthy();
   });
 
+  it('submits the email field with a next action', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    const emailInput = screen.getByLabelText('Email address');
+
+    expect(emailInput.props.returnKeyType).toBe('next');
+    expect(emailInput.props.onSubmitEditing).toEqual(expect.any(Function));
+  });
+
   beforeEach(async () => {
     await api.clearSession();
     clearInventorySnapshot();
