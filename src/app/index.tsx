@@ -1,4 +1,5 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import type {ElementRef} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -57,6 +58,7 @@ export default function InventoryScreen() {
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const passwordInputRef = useRef<ElementRef<typeof TextInput>>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [search, setSearch] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
@@ -431,9 +433,11 @@ export default function InventoryScreen() {
               textContentType="emailAddress"
               editable={!loading}
               returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
             />
             <Text style={styles.inputLabel}>Password</Text>
             <TextInput
+              ref={passwordInputRef}
               accessibilityLabel="Password"
               value={password}
               onChangeText={setPassword}
