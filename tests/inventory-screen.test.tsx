@@ -316,8 +316,11 @@ describe('inventory sign-in flow', () => {
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'no-such-part');
 
     expect(screen.getByText('No matching stock')).toBeTruthy();
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss');
     await fireEvent.press(screen.getByRole('button', {name: 'Clear search and filters'}));
 
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+    dismissKeyboard.mockRestore();
     expect(screen.getByLabelText('Search inventory').props.value).toBe('');
     expect(screen.getByRole('radio', {name: 'All'}).props.accessibilityState.checked).toBe(true);
     expect(screen.getByRole('radio', {name: 'Default'}).props.accessibilityState.checked).toBe(true);
