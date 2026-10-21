@@ -58,6 +58,7 @@ export default function InventoryScreen() {
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const passwordInputRef = useRef<ElementRef<typeof TextInput>>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [search, setSearch] = useState('');
@@ -131,6 +132,7 @@ export default function InventoryScreen() {
       issuedSession = true;
       setHasSession(true);
       setPassword('');
+      setPasswordVisible(false);
       const currentUser = await api.getMe();
       setUser(currentUser);
       await loadInventory();
@@ -436,22 +438,34 @@ export default function InventoryScreen() {
               onSubmitEditing={() => passwordInputRef.current?.focus()}
             />
             <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              ref={passwordInputRef}
-              accessibilityLabel="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              placeholderTextColor={palette.placeholder}
-              style={styles.input}
-              autoCapitalize="none"
-              autoComplete="password"
-              secureTextEntry
-              textContentType="password"
-              editable={!loading}
-              onSubmitEditing={signIn}
-              returnKeyType="go"
-            />
+            <View style={styles.passwordField}>
+              <TextInput
+                ref={passwordInputRef}
+                accessibilityLabel="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter your password"
+                placeholderTextColor={palette.placeholder}
+                style={styles.passwordInput}
+                autoCapitalize="none"
+                autoComplete="password"
+                secureTextEntry={!passwordVisible}
+                textContentType="password"
+                editable={!loading}
+                onSubmitEditing={signIn}
+                returnKeyType="go"
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                accessibilityHint={passwordVisible ? 'Hides the password characters.' : 'Shows the password characters.'}
+                disabled={loading}
+                onPress={() => setPasswordVisible(value => !value)}
+                style={styles.passwordVisibilityButton}
+              >
+                <Text style={styles.passwordVisibilityText}>{passwordVisible ? 'Hide' : 'Show'}</Text>
+              </Pressable>
+            </View>
             <Pressable
               accessibilityRole="checkbox"
               accessibilityState={{checked: rememberMe}}
@@ -575,6 +589,10 @@ const styles = StyleSheet.create({
   loginSubtitle: {marginTop: 5, marginBottom: 23, fontSize: 15, color: palette.muted},
   inputLabel: {marginBottom: 7, marginTop: 15, fontSize: 14, fontWeight: '700', color: palette.text},
   input: {height: 52, paddingHorizontal: 13, borderRadius: 11, borderWidth: 1, borderColor: '#AFC0CF', fontSize: 15, color: palette.text, backgroundColor: palette.white},
+  passwordField: {height: 52, flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, borderColor: '#AFC0CF', backgroundColor: palette.white},
+  passwordInput: {flex: 1, height: 50, paddingHorizontal: 13, fontSize: 15, color: palette.text},
+  passwordVisibilityButton: {minWidth: 58, minHeight: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center'},
+  passwordVisibilityText: {fontSize: 13, fontWeight: '700', color: palette.navy},
   rememberRow: {flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 9, marginTop: 18, paddingVertical: 5},
   checkbox: {width: 21, height: 21, alignItems: 'center', justifyContent: 'center', borderRadius: 6, borderWidth: 1.5, borderColor: '#98A7B5'},
   checkboxChecked: {backgroundColor: palette.navy, borderColor: palette.navy},

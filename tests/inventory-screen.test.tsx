@@ -32,6 +32,20 @@ describe('inventory sign-in flow', () => {
     expect(emailInput.props.onSubmitEditing).toEqual(expect.any(Function));
   });
 
+  it('lets staff show and hide the password while signing in', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    const passwordInput = screen.getByLabelText('Password');
+
+    expect(passwordInput.props.secureTextEntry).toBe(true);
+    await fireEvent.press(screen.getByRole('button', {name: 'Show password'}));
+    expect(passwordInput.props.secureTextEntry).toBe(false);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Hide password'}));
+    expect(passwordInput.props.secureTextEntry).toBe(true);
+  });
+
   beforeEach(async () => {
     await api.clearSession();
     clearInventorySnapshot();
