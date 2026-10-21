@@ -199,6 +199,14 @@ export default function InventoryScreen() {
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
 
+  const inventoryFilterCounts = useMemo(() => inventory.reduce((counts, row) => {
+    counts.all += 1;
+    if (row.quantity <= row.minThreshold) counts.lowStock += 1;
+    if (row.isAllocated) counts.allocated += 1;
+    else counts.available += 1;
+    return counts;
+  }, {all: 0, lowStock: 0, available: 0, allocated: 0}), [inventory]);
+
   function clearInventoryCriteria() {
     setSearch('');
     setInventoryFilter('all');
@@ -263,16 +271,18 @@ export default function InventoryScreen() {
           <View style={styles.filterRow} accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
             {inventoryFilterOptions.map(option => {
               const selected = inventoryFilter === option.value;
+              const count = inventoryFilterCounts[option.value];
               return (
                 <Pressable
                   key={option.value}
                   accessibilityRole="radio"
                   accessibilityLabel={option.label}
+                  accessibilityHint={`${count} ${count === 1 ? 'item' : 'items'}`}
                   accessibilityState={{checked: selected}}
                   onPress={() => setInventoryFilter(option.value)}
                   style={[styles.filterChip, selected && styles.filterChipSelected]}
                 >
-                  <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label}</Text>
+                  <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label} · {count}</Text>
                 </Pressable>
               );
             })}
