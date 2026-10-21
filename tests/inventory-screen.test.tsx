@@ -160,4 +160,28 @@ describe('inventory sign-in flow', () => {
     expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
     expect(screen.queryByRole('button', {name: 'Clear search'})).toBeNull();
   });
+
+  it('clears search, filter, and sort from the no-results state', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+
+    await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+    await fireEvent.press(screen.getByRole('radio', {name: 'Lowest stock'}));
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'no-such-part');
+
+    expect(screen.getByText('No matching stock')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', {name: 'Clear search and filters'}));
+
+    expect(screen.getByLabelText('Search inventory').props.value).toBe('');
+    expect(screen.getByRole('radio', {name: 'All'}).props.accessibilityState.checked).toBe(true);
+    expect(screen.getByRole('radio', {name: 'Default'}).props.accessibilityState.checked).toBe(true);
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+  });
 });
