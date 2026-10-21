@@ -327,6 +327,11 @@ export default function InventoryScreen() {
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.navy} />}
             keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={hasInventoryCriteria && visibleInventory.length > 0 ? (
+              <Text accessibilityRole="text" style={styles.resultsSummary}>
+                Showing {visibleInventory.length} of {inventory.length} {inventory.length === 1 ? 'item' : 'items'}
+              </Text>
+            ) : undefined}
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
@@ -519,6 +524,7 @@ const styles = StyleSheet.create({
   sortRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 7},
   sortChip: {minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 20, backgroundColor: palette.white},
   listContent: {paddingTop: 13, paddingBottom: 28, gap: 10},
+  resultsSummary: {paddingHorizontal: 2, paddingBottom: 2, fontSize: 12, fontWeight: '600', color: palette.muted},
   stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 15, padding: 15, shadowColor: '#152D43', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.045, shadowRadius: 9, elevation: 1},
   stockCardPressed: {opacity: 0.72},
   cardTop: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10},
