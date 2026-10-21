@@ -92,6 +92,21 @@ describe('inventory sign-in flow', () => {
     expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
   });
 
+  it('shows counts for each inventory status filter', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+
+    expect(screen.getByRole('radio', {name: 'All'})).toHaveTextContent('All · 4');
+    expect(screen.getByRole('radio', {name: 'Low stock'})).toHaveTextContent('Low stock · 2');
+    expect(screen.getByRole('radio', {name: 'Available'})).toHaveTextContent('Available · 3');
+    expect(screen.getByRole('radio', {name: 'Allocated'})).toHaveTextContent('Allocated · 1');
+  });
+
   it('finds allocated stock by its work-order number', async () => {
     const screen = await render(<InventoryScreen />);
 
