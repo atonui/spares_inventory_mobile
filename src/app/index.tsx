@@ -187,7 +187,7 @@ export default function InventoryScreen() {
     const query = search.trim().toLocaleLowerCase();
     const filtered = inventory.filter(row => {
       const matchesSearch = !query ||
-        `${row.partNumber} ${row.description} ${row.storeName}`.toLocaleLowerCase().includes(query);
+        `${row.partNumber} ${row.description} ${row.storeName} ${row.workOrder ?? ''}`.toLocaleLowerCase().includes(query);
       const matchesFilter = inventoryFilter === 'all' ||
         (inventoryFilter === 'lowStock' && row.quantity <= row.minThreshold) ||
         (inventoryFilter === 'available' && !row.isAllocated) ||
@@ -233,7 +233,7 @@ export default function InventoryScreen() {
               accessibilityLabel="Search inventory"
               value={search}
               onChangeText={setSearch}
-              placeholder="Search part, description, or store"
+              placeholder="Search part, description, store, or work order"
               placeholderTextColor={palette.placeholder}
               style={styles.searchInput}
               returnKeyType="search"
