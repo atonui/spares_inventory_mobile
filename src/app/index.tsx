@@ -17,6 +17,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter} from 'expo-router';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
+import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
 
 function responseMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -26,11 +27,17 @@ function responseMessage(error: unknown): string {
 
 type InventoryFilter = 'all' | 'lowStock' | 'available' | 'allocated';
 
-const inventoryFilterOptions: Array<{value: InventoryFilter; label: string}> = [
+const inventoryFilterOptions: {value: InventoryFilter; label: string}[] = [
   {value: 'all', label: 'All'},
   {value: 'lowStock', label: 'Low stock'},
   {value: 'available', label: 'Available'},
   {value: 'allocated', label: 'Allocated'},
+];
+
+const inventorySortOptions: {value: InventorySort; label: string}[] = [
+  {value: 'default', label: 'Default'},
+  {value: 'partNumber', label: 'Part number'},
+  {value: 'lowestStock', label: 'Lowest stock'},
 ];
 
 export default function InventoryScreen() {
@@ -47,6 +54,7 @@ export default function InventoryScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [search, setSearch] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
+  const [inventorySort, setInventorySort] = useState<InventorySort>('default');
 
   const loadInventory = useCallback(async () => {
     const rows = await api.getInventory();
@@ -177,7 +185,7 @@ export default function InventoryScreen() {
 
   const visibleInventory = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return inventory.filter(row => {
+    const filtered = inventory.filter(row => {
       const matchesSearch = !query ||
         `${row.partNumber} ${row.description} ${row.storeName}`.toLocaleLowerCase().includes(query);
       const matchesFilter = inventoryFilter === 'all' ||
@@ -186,7 +194,8 @@ export default function InventoryScreen() {
         (inventoryFilter === 'allocated' && row.isAllocated);
       return matchesSearch && matchesFilter;
     });
-  }, [inventory, search, inventoryFilter]);
+    return sortInventory(filtered, inventorySort);
+  }, [inventory, search, inventoryFilter, inventorySort]);
 
   if (!isReady || (loading && !user && hasSession)) {
     return <LoadingScreen message="Checking your session…" />;
@@ -259,6 +268,27 @@ export default function InventoryScreen() {
                 </Pressable>
               );
             })}
+          </View>
+
+          <View style={styles.sortSection}>
+            <Text style={styles.sortLabel}>Sort by</Text>
+            <View style={styles.sortRow} accessibilityRole="radiogroup" accessibilityLabel="Sort inventory">
+              {inventorySortOptions.map(option => {
+                const selected = inventorySort === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityLabel={option.label}
+                    accessibilityState={{checked: selected}}
+                    onPress={() => setInventorySort(option.value)}
+                    style={[styles.sortChip, selected && styles.filterChipSelected]}
+                  >
+                    <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
@@ -445,6 +475,10 @@ const styles = StyleSheet.create({
   filterChipSelected: {borderColor: palette.amber, backgroundColor: palette.amber},
   filterLabel: {fontSize: 12, fontWeight: '700', color: palette.muted},
   filterLabelSelected: {color: palette.navy},
+  sortSection: {marginTop: 11},
+  sortLabel: {marginBottom: 6, fontSize: 12, fontWeight: '700', color: palette.muted},
+  sortRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 7},
+  sortChip: {minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 20, backgroundColor: palette.white},
   listContent: {paddingTop: 13, paddingBottom: 28, gap: 10},
   stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 15, padding: 15, shadowColor: '#152D43', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.045, shadowRadius: 9, elevation: 1},
   stockCardPressed: {opacity: 0.72},
