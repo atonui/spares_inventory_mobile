@@ -28,6 +28,9 @@ export type NativeLogin = NativeSession & {
   user: NativeUser;
 };
 
+export type MobilePairingClaim = {claimToken: string; expiresAt: string};
+export type MobilePairingStatus = {status: 'pending'} | {status: 'approved'; session: NativeLogin};
+
 export type SessionStore = {
   getSession(): Promise<NativeSession | null>;
   setSession(session: NativeSession): Promise<void>;
@@ -260,6 +263,28 @@ export function createApiClient({
         extraHeaders: {'X-CSRF-Token': csrfToken},
       });
       return parseNativeLoginResponse(result);
+    },
+    async claimMobilePairing(qrData: string, deviceName: string): Promise<MobilePairingClaim> {
+      const result = await request<unknown>('/api/v1/auth/mobile-pairing/claim', {
+        method: 'POST',
+        body: {qr_data: qrData, device_name: deviceName},
+      });
+      if (!isRecord(result) || !isNonEmptyString(result.claim_token) || !isDateTime(result.expires_at)) {
+        throw new ApiError('The pairing request could not be started.', 0);
+      }
+      return {claimToken: result.claim_token, expiresAt: result.expires_at};
+    },
+    async completeMobilePairing(claimToken: string): Promise<MobilePairingStatus> {
+      const result = await request<unknown>('/api/v1/auth/mobile-pairing/complete', {
+        method: 'POST',
+        body: {claim_token: claimToken},
+      });
+      if (!isRecord(result)) throw new ApiError('The pairing response was invalid.', 0);
+      if (result.status === 'pending') return {status: 'pending'};
+      if (result.status === 'approved') {
+        return {status: 'approved', session: parseNativeLoginResponse(result)};
+      }
+      throw new ApiError('The pairing response was invalid.', 0);
     },
     refresh,
     getSession() {

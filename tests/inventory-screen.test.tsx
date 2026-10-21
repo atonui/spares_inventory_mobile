@@ -5,6 +5,13 @@ import {api} from '../src/api/runtime';
 import InventoryScreen from '../src/app/index';
 import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/inventory/inventorySnapshot';
 
+
+async function pairFromPreview(screen: ReturnType<typeof render>) {
+  await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+  await fireEvent.press(screen.getByRole('button', {name: 'Try preview pairing'}));
+  await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy(), {timeout: 5000});
+}
+
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 let mockItemId = '2';
@@ -14,11 +21,11 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({itemId: mockItemId}),
 }));
 
-describe('inventory sign-in flow', () => {
-  it('renders the sign-in screen on initial load', async () => {
+describe('inventory device-pairing flow', () => {
+  it('renders desktop pairing guidance on initial load', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
     expect(screen.getByText('SparesFlow')).toBeTruthy();
     expect(screen.getByText('Everything in its place.')).toBeTruthy();
   });
@@ -33,7 +40,7 @@ describe('inventory sign-in flow', () => {
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     expect(getMe).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Good to see you, Preview')).toBeTruthy();
-    expect(screen.queryByText('Welcome back')).toBeNull();
+    expect(screen.queryByText('Sign in through your desktop account')).toBeNull();
     getMe.mockRestore();
   });
 
@@ -67,43 +74,25 @@ describe('inventory sign-in flow', () => {
     getMe.mockRestore();
   });
 
-  it('shows a retryable sign-in error when credentials are rejected', async () => {
-    const login = jest.spyOn(api, 'login').mockRejectedValue(new Error('Invalid email or password.'));
+  it('shows a retryable pairing error when a QR code is rejected', async () => {
+    jest.spyOn(api, 'claimMobilePairing').mockRejectedValue(new Error('This QR code is invalid or has expired.'));
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'wrong-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await fireEvent.press(screen.getByRole('button', {name: 'Try preview pairing'}));
 
-    await waitFor(() => expect(screen.getByText('Invalid email or password.')).toBeTruthy());
-    expect(screen.getByRole('button', {name: 'Sign in'})).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('This QR code is invalid or has expired.')).toBeTruthy());
+    expect(screen.getByRole('button', {name: 'Use preview QR'})).toBeTruthy();
     expect(screen.queryByText('Inventory')).toBeNull();
-    login.mockRestore();
   });
 
-  it('submits the email field with a next action', async () => {
+  it('opens the camera permission step from pairing instructions', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    const emailInput = screen.getByLabelText('Email address');
-
-    expect(emailInput.props.returnKeyType).toBe('next');
-    expect(emailInput.props.onSubmitEditing).toEqual(expect.any(Function));
-  });
-
-  it('lets staff show and hide the password while signing in', async () => {
-    const screen = await render(<InventoryScreen />);
-
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    const passwordInput = screen.getByLabelText('Password');
-
-    expect(passwordInput.props.secureTextEntry).toBe(true);
-    await fireEvent.press(screen.getByRole('button', {name: 'Show password'}));
-    expect(passwordInput.props.secureTextEntry).toBe(false);
-
-    await fireEvent.press(screen.getByRole('button', {name: 'Hide password'}));
-    expect(passwordInput.props.secureTextEntry).toBe(true);
+    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await fireEvent.press(screen.getByRole('button', {name: 'Scan QR code'}));
+    expect(screen.getByText('Camera access is needed to scan your QR code')).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Allow camera'})).toBeTruthy();
   });
 
   beforeEach(async () => {
@@ -115,16 +104,10 @@ describe('inventory sign-in flow', () => {
     mockItemId = '2';
   });
 
-  it('validates sign-in and opens the read-only inventory preview', async () => {
+  it('pairs a preview device and opens the read-only inventory preview', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
-    expect(screen.getByText('Enter your email and password to continue.')).toBeTruthy();
-
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     expect(screen.getByText('SparesFlow')).toBeTruthy();
@@ -134,7 +117,7 @@ describe('inventory sign-in flow', () => {
     expect(screen.queryByText('Adjust stock')).toBeNull();
 
     await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
     expect(getCachedInventoryItem(2)).toBeUndefined();
   });
 
@@ -143,10 +126,7 @@ describe('inventory sign-in flow', () => {
       .mockRejectedValueOnce(new Error('Inventory service unavailable'));
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory service unavailable')).toBeTruthy());
     expect(screen.queryByText('No stock to show')).toBeNull();
@@ -163,10 +143,7 @@ describe('inventory sign-in flow', () => {
   it('navigates to an inventory item detail using the item ID', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), '110245012');
@@ -181,10 +158,7 @@ describe('inventory sign-in flow', () => {
   it('dismisses the keyboard on search submit and before opening a stock item', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss');
@@ -205,10 +179,7 @@ describe('inventory sign-in flow', () => {
   it('filters inventory status and combines the filter with local search', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
@@ -236,10 +207,7 @@ describe('inventory sign-in flow', () => {
   it('shows counts for each inventory status filter', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     expect(screen.getByRole('radio', {name: 'All'})).toHaveTextContent('All · 4');
@@ -251,10 +219,7 @@ describe('inventory sign-in flow', () => {
   it('finds allocated stock by its work-order number', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'wo-004537370');
@@ -267,10 +232,7 @@ describe('inventory sign-in flow', () => {
   it('searches by a human-readable inventory location type', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'CUSTOMER SITE');
@@ -292,10 +254,7 @@ describe('inventory sign-in flow', () => {
   it('matches search terms across fields and normalizes work-order punctuation', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     const search = screen.getByLabelText('Search inventory');
@@ -313,10 +272,7 @@ describe('inventory sign-in flow', () => {
   it('sorts inventory by lowest quantity without breaking search and filters', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     await fireEvent.press(screen.getByRole('radio', {name: 'Lowest stock'}));
@@ -343,10 +299,7 @@ describe('inventory sign-in flow', () => {
   it('shows an accessible clear-search action and restores all matching rows', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), '6190901970');
@@ -366,10 +319,7 @@ describe('inventory sign-in flow', () => {
   it('clears search, filter, and sort from the no-results state', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
-    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
-    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));

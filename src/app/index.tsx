@@ -1,11 +1,9 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import type {ElementRef} from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   RefreshControl,
@@ -21,6 +19,7 @@ import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
 import {clearInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
+import DesktopPairing from '../features/auth/DesktopPairing';
 
 function responseMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -56,11 +55,7 @@ export default function InventoryScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const passwordInputRef = useRef<ElementRef<typeof TextInput>>(null);
-  const [rememberMe, setRememberMe] = useState(false);
+  const pairingCancelledRef = useRef(false);
   const [search, setSearch] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
   const [inventorySort, setInventorySort] = useState<InventorySort>('default');
@@ -113,29 +108,32 @@ export default function InventoryScreen() {
     return () => { active = false; };
   }, [restoreSession]);
 
-  async function signIn() {
-    if (!email.trim() || !password) {
-      setError('Enter your email and password to continue.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Enter a valid email address.');
-      return;
-    }
+  async function pairWithDesktop(qrData: string, onApprovalRequired: () => void) {
     setError('');
     setLoading(true);
     let issuedSession = false;
+    pairingCancelledRef.current = false;
     clearInventorySnapshot();
     try {
-      const session = await api.login({email, password, rememberMe});
-      await api.saveSession(session);
-      issuedSession = true;
-      setHasSession(true);
-      setPassword('');
-      setPasswordVisible(false);
-      const currentUser = await api.getMe();
-      setUser(currentUser);
-      await loadInventory();
+      const deviceName = Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android phone' : 'Web preview';
+      const claim = await api.claimMobilePairing(qrData, deviceName);
+      onApprovalRequired();
+      while (!pairingCancelledRef.current) {
+        if (Date.parse(claim.expiresAt) <= Date.now()) {
+          throw new ApiError('This pairing request expired. Generate a new QR code from desktop and try again.', 410);
+        }
+        const result = await api.completeMobilePairing(claim.claimToken);
+        if (result.status === 'approved') {
+          await api.saveSession(result.session);
+          issuedSession = true;
+          setHasSession(true);
+          const currentUser = await api.getMe();
+          setUser(currentUser);
+          await loadInventory();
+          return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
     } catch (reason) {
       if (issuedSession && reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
@@ -143,11 +141,16 @@ export default function InventoryScreen() {
         setHasSession(false);
         setUser(null);
       }
-      setError(responseMessage(reason));
+      if (issuedSession) setError(responseMessage(reason));
+      throw new Error(responseMessage(reason));
     } finally {
       setLoading(false);
       setIsReady(true);
     }
+  }
+
+  function cancelPairing() {
+    pairingCancelledRef.current = true;
   }
 
   async function signOut() {
@@ -407,8 +410,7 @@ export default function InventoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={styles.loginScreen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.loginContent} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.onboardingContent} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
             <View style={styles.heroBrandRow}>
               <View style={styles.heroMark}><Image source={require('../../assets/android-icon-foreground.png')} style={styles.heroBrandIcon} /></View>
@@ -418,74 +420,10 @@ export default function InventoryScreen() {
             <Text style={styles.heroTitle}>Everything in its place.</Text>
             <Text style={styles.heroSubtitle}>Keep track of your stock, wherever the work takes you.</Text>
           </View>
-          <View style={styles.loginCard}>
-            <Text style={styles.loginTitle}>Welcome back</Text>
-            <Text style={styles.loginSubtitle}>Sign in to manage your inventory.</Text>
-            {!!error && <ErrorNotice message={error} onRetry={hasSession ? restoreSession : undefined} />}
-            <Text style={styles.inputLabel}>Email address</Text>
-            <TextInput
-              accessibilityLabel="Email address"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@company.com"
-              placeholderTextColor={palette.placeholder}
-              style={styles.input}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              editable={!loading}
-              returnKeyType="next"
-              onSubmitEditing={() => passwordInputRef.current?.focus()}
-            />
-            <Text style={styles.inputLabel}>Password</Text>
-            <View style={styles.passwordField}>
-              <TextInput
-                ref={passwordInputRef}
-                accessibilityLabel="Password"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter your password"
-                placeholderTextColor={palette.placeholder}
-                style={styles.passwordInput}
-                autoCapitalize="none"
-                autoComplete="password"
-                secureTextEntry={!passwordVisible}
-                textContentType="password"
-                editable={!loading}
-                onSubmitEditing={signIn}
-                returnKeyType="go"
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
-                accessibilityHint={passwordVisible ? 'Hides the password characters.' : 'Shows the password characters.'}
-                disabled={loading}
-                onPress={() => setPasswordVisible(value => !value)}
-                style={styles.passwordVisibilityButton}
-              >
-                <Text style={styles.passwordVisibilityText}>{passwordVisible ? 'Hide' : 'Show'}</Text>
-              </Pressable>
-            </View>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{checked: rememberMe}}
-              onPress={() => setRememberMe(value => !value)}
-              style={styles.rememberRow}
-            >
-              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                {rememberMe && <Text style={styles.checkboxTick}>✓</Text>}
-              </View>
-              <Text style={styles.rememberText}>Stay signed in</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={signIn} disabled={loading} style={[styles.primaryButton, loading && styles.buttonDisabled]}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Sign in</Text>}
-            </Pressable>
-            <Text style={styles.inviteNote}>Access is available by invitation from your organization.</Text>
-            {isMockMode && <Text style={styles.previewNote}>Preview mode: any valid email and non-empty password will show sample inventory.</Text>}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          {!!error && <ErrorNotice message={error} onRetry={hasSession ? restoreSession : undefined} />}
+          <DesktopPairing mockMode={isMockMode} onPair={pairWithDesktop} onCancel={cancelPairing} />
+          <Text style={styles.onboardingFootnote}>Mobile access is managed by your organisation. Your desktop profile is used to approve this device.</Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -575,8 +513,7 @@ const styles = StyleSheet.create({
   emptyTitle: {fontSize: 17, fontWeight: '800', color: palette.text},
   emptyResetButton: {minHeight: 44, justifyContent: 'center', marginTop: 15, paddingHorizontal: 16, borderWidth: 1, borderColor: palette.amber, borderRadius: 22, backgroundColor: palette.white},
   emptyResetText: {fontSize: 13, fontWeight: '800', color: palette.navy},
-  loginScreen: {flex: 1},
-  loginContent: {flexGrow: 1, padding: 18, justifyContent: 'center'},
+  onboardingContent: {flexGrow: 1, padding: 18, justifyContent: 'center'},
   hero: {paddingHorizontal: 22, paddingTop: 26, paddingBottom: 30, backgroundColor: palette.navy, borderTopLeftRadius: 24, borderTopRightRadius: 24},
   heroBrandRow: {flexDirection: 'row', alignItems: 'center', gap: 12},
   heroMark: {width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: palette.white},
@@ -585,25 +522,7 @@ const styles = StyleSheet.create({
   heroLabel: {marginTop: 16, fontSize: 10, fontWeight: '800', letterSpacing: 1.6, color: palette.amber},
   heroTitle: {marginTop: 9, fontSize: 30, lineHeight: 36, fontWeight: '800', color: palette.white},
   heroSubtitle: {marginTop: 8, fontSize: 15, lineHeight: 23, color: '#C1D0DF'},
-  loginCard: {padding: 22, backgroundColor: palette.white, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, borderWidth: 1, borderTopWidth: 0, borderColor: palette.border},
-  loginTitle: {fontSize: 29, fontWeight: '800', letterSpacing: -0.7, color: palette.navy},
-  loginSubtitle: {marginTop: 5, marginBottom: 23, fontSize: 15, color: palette.muted},
-  inputLabel: {marginBottom: 7, marginTop: 15, fontSize: 14, fontWeight: '700', color: palette.text},
-  input: {height: 52, paddingHorizontal: 13, borderRadius: 11, borderWidth: 1, borderColor: '#AFC0CF', fontSize: 15, color: palette.text, backgroundColor: palette.white},
-  passwordField: {height: 52, flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, borderColor: '#AFC0CF', backgroundColor: palette.white},
-  passwordInput: {flex: 1, height: 50, paddingHorizontal: 13, fontSize: 15, color: palette.text},
-  passwordVisibilityButton: {minWidth: 58, minHeight: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center'},
-  passwordVisibilityText: {fontSize: 13, fontWeight: '700', color: palette.navy},
-  rememberRow: {flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 9, marginTop: 18, paddingVertical: 5},
-  checkbox: {width: 21, height: 21, alignItems: 'center', justifyContent: 'center', borderRadius: 6, borderWidth: 1.5, borderColor: '#98A7B5'},
-  checkboxChecked: {backgroundColor: palette.navy, borderColor: palette.navy},
-  checkboxTick: {fontSize: 14, fontWeight: '800', color: palette.white},
-  rememberText: {fontSize: 13, color: palette.muted},
-  primaryButton: {minHeight: 51, marginTop: 20, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.amber},
-  buttonDisabled: {opacity: 0.65},
-  primaryButtonText: {fontSize: 15, fontWeight: '800', color: palette.navy},
-  inviteNote: {marginTop: 16, textAlign: 'center', fontSize: 11, lineHeight: 16, color: palette.muted},
-  previewNote: {marginTop: 8, textAlign: 'center', fontSize: 11, lineHeight: 16, color: palette.navy},
+  onboardingFootnote: {marginTop: 14, marginHorizontal: 14, textAlign: 'center', fontSize: 11, lineHeight: 17, color: palette.slate},
   errorNotice: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12, padding: 11, borderRadius: 10, backgroundColor: palette.redTint},
   errorText: {flex: 1, fontSize: 12, lineHeight: 18, color: palette.red},
   retryText: {fontWeight: '800', color: palette.red},
