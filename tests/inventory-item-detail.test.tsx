@@ -1,5 +1,7 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {api} from '../src/api/runtime';
 import InventoryItemDetailScreen from '../src/app/inventory/[itemId]';
+import {clearInventorySnapshot, setInventorySnapshot} from '../src/features/inventory/inventorySnapshot';
 
 const mockBack = jest.fn();
 let mockItemId = '2';
@@ -11,6 +13,8 @@ jest.mock('expo-router', () => ({
 
 describe('inventory item detail screen', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
+    clearInventorySnapshot();
     mockBack.mockClear();
     mockItemId = '2';
   });
@@ -38,5 +42,17 @@ describe('inventory item detail screen', () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
     await waitFor(() => expect(screen.getByText('Stock item not found')).toBeTruthy());
+  });
+
+  it('uses the inventory snapshot instead of fetching all rows again', async () => {
+    const rows = await api.getInventory();
+    setInventorySnapshot(rows);
+    const inventoryRequest = jest.spyOn(api, 'getInventory');
+
+    const screen = await render(<InventoryItemDetailScreen />);
+
+    await waitFor(() => expect(screen.getByText('Stock details')).toBeTruthy());
+    expect(screen.getByText('110245012')).toBeTruthy();
+    expect(inventoryRequest).not.toHaveBeenCalled();
   });
 });

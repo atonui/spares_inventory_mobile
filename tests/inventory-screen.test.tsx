@@ -1,6 +1,7 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import {api} from '../src/api/runtime';
 import InventoryScreen from '../src/app/index';
+import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/inventory/inventorySnapshot';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -21,6 +22,7 @@ describe('inventory sign-in flow', () => {
 
   beforeEach(async () => {
     await api.clearSession();
+    clearInventorySnapshot();
     mockPush.mockClear();
     mockBack.mockClear();
     mockItemId = '2';
@@ -39,8 +41,13 @@ describe('inventory sign-in flow', () => {
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     expect(screen.getByText('6190901970')).toBeTruthy();
+    expect(getCachedInventoryItem(2)?.partNumber).toBe('110245012');
     expect(screen.getAllByText('LOW STOCK').length).toBeGreaterThan(0);
     expect(screen.queryByText('Adjust stock')).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    expect(getCachedInventoryItem(2)).toBeUndefined();
   });
 
   it('navigates to an inventory item detail using the item ID', async () => {

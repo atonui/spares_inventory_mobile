@@ -4,6 +4,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api} from '../../api/runtime';
 import type {InventoryRow} from '../../api/client';
+import {getCachedInventoryItem, setInventorySnapshot} from '../../features/inventory/inventorySnapshot';
 import {InventoryItemDetails} from '../../features/inventory/InventoryItemDetails';
 
 type DetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
@@ -26,9 +27,19 @@ export default function InventoryItemDetailScreen() {
         return;
       }
 
+      const cachedItem = getCachedInventoryItem(Number(itemId));
+      if (cachedItem !== undefined) {
+        if (active) {
+          setItem(cachedItem);
+          setStatus(cachedItem ? 'ready' : 'not-found');
+        }
+        return;
+      }
+
       try {
         const rows = await api.getInventory();
         if (!active) return;
+        setInventorySnapshot(rows);
         const found = rows.find(row => row.id === Number(itemId)) ?? null;
         setItem(found);
         setStatus(found ? 'ready' : 'not-found');

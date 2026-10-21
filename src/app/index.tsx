@@ -17,6 +17,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter} from 'expo-router';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
+import {clearInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
 
 function responseMessage(error: unknown): string {
@@ -59,6 +60,7 @@ export default function InventoryScreen() {
   const loadInventory = useCallback(async () => {
     const rows = await api.getInventory();
     setInventory(rows);
+    setInventorySnapshot(rows);
   }, []);
 
   const restoreSession = useCallback(async () => {
@@ -67,6 +69,7 @@ export default function InventoryScreen() {
     try {
       const savedSession = await api.getSession();
       if (!savedSession) {
+        clearInventorySnapshot();
         setHasSession(false);
         setUser(null);
         return;
@@ -78,6 +81,7 @@ export default function InventoryScreen() {
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
+        clearInventorySnapshot();
         setHasSession(false);
         setUser(null);
         setInventory([]);
@@ -113,6 +117,7 @@ export default function InventoryScreen() {
     setError('');
     setLoading(true);
     let issuedSession = false;
+    clearInventorySnapshot();
     try {
       const session = await api.login({email, password, rememberMe});
       await api.saveSession(session);
@@ -125,6 +130,7 @@ export default function InventoryScreen() {
     } catch (reason) {
       if (issuedSession && reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
+        clearInventorySnapshot();
         setHasSession(false);
         setUser(null);
       }
@@ -142,6 +148,7 @@ export default function InventoryScreen() {
     try {
       const result = await api.logout();
       if (!result.success) throw new ApiError('The server could not confirm sign out.', 0);
+      clearInventorySnapshot();
       setHasSession(false);
       setUser(null);
       setInventory([]);
@@ -149,6 +156,7 @@ export default function InventoryScreen() {
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
+        clearInventorySnapshot();
         setHasSession(false);
         setUser(null);
         setInventory([]);
@@ -169,6 +177,7 @@ export default function InventoryScreen() {
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
+        clearInventorySnapshot();
         setHasSession(false);
         setUser(null);
         setInventory([]);
