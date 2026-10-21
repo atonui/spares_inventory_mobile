@@ -27,6 +27,10 @@ function responseMessage(error: unknown): string {
   return 'Could not reach the server. Check your connection and try again.';
 }
 
+function normalizeInventorySearchText(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
 type InventoryFilter = 'all' | 'lowStock' | 'available' | 'allocated';
 
 const inventoryFilterOptions: {value: InventoryFilter; label: string}[] = [
@@ -194,11 +198,13 @@ export default function InventoryScreen() {
   }
 
   const visibleInventory = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
+    const query = search.trim();
+    const queryTerms = normalizeInventorySearchText(query).split(' ').filter(Boolean);
     const filtered = inventory.filter(row => {
-      const matchesSearch = !query ||
-        `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType.replaceAll('_', ' ')} ${row.workOrder ?? ''}`
-          .toLocaleLowerCase().includes(query);
+      const searchableText = normalizeInventorySearchText(
+        `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
+      );
+      const matchesSearch = !query || (queryTerms.length > 0 && queryTerms.every(term => searchableText.includes(term)));
       const matchesFilter = inventoryFilter === 'all' ||
         (inventoryFilter === 'lowStock' && row.quantity <= row.minThreshold) ||
         (inventoryFilter === 'available' && !row.isAllocated) ||
