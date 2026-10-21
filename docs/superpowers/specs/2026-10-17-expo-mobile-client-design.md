@@ -1,6 +1,7 @@
 # React Native with Expo Mobile Client Design
 
-**Status:** Approved direction; implementation underway  
+**Status:** First-scope implementation complete; live SaaS and physical-device validation pending
+
 **Date:** 2026-10-17  
 **Project:** `atonui/spares_inventory_mobile`  
 **Display name:** SparesFlow (provisional; do not rename repository or technical identifiers)
@@ -69,6 +70,8 @@ Use navy `#15263B`, amber `#E9A23B`, slate `#64748B`, pale neutral `#F5F7FA`, an
 
 ## Verification and delivery
 
-Current verification includes `npm test`, `npm run test:api`, `npm run typecheck`, and Android/iOS JavaScript bundle export. Covered behaviors include config safety, CSRF-before-login, bearer-only protected requests, refresh request-ID reuse, coalesced refresh/retry, transient/rejected refresh outcomes, logout retention, cursor accumulation/repetition protection, sign-in validation, sample inventory, and read-only UI. Further malformed-response and session-storage tests can be added as the first slice expands.
+Current verification includes `npm test`, `npm run test:api`, `npm run typecheck`, lint, Expo Doctor, and Android/iOS JavaScript bundle export. Covered behaviors include config safety, CSRF-before-login, bearer-only protected requests, refresh request-ID reuse, coalesced refresh/retry, transient/rejected refresh outcomes, logout retention, cursor accumulation/repetition protection, sign-in validation, successful and rejected sign-in, valid/expired/transient session restoration, sample inventory, search/filter/sort, item details, and read-only UI.
 
-Use Expo development builds/cloud builds for native integration and GitHub Actions for reproducible checks. A phone-friendly preview may use Expo Snack, but production source and tests live in this repository. SaaS smoke testing waits for the SaaS/PostgreSQL API base URL; never test against the production SQLite service.
+The first-scope implementation is complete. Live validation still requires an HTTPS SaaS/PostgreSQL API base URL and an authorized test account. Physical-device verification still requires a linked Expo project and EAS development builds. Do not test against the production SQLite service.
+
+Use Expo development builds/cloud builds for native integration and GitHub Actions for reproducible checks. A phone-friendly preview may use Expo Snack, but production source and tests live in this repository.

@@ -1,5 +1,6 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import {Keyboard} from 'react-native';
+import {ApiError} from '../src/api/client';
 import {api} from '../src/api/runtime';
 import InventoryScreen from '../src/app/index';
 import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/inventory/inventorySnapshot';
@@ -20,6 +21,65 @@ describe('inventory sign-in flow', () => {
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
     expect(screen.getByText('SparesFlow')).toBeTruthy();
     expect(screen.getByText('Everything in its place.')).toBeTruthy();
+  });
+
+  it('restores a saved session and loads inventory without showing sign-in', async () => {
+    const session = await api.login({email: 'field@company.example', password: 'preview-password', rememberMe: true});
+    await api.saveSession(session);
+    const getMe = jest.spyOn(api, 'getMe');
+
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    expect(getMe).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Good to see you, Preview')).toBeTruthy();
+    expect(screen.queryByText('Welcome back')).toBeNull();
+    getMe.mockRestore();
+  });
+
+  it('clears an expired session and returns to sign-in', async () => {
+    const session = await api.login({email: 'field@company.example', password: 'preview-password', rememberMe: true});
+    await api.saveSession(session);
+    const getMe = jest.spyOn(api, 'getMe').mockRejectedValue(new ApiError('Expired session', 401));
+
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Your session expired. Please sign in again.')).toBeTruthy());
+    expect(await api.getSession()).toBeNull();
+    expect(screen.queryByText('Inventory')).toBeNull();
+    getMe.mockRestore();
+  });
+
+  it('keeps a session after a temporary restore failure and retries successfully', async () => {
+    const session = await api.login({email: 'field@company.example', password: 'preview-password', rememberMe: true});
+    await api.saveSession(session);
+    const getMe = jest.spyOn(api, 'getMe').mockRejectedValueOnce(new Error('Connection lost'));
+
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Connection lost')).toBeTruthy());
+    expect(await api.getSession()).not.toBeNull();
+    await fireEvent.press(screen.getByRole('button', {name: 'Retry'}));
+
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    expect(getMe).toHaveBeenCalledTimes(2);
+    expect(await api.getSession()).not.toBeNull();
+    getMe.mockRestore();
+  });
+
+  it('shows a retryable sign-in error when credentials are rejected', async () => {
+    const login = jest.spyOn(api, 'login').mockRejectedValue(new Error('Invalid email or password.'));
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'wrong-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+
+    await waitFor(() => expect(screen.getByText('Invalid email or password.')).toBeTruthy());
+    expect(screen.getByRole('button', {name: 'Sign in'})).toBeTruthy();
+    expect(screen.queryByText('Inventory')).toBeNull();
+    login.mockRestore();
   });
 
   it('submits the email field with a next action', async () => {
@@ -47,6 +107,7 @@ describe('inventory sign-in flow', () => {
   });
 
   beforeEach(async () => {
+    jest.restoreAllMocks();
     await api.clearSession();
     clearInventorySnapshot();
     mockPush.mockClear();
