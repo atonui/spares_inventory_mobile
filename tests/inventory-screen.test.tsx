@@ -141,9 +141,11 @@ describe('inventory sign-in flow', () => {
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'CUSTOMER SITE');
     expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.getByText('Showing 1 of 4 items')).toBeTruthy();
     expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'warehouse');
+    expect(screen.getByText('Showing 2 of 4 items')).toBeTruthy();
     expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
     expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
     expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
