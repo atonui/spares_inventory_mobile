@@ -130,6 +130,29 @@ describe('inventory sign-in flow', () => {
     expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
   });
 
+  it('searches by a human-readable inventory location type', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'CUSTOMER SITE');
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
+
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'warehouse');
+    expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
+
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'engineer');
+    expect(screen.getByRole('button', {name: 'View M-410720, Magnetron control cable'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
+  });
+
   it('sorts inventory by lowest quantity without breaking search and filters', async () => {
     const screen = await render(<InventoryScreen />);
 
