@@ -66,7 +66,7 @@ export default function InventoryItemDetailScreen() {
             <Text style={styles.backButtonText}>‹</Text>
           </Pressable>
           <View>
-            <Text style={styles.wordmark}>Spares Tracker</Text>
+            <Text style={styles.wordmark}>SparesFlow</Text>
             <Text accessibilityRole="header" style={styles.pageTitle}>Stock details</Text>
           </View>
         </View>
