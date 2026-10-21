@@ -334,7 +334,7 @@ export default function InventoryScreen() {
                 Showing {visibleInventory.length} of {inventory.length} {inventory.length === 1 ? 'item' : 'items'}
               </Text>
             ) : undefined}
-            ListEmptyComponent={
+            ListEmptyComponent={error ? <></> : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>
@@ -354,7 +354,7 @@ export default function InventoryScreen() {
                   </Pressable>
                 )}
               </View>
-            }
+            )}
             renderItem={({item: row}) => {
               const lowStock = row.quantity <= row.minThreshold;
               return (
@@ -478,7 +478,7 @@ function ErrorNotice({message, onRetry}: {message: string; onRetry?: () => void}
   return (
     <View accessibilityRole="alert" style={styles.errorNotice}>
       <Text style={styles.errorText}>{message}</Text>
-      {onRetry && <Pressable onPress={() => void onRetry()}><Text style={styles.retryText}>Retry</Text></Pressable>}
+      {onRetry && <Pressable accessibilityRole="button" accessibilityLabel="Retry" onPress={() => void onRetry()}><Text style={styles.retryText}>Retry</Text></Pressable>}
     </View>
   );
 }
