@@ -204,6 +204,27 @@ describe('inventory sign-in flow', () => {
     expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
   });
 
+  it('matches search terms across fields and normalizes work-order punctuation', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+
+    const search = screen.getByLabelText('Search inventory');
+    await fireEvent.changeText(search, 'coast cooling');
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.getByText('Showing 1 of 4 items')).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
+
+    await fireEvent.changeText(search, 'WO 004537370');
+    expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.getByText('Showing 1 of 4 items')).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
+  });
+
   it('sorts inventory by lowest quantity without breaking search and filters', async () => {
     const screen = await render(<InventoryScreen />);
 
