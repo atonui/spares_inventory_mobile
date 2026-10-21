@@ -5,8 +5,9 @@ const checkerModule = await import('../scripts/check-mobile-api-contract.mjs').c
 
 const requiredRoutes = [
   ['GET', '/api/v1/csrf-token'],
-  ['POST', '/api/v1/auth/native/login'],
   ['POST', '/api/v1/auth/native/refresh'],
+  ['POST', '/api/v1/auth/mobile-pairing/claim'],
+  ['POST', '/api/v1/auth/mobile-pairing/complete'],
   ['GET', '/api/v1/me'],
   ['GET', '/api/v1/inventory'],
   ['POST', '/api/v1/auth/logout'],
@@ -19,7 +20,7 @@ function contractFor(routes) {
   };
 }
 
-test('checks all six mobile routes using the generated OpenAPI document only', async () => {
+test('checks all seven mobile routes using the generated OpenAPI document only', async () => {
   assert.ok(checkerModule, 'the mobile API contract checker should be available');
   let request;
   const result = await checkerModule.checkMobileApiContract({
@@ -35,7 +36,7 @@ test('checks all six mobile routes using the generated OpenAPI document only', a
   assert.equal(request.options.credentials, 'omit');
   assert.equal(request.options.headers.Accept, 'application/json');
   assert.equal('Authorization' in request.options.headers, false);
-  assert.equal(result.checkedRoutes, 6);
+  assert.equal(result.checkedRoutes, 7);
 });
 
 test('reports missing mobile route methods in the generated contract', async () => {

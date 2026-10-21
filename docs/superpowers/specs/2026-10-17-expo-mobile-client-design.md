@@ -1,6 +1,6 @@
 # React Native with Expo Mobile Client Design
 
-**Status:** First-scope implementation complete; live SaaS and physical-device validation pending
+**Status:** First scope and desktop-approved mobile pairing implemented; live SaaS and physical-device validation pending
 
 **Date:** 2026-10-17  
 **Project:** `atonui/spares_inventory_mobile`  
@@ -8,15 +8,15 @@
 
 ## Purpose and first slice
 
-Build one iOS and Android client for inventory staff and field-service engineers. The first usable slice covers invitation-only sign-in, secure session restoration and logout, and read-only company inventory browsing with search and cursor pagination. Carry the approved SparesFlow visual design into the native app without adding workflows or changing backend behavior.
+Build one iOS and Android client for inventory staff and field-service engineers. The first usable slice covers desktop-approved account pairing, secure session restoration and logout, and read-only company inventory browsing with search and cursor pagination. Carry the approved SparesFlow visual design into the native app.
 
-Use React Native with Expo and TypeScript. The existing Expo client in `atonui/spares_inventory` was reviewed for API and session edge cases; its tested transport behavior was selectively carried over, while the SparesFlow screen and preview data are implemented here.
+Use React Native with Expo and TypeScript. The existing Expo client in `atonui/spares_inventory` was reviewed for API and session edge cases; its tested transport behavior was selectively carried over, while the SparesFlow pairing screen and preview data are implemented here.
 
 ## Goals and non-goals
 
-Goals: shared iOS/Android implementation; approved Sign in and Inventory screens; small repository interfaces with deterministic mocks; an HTTPS implementation of the current six-route v1 API; secure credentials; testable behavior.
+Goals: shared iOS/Android implementation; desktop-account pairing and Inventory screens; small repository interfaces with deterministic mocks; an HTTPS implementation of the generated v1 API; secure credentials; testable behavior.
 
-Out of scope: backend or tenant-policy changes; sign-up, invitations, password recovery, account switching or administration; stock mutations, barcode scanning, offline writes, or store submission; a second codebase per platform.
+Out of scope: self-service sign-up, invitations, password recovery, account switching or administration; stock mutations, offline writes, or store submission; a second codebase per platform.
 
 ## Contract and environment
 
@@ -24,16 +24,19 @@ The backend generates its OpenAPI document at `<API_BASE_URL>/api/v1/openapi.jso
 
 | Method | Path | Use |
 |---|---|---|
-| GET | `/api/v1/csrf-token` | Fetch CSRF token before sign-in. |
-| POST | `/api/v1/auth/native/login` | Invitation-only email/password/remember-me sign-in. |
 | POST | `/api/v1/auth/native/refresh` | Rotate access and refresh credentials. |
+| POST | `/api/v1/auth/mobile-pairing/claim` | Exchange a short-lived desktop QR capability for a pending device claim. |
+| POST | `/api/v1/auth/mobile-pairing/complete` | Poll approval and receive a one-time native session after desktop approval. |
+| GET | `/api/v1/csrf-token` | Fetch CSRF token before session logout. |
 | GET | `/api/v1/me` | Validate and load the current user. |
 | GET | `/api/v1/inventory` | Read one tenant-scoped inventory page. |
 | POST | `/api/v1/auth/logout` | Revoke the current server session. |
 
+The desktop user starts pairing from Profile → Connect mobile app. The QR capability expires after two minutes and may be claimed once. Claiming never grants access; the desktop must explicitly approve the named device. The server issues one native session only after approval. Pairing capability responses are never cached.
+
 `EXPO_PUBLIC_API_BASE_URL` is configuration, not a secret. Real API mode requires an explicit HTTPS SaaS/PostgreSQL base URL. If absent, development/test uses deterministic mock repositories; release configuration fails rather than silently using mock data. Do not commit environment values or credentials.
 
-Before a live mobile smoke test, compare the backend's generated contract with the six required routes using `SAAS_API_BASE_URL="https://your-saas-postgres-api.example" npm run check:mobile-api-contract`. This reads only `/api/v1/openapi.json`; it does not send credentials or call data endpoints. Never point it at the production SQLite service.
+Before a live mobile smoke test, compare the backend's generated contract with the seven required routes using `SAAS_API_BASE_URL="https://your-saas-postgres-api.example" npm run check:mobile-api-contract`. This reads only `/api/v1/openapi.json`; it does not send credentials or call data endpoints. Never point it at the production SQLite service.
 
 ## Architecture
 
@@ -50,7 +53,7 @@ Use Expo SecureStore for the access/refresh pair (iOS Keychain and Android Keyst
 
 ## Authentication and session behavior
 
-1. Sign-in requests `/api/v1/csrf-token`, then posts existing `email`, `password`, and `remember_me` fields to `/api/v1/auth/native/login` with `X-CSRF-Token`. Do not send browser cookies. Validate the full response before storing a single serialized session value.
+1. Pairing explains that the user must first sign in to their desktop account. Scan the desktop’s short-lived QR code, send only its payload and a generic device label to the claim endpoint, then poll using the claim token in the request body. Do not send browser cookies or put capability tokens in URLs. Validate the full approval response before storing a single serialized session value.
 2. Restore reads the secure session and validates it through `/api/v1/me`. A protected 401 triggers at most one refresh and one retry of the original request.
 3. Refresh posts the refresh token with a generated `X-Request-ID`; reuse the same ID only when retrying that identical request after an ambiguous/lost response. Persist rotated credentials atomically and coalesce concurrent refresh attempts.
 4. Clear credentials when refresh is rejected as expired/revoked. Preserve them on transient network/service errors. Decode `{error:{status,code,detail,request_id}}`; display safe detail only and never log credentials.

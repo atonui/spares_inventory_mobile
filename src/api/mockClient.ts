@@ -18,6 +18,7 @@ const previewInventory: InventoryItem[] = [
 
 export function createMockApiClient(): MobileApi {
   let session: NativeSession | null = null;
+  let pairingPolls = 0;
   return {
     async login({email, password}) {
       if (!email.trim() || !password) throw new Error('Enter your email and password to continue.');
@@ -29,6 +30,30 @@ export function createMockApiClient(): MobileApi {
         expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
         user: {...previewUser, email: email.trim()},
       } satisfies NativeLogin;
+    },
+    async claimMobilePairing(qrData, deviceName) {
+      if (!qrData.includes('token=preview-pairing-token')) {
+        throw new Error('This QR code is invalid or has expired. Generate a new code from your desktop account.');
+      }
+      if (!deviceName.trim()) throw new Error('This device could not be identified. Try pairing again.');
+      pairingPolls = 0;
+      return {claimToken: 'preview-claim-token', expiresAt: new Date(Date.now() + 2 * 60_000).toISOString()};
+    },
+    async completeMobilePairing(claimToken) {
+      if (claimToken !== 'preview-claim-token') throw new Error('This pairing request is invalid or has expired.');
+      pairingPolls += 1;
+      if (pairingPolls === 1) return {status: 'pending'};
+      return {
+        status: 'approved',
+        session: {
+          success: true,
+          token_type: 'Bearer',
+          access_token: 'preview-paired-access-token',
+          refresh_token: 'preview-paired-refresh-token',
+          expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+          user: {...previewUser},
+        },
+      };
     },
     async refresh() {
       if (!session) throw new Error('Preview session expired. Please sign in again.');

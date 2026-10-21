@@ -2,8 +2,9 @@ import {pathToFileURL} from 'node:url';
 
 const requiredRoutes = [
   ['GET', '/api/v1/csrf-token'],
-  ['POST', '/api/v1/auth/native/login'],
   ['POST', '/api/v1/auth/native/refresh'],
+  ['POST', '/api/v1/auth/mobile-pairing/claim'],
+  ['POST', '/api/v1/auth/mobile-pairing/complete'],
   ['GET', '/api/v1/me'],
   ['GET', '/api/v1/inventory'],
   ['POST', '/api/v1/auth/logout'],

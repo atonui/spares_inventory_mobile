@@ -64,6 +64,55 @@ test('native login obtains a CSRF token before sending credentials', async () =>
   assert.equal(session.refresh_token, 'refresh-secret');
 });
 
+test('mobile pairing claim sends only the scanned pairing data and generic device label', async () => {
+  let call;
+  const client = createApiClient({
+    baseUrl: 'https://inventory.example',
+    fetchImpl: async (url, options) => {
+      call = {url, options};
+      return jsonResponse({claim_token: 'short-lived-claim', expires_at: '2026-10-16T00:02:00Z'});
+    },
+  });
+
+  const claim = await client.claimMobilePairing('sparesflow://pair?token=one-time-token', 'Android phone');
+
+  assert.equal(call.url, 'https://inventory.example/api/v1/auth/mobile-pairing/claim');
+  assert.equal(call.options.method, 'POST');
+  assert.equal(call.options.credentials, 'omit');
+  assert.deepEqual(JSON.parse(call.options.body), {
+    qr_data: 'sparesflow://pair?token=one-time-token', device_name: 'Android phone',
+  });
+  assert.deepEqual(claim, {claimToken: 'short-lived-claim', expiresAt: '2026-10-16T00:02:00Z'});
+});
+
+test('mobile pairing polls without exposing the claim token in the URL', async () => {
+  let call;
+  const client = createApiClient({
+    baseUrl: 'https://inventory.example',
+    fetchImpl: async (url, options) => {
+      call = {url, options};
+      return jsonResponse({status: 'pending'});
+    },
+  });
+
+  assert.deepEqual(await client.completeMobilePairing('short-lived-claim'), {status: 'pending'});
+  assert.equal(call.url, 'https://inventory.example/api/v1/auth/mobile-pairing/complete');
+  assert.equal(call.options.credentials, 'omit');
+  assert.deepEqual(JSON.parse(call.options.body), {claim_token: 'short-lived-claim'});
+});
+
+test('mobile pairing returns an approved native session only after desktop approval', async () => {
+  const client = createApiClient({
+    baseUrl: 'https://inventory.example',
+    fetchImpl: async () => jsonResponse({status: 'approved', ...nativeLoginResponse()}),
+  });
+
+  const result = await client.completeMobilePairing('short-lived-claim');
+  assert.equal(result.status, 'approved');
+  assert.equal(result.session.access_token, 'opaque-secret');
+  assert.equal(result.session.user.email, 'member@example.test');
+});
+
 test('native login accepts an omitted optional territory as null', async () => {
   const loginResponse = nativeLoginResponse({
     user: {id: 7, email: 'member@example.test', name: 'Member', role: 'manager'},
