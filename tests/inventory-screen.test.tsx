@@ -1,4 +1,5 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {Keyboard} from 'react-native';
 import {api} from '../src/api/runtime';
 import InventoryScreen from '../src/app/index';
 import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/inventory/inventorySnapshot';
@@ -68,6 +69,30 @@ describe('inventory sign-in flow', () => {
       pathname: '/inventory/[itemId]',
       params: {itemId: '2'},
     });
+  });
+
+  it('dismisses the keyboard on search submit and before opening a stock item', async () => {
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeTruthy());
+    await fireEvent.changeText(screen.getByLabelText('Email address'), 'field@company.example');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'preview-password');
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign in'}));
+    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss');
+    const searchInput = screen.getByLabelText('Search inventory');
+    await fireEvent.changeText(searchInput, '110245012');
+    await fireEvent(searchInput, 'submitEditing');
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'}));
+    expect(dismissKeyboard).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/inventory/[itemId]',
+      params: {itemId: '2'},
+    });
+    dismissKeyboard.mockRestore();
   });
 
   it('filters inventory status and combines the filter with local search', async () => {
