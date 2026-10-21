@@ -197,6 +197,14 @@ export default function InventoryScreen() {
     return sortInventory(filtered, inventorySort);
   }, [inventory, search, inventoryFilter, inventorySort]);
 
+  const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
+
+  function clearInventoryCriteria() {
+    setSearch('');
+    setInventoryFilter('all');
+    setInventorySort('default');
+  }
+
   if (!isReady || (loading && !user && hasSession)) {
     return <LoadingScreen message="Checking your session…" />;
   }
@@ -301,12 +309,23 @@ export default function InventoryScreen() {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>{search || inventoryFilter !== 'all' ? 'No matching stock' : 'No stock to show'}</Text>
+                <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>
-                  {search || inventoryFilter !== 'all'
+                  {hasInventoryCriteria
                     ? 'Try changing your search or filter.'
                     : 'Pull down to refresh your inventory.'}
                 </Text>
+                {hasInventoryCriteria && inventory.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear search and filters"
+                    accessibilityHint="Clears the search, shows all stock, and restores the default sort"
+                    onPress={clearInventoryCriteria}
+                    style={styles.emptyResetButton}
+                  >
+                    <Text style={styles.emptyResetText}>Clear search and filters</Text>
+                  </Pressable>
+                )}
               </View>
             }
             renderItem={({item: row}) => {
@@ -498,6 +517,8 @@ const styles = StyleSheet.create({
   threshold: {fontSize: 11, color: palette.muted},
   emptyState: {alignItems: 'center', paddingHorizontal: 24, paddingTop: 70},
   emptyTitle: {fontSize: 17, fontWeight: '800', color: palette.text},
+  emptyResetButton: {minHeight: 44, justifyContent: 'center', marginTop: 15, paddingHorizontal: 16, borderWidth: 1, borderColor: palette.amber, borderRadius: 22, backgroundColor: palette.white},
+  emptyResetText: {fontSize: 13, fontWeight: '800', color: palette.navy},
   loginScreen: {flex: 1},
   loginContent: {flexGrow: 1, padding: 18, justifyContent: 'center'},
   hero: {paddingHorizontal: 22, paddingTop: 26, paddingBottom: 30, backgroundColor: palette.navy, borderTopLeftRadius: 24, borderTopRightRadius: 24},
