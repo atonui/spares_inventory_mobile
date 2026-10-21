@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -263,6 +264,7 @@ export default function InventoryScreen() {
               placeholderTextColor={palette.placeholder}
               style={styles.searchInput}
               returnKeyType="search"
+              onSubmitEditing={() => Keyboard.dismiss()}
             />
             {search.length > 0 && (
               <Pressable
@@ -360,7 +362,10 @@ export default function InventoryScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`View ${row.partNumber}, ${row.description}`}
                   accessibilityHint="Opens stock details"
-                  onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}})}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}});
+                  }}
                   style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
                 >
                   <View style={styles.cardTop}>
