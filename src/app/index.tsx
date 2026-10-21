@@ -229,6 +229,7 @@ export default function InventoryScreen() {
   }, {all: 0, lowStock: 0, available: 0, allocated: 0}), [inventory]);
 
   function clearInventoryCriteria() {
+    Keyboard.dismiss();
     setSearch('');
     setInventoryFilter('all');
     setInventorySort('default');
