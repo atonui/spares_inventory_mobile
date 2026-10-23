@@ -7,7 +7,8 @@ import {secureSessionStore} from './sessionStore';
 const config = resolveAppConfig({
   isRelease: !__DEV__,
   apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
-  forceMockData: Constants.expoConfig?.extra?.appVariant === 'demo',
+  forceMockData: process.env.EXPO_PUBLIC_APP_VARIANT === 'demo' ||
+    Constants.expoConfig?.extra?.appVariant === 'demo',
 });
 
 export const isMockMode = config.useMockApi;
