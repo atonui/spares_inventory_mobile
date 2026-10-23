@@ -2,9 +2,12 @@ import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import {api} from '../src/api/runtime';
 import InventoryItemDetailScreen from '../src/app/inventory/[itemId]';
 import {clearInventorySnapshot, setInventorySnapshot} from '../src/features/inventory/inventorySnapshot';
+import type {NativeUser} from '../src/api/client';
+import type {InventoryItem} from '../src/features/inventory/inventoryRepository';
 
 const mockBack = jest.fn();
 let mockItemId = '2';
+let mockProfile: NativeUser | null = null;
 
 jest.mock('expo-network', () => ({addNetworkStateListener: () => ({remove: jest.fn()})}));
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
@@ -12,8 +15,8 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
     list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
     markConflict: async () => undefined,
     saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
-    saveProfile: async () => undefined, loadProfile: async () => null,
-    getActiveUserId: async () => null, setActiveUserId: async () => undefined,
+    saveProfile: async () => undefined, loadProfile: async () => mockProfile,
+    getActiveUserId: async () => 1, setActiveUserId: async () => undefined,
   },
 }));
 
@@ -28,6 +31,7 @@ describe('inventory item detail screen', () => {
     clearInventorySnapshot();
     mockBack.mockClear();
     mockItemId = '2';
+    mockProfile = null;
   });
 
   it('loads a mock inventory row by route ID and shows its details', async () => {
@@ -66,5 +70,50 @@ describe('inventory item detail screen', () => {
     await waitFor(() => expect(screen.getByText('Stock details')).toBeTruthy());
     expect(screen.getByText('110245012')).toBeTruthy();
     expect(inventoryRequest).not.toHaveBeenCalled();
+  });
+
+  it('shows stock actions for a manager assigned to the inventory store', async () => {
+    const row: InventoryItem = {
+      id: 88, partId: 3, storeId: 8, partNumber: 'PART-88', description: 'Pump seal',
+      storeName: 'My van', storeType: 'engineer', storeOwner: 1, quantity: 4,
+      minThreshold: 1, isAllocated: false, workOrder: null,
+    };
+    mockProfile = {id: 1, email: 'worker@example.com', name: 'Worker', role: 'manager', territory: null};
+    mockItemId = '88';
+    setInventorySnapshot([row]);
+    const screen = await render(<InventoryItemDetailScreen />);
+
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Add stock'})).toBeTruthy());
+    expect(screen.getByRole('button', {name: 'Edit count'})).toBeTruthy();
+  });
+
+  it('hides stock actions for an engineer assigned to a different store', async () => {
+    const row: InventoryItem = {
+      id: 89, partId: 3, storeId: 9, partNumber: 'PART-89', description: 'Pump seal',
+      storeName: 'Other van', storeType: 'engineer', storeOwner: 2, quantity: 4,
+      minThreshold: 1, isAllocated: false, workOrder: null,
+    };
+    mockProfile = {id: 1, email: 'worker@example.com', name: 'Worker', role: 'engineer', territory: null};
+    mockItemId = '89';
+    setInventorySnapshot([row]);
+    const screen = await render(<InventoryItemDetailScreen />);
+
+    await waitFor(() => expect(screen.getByText('PART-89')).toBeTruthy());
+    expect(screen.queryByRole('button', {name: 'Add stock'})).toBeNull();
+    expect(screen.getByText('Stock adjustments are limited to central and assigned stores.')).toBeTruthy();
+  });
+
+  it('allows an admin to adjust unallocated stock outside their assignment', async () => {
+    const row: InventoryItem = {
+      id: 90, partId: 3, storeId: 10, partNumber: 'PART-90', description: 'Pump seal',
+      storeName: 'Other van', storeType: 'engineer', storeOwner: 2, quantity: 4,
+      minThreshold: 1, isAllocated: false, workOrder: null,
+    };
+    mockProfile = {id: 1, email: 'admin@example.com', name: 'Admin', role: 'admin', territory: null};
+    mockItemId = '90';
+    setInventorySnapshot([row]);
+    const screen = await render(<InventoryItemDetailScreen />);
+
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Add stock'})).toBeTruthy());
   });
 });

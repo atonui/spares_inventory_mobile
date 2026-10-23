@@ -3,7 +3,7 @@ import {ActivityIndicator, Image, Pressable, StyleSheet, Text, View} from 'react
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api} from '../../api/runtime';
-import type {InventoryRow} from '../../api/client';
+import type {InventoryRow, NativeUser} from '../../api/client';
 import {getCachedInventoryItem, setInventorySnapshot, updateInventorySnapshotItem} from '../../features/inventory/inventorySnapshot';
 import {InventoryItemDetails} from '../../features/inventory/InventoryItemDetails';
 import {applyQueuedStockCounts} from '../../features/inventory/offlineStockQueue';
@@ -17,6 +17,7 @@ export default function InventoryItemDetailScreen() {
   const [item, setItem] = useState<InventoryRow | null>(null);
   const [status, setStatus] = useState<DetailStatus>('loading');
   const [userId, setUserId] = useState<number | null>(null);
+  const [user, setUser] = useState<NativeUser | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -30,24 +31,58 @@ export default function InventoryItemDetailScreen() {
         return;
       }
 
-      let currentUserId = /^\d+$/.test(userIdParam ?? '') ? Number(userIdParam) : null;
+      const requestedUserId = /^\d+$/.test(userIdParam ?? '') ? Number(userIdParam) : null;
+      let storedActiveUserId: number | null = null;
+      try { storedActiveUserId = await offlineStockStore.getActiveUserId(); }
+      catch { storedActiveUserId = null; }
+      let currentUserId = storedActiveUserId ?? requestedUserId;
       if (currentUserId !== null && active) setUserId(currentUserId);
+      let savedProfile: NativeUser | null = null;
+      if (currentUserId !== null) {
+        try { savedProfile = await offlineStockStore.loadProfile(currentUserId); }
+        catch { savedProfile = null; }
+      }
+      if (savedProfile?.id !== currentUserId) savedProfile = null;
+      if (savedProfile && active) setUser(savedProfile);
       const cachedItem = getCachedInventoryItem(Number(itemId));
       if (cachedItem !== undefined && currentUserId !== null) {
         if (active) {
           setItem(cachedItem);
           setStatus(cachedItem ? 'ready' : 'not-found');
         }
+        if (!savedProfile) {
+          try {
+            const currentUser = await api.getMe();
+            if (currentUser.id === currentUserId && active) {
+              setUser(currentUser);
+              await offlineStockStore.saveProfile(currentUser);
+            }
+          } catch { /* Keep the stock details available offline; controls stay hidden without a profile. */ }
+        }
         return;
       }
 
       try {
         if (currentUserId === null) {
-          currentUserId = (await api.getMe()).id;
+          const currentUser = await api.getMe();
+          currentUserId = currentUser.id;
+          savedProfile = currentUser;
+          await offlineStockStore.saveProfile(currentUser);
+          if (active) setUser(currentUser);
           if (active) setUserId(currentUserId);
         }
         const activeUserId = currentUserId;
         const serverRows = await api.getInventory();
+        if (!savedProfile) {
+          try {
+            const currentUser = await api.getMe();
+            if (currentUser.id === activeUserId) {
+              savedProfile = currentUser;
+              await offlineStockStore.saveProfile(currentUser);
+              if (active) setUser(currentUser);
+            }
+          } catch { /* Stock details still work offline without exposing adjustment controls. */ }
+        }
         const rows = applyQueuedStockCounts(serverRows, await offlineStockStore.list(activeUserId));
         if (!active) return;
         setInventorySnapshot(rows);
@@ -110,6 +145,7 @@ export default function InventoryItemDetailScreen() {
         {status === 'ready' && item && userId !== null && (
           <InventoryItemDetails
             item={item}
+            user={user}
             userId={userId}
             onQuantityChange={quantity => {
               setItem(current => {

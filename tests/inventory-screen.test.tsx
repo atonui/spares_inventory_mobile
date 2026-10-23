@@ -166,6 +166,15 @@ describe('inventory device-pairing flow', () => {
     });
   });
 
+  it('opens inventory scanning with the signed-in user scope', async () => {
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Scan barcode or QR code'}));
+
+    expect(mockPush).toHaveBeenCalledWith({pathname: '/scan', params: {userId: '1'}});
+  });
+
   it('dismisses the keyboard on search submit and before opening a stock item', async () => {
     const screen = await render(<InventoryScreen />);
 

@@ -170,6 +170,7 @@ export default function InventoryScreen() {
           setHasSession(true);
           const currentUser = await api.getMe();
           setUser(currentUser);
+          await offlineStockStore.saveProfile(currentUser);
           await loadInventory(currentUser.id);
           return;
         }
@@ -296,6 +297,14 @@ export default function InventoryScreen() {
               <Text style={styles.wordmark}>Spares Tracker</Text>
               <Text style={styles.pageTitle}>Inventory</Text>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Scan barcode or QR code"
+              onPress={() => router.push({pathname: '/scan', params: {userId: String(user.id)}})}
+              style={styles.signOutButton}
+            >
+              <Text style={styles.signOutText}>Scan</Text>
+            </Pressable>
             <Pressable accessibilityRole="button" onPress={signOut} disabled={loading} style={styles.signOutButton}>
               <Text style={styles.signOutText}>{loading ? '…' : 'Sign out'}</Text>
             </Pressable>
