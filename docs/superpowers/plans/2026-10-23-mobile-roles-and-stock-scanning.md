@@ -93,4 +93,4 @@
 - [x] Run `npm test`, `npm run test:api`, `npm run typecheck`, and `npm run lint`.
 - [x] Run native bundle export for Android and iOS.
 - [ ] Re-run `npm run check:mobile-api-contract` after `SAAS_API_BASE_URL` is available for a SaaS/PostgreSQL environment. Current attempt stopped safely with the documented missing-URL message.
-- [ ] Review the complete diff and open a PR on a feature branch.
+- [x] Review the complete diff and open PR #36 on `feat/mobile-role-aware-scanning`.
