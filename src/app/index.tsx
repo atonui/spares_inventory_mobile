@@ -15,10 +15,13 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter} from 'expo-router';
+import * as Network from 'expo-network';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
 import {clearInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
+import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
+import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import DesktopPairing from '../features/auth/DesktopPairing';
 
 function responseMessage(error: unknown): string {
@@ -56,12 +59,29 @@ export default function InventoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const pairingCancelledRef = useRef(false);
+  const syncInFlightRef = useRef<Promise<unknown> | null>(null);
   const [search, setSearch] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
   const [inventorySort, setInventorySort] = useState<InventorySort>('default');
 
-  const loadInventory = useCallback(async () => {
-    const rows = await api.getInventory();
+  const loadInventory = useCallback(async (userId: number) => {
+    if (!syncInFlightRef.current) {
+      syncInFlightRef.current = syncQueuedStock(offlineStockStore, userId, api.adjustStock)
+        .finally(() => { syncInFlightRef.current = null; });
+    }
+    await syncInFlightRef.current;
+    let baseRows: InventoryRow[];
+    try {
+      baseRows = await api.getInventory();
+      await offlineStockStore.saveInventorySnapshot(userId, baseRows);
+      setError(current => current.startsWith('Offline mode ·') ? '' : current);
+    } catch (reason) {
+      const cachedRows = await offlineStockStore.loadInventorySnapshot(userId);
+      if (!cachedRows) throw reason;
+      baseRows = cachedRows;
+      setError('Offline mode · showing the last saved inventory. Stock changes stay on this device until synced.');
+    }
+    const rows = applyQueuedStockCounts(baseRows, await offlineStockStore.list(userId));
     setInventory(rows);
     setInventorySnapshot(rows);
   }, []);
@@ -78,9 +98,20 @@ export default function InventoryScreen() {
         return;
       }
       setHasSession(true);
-      const currentUser = await api.getMe();
+      let currentUser: NativeUser;
+      try {
+        currentUser = await api.getMe();
+        await offlineStockStore.saveProfile(currentUser);
+      } catch (reason) {
+        if (reason instanceof ApiError && [401, 403].includes(reason.status)) throw reason;
+        const activeUserId = await offlineStockStore.getActiveUserId();
+        const savedProfile = activeUserId === null ? null : await offlineStockStore.loadProfile(activeUserId);
+        if (!savedProfile) throw reason;
+        currentUser = savedProfile;
+        setError('Offline mode · showing the last saved inventory. Stock changes stay on this device until synced.');
+      }
       setUser(currentUser);
-      await loadInventory();
+      await loadInventory(currentUser.id);
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
@@ -108,6 +139,16 @@ export default function InventoryScreen() {
     return () => { active = false; };
   }, [restoreSession]);
 
+  useEffect(() => {
+    if (!hasSession || !user) return;
+    const subscription = Network.addNetworkStateListener(state => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        void loadInventory(user.id).catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, [hasSession, user, loadInventory]);
+
   async function pairWithDesktop(qrData: string, onApprovalRequired: () => void) {
     setError('');
     setLoading(true);
@@ -129,7 +170,7 @@ export default function InventoryScreen() {
           setHasSession(true);
           const currentUser = await api.getMe();
           setUser(currentUser);
-          await loadInventory();
+          await loadInventory(currentUser.id);
           return;
         }
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -160,6 +201,7 @@ export default function InventoryScreen() {
     try {
       const result = await api.logout();
       if (!result.success) throw new ApiError('The server could not confirm sign out.', 0);
+      await offlineStockStore.setActiveUserId(null);
       clearInventorySnapshot();
       setHasSession(false);
       setUser(null);
@@ -168,6 +210,7 @@ export default function InventoryScreen() {
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
+        await offlineStockStore.setActiveUserId(null);
         clearInventorySnapshot();
         setHasSession(false);
         setUser(null);
@@ -185,7 +228,8 @@ export default function InventoryScreen() {
     setRefreshing(true);
     setError('');
     try {
-      await loadInventory();
+      if (!user) return;
+      await loadInventory(user.id);
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
@@ -378,7 +422,7 @@ export default function InventoryScreen() {
                   accessibilityHint="Opens stock details"
                   onPress={() => {
                     Keyboard.dismiss();
-                    router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id)}});
+                    router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id), userId: String(user?.id ?? '')}});
                   }}
                   style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
                 >

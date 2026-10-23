@@ -1,5 +1,6 @@
 import type {MobileApi, NativeLogin, NativeSession, NativeUser} from './client';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
+import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
 
 const previewUser: NativeUser = {
   id: 1,
@@ -69,6 +70,15 @@ export function createMockApiClient(): MobileApi {
       return {...previewUser};
     },
     async getInventory() { return previewInventory.map(row => ({...row})); },
+    async adjustStock(adjustment: QueuedStockAdjustment) {
+      const item = previewInventory.find(row => row.id === adjustment.inventoryId);
+      if (!item) throw new Error('Inventory item not found.');
+      if (item.isAllocated) throw Object.assign(new Error('Allocated stock cannot be adjusted here.'), {status: 409});
+      if (item.quantity !== adjustment.expectedQuantity) {
+        throw Object.assign(new Error('Stock changed since this count was recorded.'), {status: 409});
+      }
+      item.quantity = adjustment.newQuantity;
+    },
     async logout() {
       if (!session) throw new Error('Please sign in to continue.');
       session = null;

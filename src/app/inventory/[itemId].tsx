@@ -4,16 +4,19 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api} from '../../api/runtime';
 import type {InventoryRow} from '../../api/client';
-import {getCachedInventoryItem, setInventorySnapshot} from '../../features/inventory/inventorySnapshot';
+import {getCachedInventoryItem, setInventorySnapshot, updateInventorySnapshotItem} from '../../features/inventory/inventorySnapshot';
 import {InventoryItemDetails} from '../../features/inventory/InventoryItemDetails';
+import {applyQueuedStockCounts} from '../../features/inventory/offlineStockQueue';
+import {offlineStockStore} from '../../features/inventory/offlineStockStore';
 
 type DetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
 
 export default function InventoryItemDetailScreen() {
-  const {itemId} = useLocalSearchParams<{itemId: string}>();
+  const {itemId, userId: userIdParam} = useLocalSearchParams<{itemId: string; userId?: string}>();
   const router = useRouter();
   const [item, setItem] = useState<InventoryRow | null>(null);
   const [status, setStatus] = useState<DetailStatus>('loading');
+  const [userId, setUserId] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -27,8 +30,10 @@ export default function InventoryItemDetailScreen() {
         return;
       }
 
+      let currentUserId = /^\d+$/.test(userIdParam ?? '') ? Number(userIdParam) : null;
+      if (currentUserId !== null && active) setUserId(currentUserId);
       const cachedItem = getCachedInventoryItem(Number(itemId));
-      if (cachedItem !== undefined) {
+      if (cachedItem !== undefined && currentUserId !== null) {
         if (active) {
           setItem(cachedItem);
           setStatus(cachedItem ? 'ready' : 'not-found');
@@ -37,7 +42,13 @@ export default function InventoryItemDetailScreen() {
       }
 
       try {
-        const rows = await api.getInventory();
+        if (currentUserId === null) {
+          currentUserId = (await api.getMe()).id;
+          if (active) setUserId(currentUserId);
+        }
+        const activeUserId = currentUserId;
+        const serverRows = await api.getInventory();
+        const rows = applyQueuedStockCounts(serverRows, await offlineStockStore.list(activeUserId));
         if (!active) return;
         setInventorySnapshot(rows);
         const found = rows.find(row => row.id === Number(itemId)) ?? null;
@@ -51,7 +62,7 @@ export default function InventoryItemDetailScreen() {
     };
     void Promise.resolve().then(loadItem);
     return () => { active = false; };
-  }, [itemId, attempt]);
+  }, [itemId, userIdParam, attempt]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -96,7 +107,20 @@ export default function InventoryItemDetailScreen() {
           </View>
         )}
 
-        {status === 'ready' && item && <InventoryItemDetails item={item} />}
+        {status === 'ready' && item && userId !== null && (
+          <InventoryItemDetails
+            item={item}
+            userId={userId}
+            onQuantityChange={quantity => {
+              setItem(current => {
+                if (!current) return current;
+                const updated = {...current, quantity};
+                updateInventorySnapshotItem(updated);
+                return updated;
+              });
+            }}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

@@ -1,5 +1,6 @@
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import type {InventoryRow} from '../../api/client';
+import {StockAdjustmentControls} from './StockAdjustmentControls';
 
 const palette = {
   navy: '#15263B',
@@ -9,7 +10,11 @@ const palette = {
   text: '#15263B',
 };
 
-export function InventoryItemDetails({item}: {item: InventoryRow}) {
+export function InventoryItemDetails({item, userId, onQuantityChange}: {
+  item: InventoryRow;
+  userId: number;
+  onQuantityChange: (quantity: number) => void;
+}) {
   const lowStock = item.quantity <= item.minThreshold;
 
   return (
@@ -33,6 +38,8 @@ export function InventoryItemDetails({item}: {item: InventoryRow}) {
         <DetailField label="Availability" value={item.isAllocated ? 'Allocated' : 'Available'} />
         {item.workOrder && <DetailField label="Work order" value={item.workOrder} />}
       </View>
+
+      <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} />
 
       <View style={styles.card}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>Storage location</Text>

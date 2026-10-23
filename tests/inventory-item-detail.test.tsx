@@ -6,9 +6,20 @@ import {clearInventorySnapshot, setInventorySnapshot} from '../src/features/inve
 const mockBack = jest.fn();
 let mockItemId = '2';
 
+jest.mock('expo-network', () => ({addNetworkStateListener: () => ({remove: jest.fn()})}));
+jest.mock('../src/features/inventory/offlineStockStore', () => ({
+  offlineStockStore: {
+    list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
+    markConflict: async () => undefined,
+    saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
+    saveProfile: async () => undefined, loadProfile: async () => null,
+    getActiveUserId: async () => null, setActiveUserId: async () => undefined,
+  },
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({back: mockBack}),
-  useLocalSearchParams: () => ({itemId: mockItemId}),
+  useLocalSearchParams: () => ({itemId: mockItemId, userId: '1'}),
 }));
 
 describe('inventory item detail screen', () => {
@@ -19,7 +30,7 @@ describe('inventory item detail screen', () => {
     mockItemId = '2';
   });
 
-  it('loads a mock inventory row by route ID and shows its read-only details', async () => {
+  it('loads a mock inventory row by route ID and shows its details', async () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
     await waitFor(() => expect(screen.getByText('Stock details')).toBeTruthy());
