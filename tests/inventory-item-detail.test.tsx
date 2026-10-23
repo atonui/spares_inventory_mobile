@@ -23,7 +23,7 @@ describe('inventory item detail screen', () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
     await waitFor(() => expect(screen.getByText('Stock details')).toBeTruthy());
-    expect(screen.getByText('SparesFlow')).toBeTruthy();
+    expect(screen.getByText('Spares Tracker')).toBeTruthy();
     expect(screen.getByText('110245012')).toBeTruthy();
     expect(screen.getByText('PCB THYRATRON GRID CONTROL')).toBeTruthy();
     expect(screen.getByText('1 unit')).toBeTruthy();

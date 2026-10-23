@@ -3,7 +3,7 @@ import type {InventoryRow} from '../../api/client';
 
 const palette = {
   navy: '#15263B',
-  muted: '#475569',
+  muted: '#64748B',
   border: '#CBD5E1',
   white: '#FFFFFF',
   text: '#15263B',

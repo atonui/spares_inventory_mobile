@@ -247,9 +247,9 @@ export default function InventoryScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.screen}>
           <View style={styles.topBar}>
-            <View style={styles.brandMark}><Image source={require('../../assets/android-icon-foreground.png')} style={styles.brandIcon} /></View>
+            <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandIcon} /></View>
             <View style={styles.brandCopy}>
-              <Text style={styles.wordmark}>SparesFlow</Text>
+              <Text style={styles.wordmark}>Spares Tracker</Text>
               <Text style={styles.pageTitle}>Inventory</Text>
             </View>
             <Pressable accessibilityRole="button" onPress={signOut} disabled={loading} style={styles.signOutButton}>
@@ -413,8 +413,8 @@ export default function InventoryScreen() {
       <ScrollView contentContainerStyle={styles.onboardingContent} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
             <View style={styles.heroBrandRow}>
-              <View style={styles.heroMark}><Image source={require('../../assets/android-icon-foreground.png')} style={styles.heroBrandIcon} /></View>
-              <Text style={styles.heroWordmark}>SparesFlow</Text>
+              <View style={styles.heroMark}><Image source={require('../../assets/icon.png')} style={styles.heroBrandIcon} /></View>
+              <Text style={styles.heroWordmark}>Spares Tracker</Text>
             </View>
             <Text style={styles.heroLabel}>INVENTORY MANAGEMENT</Text>
             <Text style={styles.heroTitle}>Everything in its place.</Text>
@@ -454,7 +454,7 @@ const palette = {
   white: '#FFFFFF',
   text: '#15263B',
   muted: '#475569',
-  placeholder: '#475569',
+  placeholder: '#64748B',
   border: '#CBD5E1',
   red: '#A13A32',
   redTint: '#FFF0EE',
@@ -464,8 +464,8 @@ const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
   screen: {flex: 1, paddingHorizontal: 20},
   topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: palette.border},
-  brandMark: {width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.navy},
-  brandIcon: {width: 31, height: 31},
+  brandMark: {width: 42, height: 42, borderRadius: 13, overflow: 'hidden'},
+  brandIcon: {width: 42, height: 42},
   brandCopy: {flex: 1},
   wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
   pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   cardFooter: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EDF1F4'},
   statusRow: {marginTop: 8},
   availableStatus: {fontSize: 12, fontWeight: '700', color: '#287441'},
-  allocatedStatus: {fontSize: 12, fontWeight: '700', color: '#475569'},
+  allocatedStatus: {fontSize: 12, fontWeight: '700', color: palette.slate},
   storeName: {flex: 1, marginRight: 8, fontSize: 12, fontWeight: '700', color: palette.muted},
   threshold: {fontSize: 11, color: palette.muted},
   emptyState: {alignItems: 'center', paddingHorizontal: 24, paddingTop: 70},
@@ -516,13 +516,13 @@ const styles = StyleSheet.create({
   onboardingContent: {flexGrow: 1, padding: 18, justifyContent: 'center'},
   hero: {paddingHorizontal: 22, paddingTop: 26, paddingBottom: 30, backgroundColor: palette.navy, borderTopLeftRadius: 24, borderTopRightRadius: 24},
   heroBrandRow: {flexDirection: 'row', alignItems: 'center', gap: 12},
-  heroMark: {width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: palette.white},
-  heroBrandIcon: {width: 38, height: 38},
+  heroMark: {width: 48, height: 48, borderRadius: 14, overflow: 'hidden'},
+  heroBrandIcon: {width: 48, height: 48},
   heroWordmark: {fontSize: 23, fontWeight: '800', color: palette.white},
   heroLabel: {marginTop: 16, fontSize: 10, fontWeight: '800', letterSpacing: 1.6, color: palette.amber},
   heroTitle: {marginTop: 9, fontSize: 30, lineHeight: 36, fontWeight: '800', color: palette.white},
   heroSubtitle: {marginTop: 8, fontSize: 15, lineHeight: 23, color: '#C1D0DF'},
-  onboardingFootnote: {marginTop: 14, marginHorizontal: 14, textAlign: 'center', fontSize: 11, lineHeight: 17, color: palette.slate},
+  onboardingFootnote: {marginTop: 14, marginHorizontal: 14, textAlign: 'center', fontSize: 11, lineHeight: 17, color: palette.muted},
   errorNotice: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12, padding: 11, borderRadius: 10, backgroundColor: palette.redTint},
   errorText: {flex: 1, fontSize: 12, lineHeight: 18, color: palette.red},
   retryText: {fontWeight: '800', color: palette.red},

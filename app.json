@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SparesFlow",
+    "name": "Spares Tracker",
     "slug": "inventory-management-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,10 +16,9 @@
     "android": {
       "package": "com.atonui.inventory",
       "adaptiveIcon": {
-        "backgroundColor": "#15263B",
+        "backgroundColor": "#F5F7FA",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundImage": "./assets/android-icon-background.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -33,7 +32,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "SparesFlow uses the camera only to scan a one-time mobile pairing code.",
+          "cameraPermission": "Spares Tracker uses the camera only to scan a one-time mobile pairing code.",
           "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
