@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {CameraView, useCameraPermissions} from 'expo-camera';
-import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Image, Pressable, StyleSheet, Text, View} from 'react-native';
 
 const palette = {
   navy: '#15263B',
@@ -56,7 +56,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel}: Props) {
   return (
     <View style={styles.page}>
       <View style={styles.brandMark} accessibilityElementsHidden>
-        <Text style={styles.brandGlyph}>▰</Text>
+        <Image source={require('../../../assets/icon.png')} style={styles.brandIcon} />
       </View>
       <Text accessibilityRole="header" style={styles.title}>
         {phase === 'pending' ? 'Approve this device' : 'Sign in through your desktop account'}
@@ -99,7 +99,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel}: Props) {
           ) : (
             <View style={styles.permissionCard}>
               <Text style={styles.permissionTitle}>Camera access is needed to scan your QR code</Text>
-              <Text style={styles.permissionBody}>SparesFlow uses the camera for QR scanning only.</Text>
+              <Text style={styles.permissionBody}>Spares Tracker uses the camera for QR scanning only.</Text>
               {!!permission && !permission.canAskAgain ? (
                 <Text style={styles.permissionBody}>Enable camera access in your device settings, then return here.</Text>
               ) : (
@@ -150,8 +150,8 @@ function Step({number, text}: {number: string; text: string}) {
 
 const styles = StyleSheet.create({
   page: {flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: palette.white, borderRadius: 22, borderWidth: 1, borderColor: palette.border},
-  brandMark: {width: 54, height: 54, marginBottom: 22, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.navy},
-  brandGlyph: {color: palette.amber, fontSize: 22, fontWeight: '900'},
+  brandMark: {width: 54, height: 54, marginBottom: 22, borderRadius: 16, overflow: 'hidden'},
+  brandIcon: {width: 54, height: 54},
   title: {fontSize: 27, lineHeight: 34, fontWeight: '800', letterSpacing: -0.5, color: palette.navy},
   body: {marginTop: 9, fontSize: 15, lineHeight: 23, color: palette.muted},
   steps: {gap: 14, marginTop: 24, marginBottom: 25},

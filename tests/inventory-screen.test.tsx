@@ -26,7 +26,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
-    expect(screen.getByText('SparesFlow')).toBeTruthy();
+    expect(screen.getByText('Spares Tracker')).toBeTruthy();
     expect(screen.getByText('Everything in its place.')).toBeTruthy();
   });
 
@@ -110,7 +110,7 @@ describe('inventory device-pairing flow', () => {
     await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
-    expect(screen.getByText('SparesFlow')).toBeTruthy();
+    expect(screen.getByText('Spares Tracker')).toBeTruthy();
     expect(screen.getByText('6190901970')).toBeTruthy();
     expect(getCachedInventoryItem(2)?.partNumber).toBe('110245012');
     expect(screen.getAllByText('LOW STOCK').length).toBeGreaterThan(0);
