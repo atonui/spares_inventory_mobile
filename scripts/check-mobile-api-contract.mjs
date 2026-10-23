@@ -7,6 +7,7 @@ const requiredRoutes = [
   ['POST', '/api/v1/auth/mobile-pairing/complete'],
   ['GET', '/api/v1/me'],
   ['GET', '/api/v1/inventory'],
+  ['POST', '/api/v1/inventory/adjustments'],
   ['POST', '/api/v1/auth/logout'],
 ];
 

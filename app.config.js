@@ -12,6 +12,7 @@ export default ({config}) => {
 
   return {
     ...config,
+    plugins: [...(config.plugins ?? []), 'expo-sqlite'],
     name: `${config.name}${label}`,
     ios: {
       ...config.ios,

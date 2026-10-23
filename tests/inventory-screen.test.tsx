@@ -16,6 +16,17 @@ const mockPush = jest.fn();
 const mockBack = jest.fn();
 let mockItemId = '2';
 
+jest.mock('expo-network', () => ({addNetworkStateListener: () => ({remove: jest.fn()})}));
+jest.mock('../src/features/inventory/offlineStockStore', () => ({
+  offlineStockStore: {
+    list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
+    markConflict: async () => undefined,
+    saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
+    saveProfile: async () => undefined, loadProfile: async () => null,
+    getActiveUserId: async () => null, setActiveUserId: async () => undefined,
+  },
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({push: mockPush, back: mockBack}),
   useLocalSearchParams: () => ({itemId: mockItemId}),
@@ -151,7 +162,7 @@ describe('inventory device-pairing flow', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/inventory/[itemId]',
-      params: {itemId: '2'},
+      params: {itemId: '2', userId: '1'},
     });
   });
 
@@ -171,7 +182,7 @@ describe('inventory device-pairing flow', () => {
     expect(dismissKeyboard).toHaveBeenCalledTimes(2);
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/inventory/[itemId]',
-      params: {itemId: '2'},
+      params: {itemId: '2', userId: '1'},
     });
     dismissKeyboard.mockRestore();
   });

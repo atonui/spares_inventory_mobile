@@ -196,11 +196,16 @@ test('authenticated requests send the server session only as a bearer header', a
 
   await client.getMe();
   await client.getInventory();
+  await client.adjustStock({
+    operationId: '6fa457d3-2a56-4c3b-8431-f65761bd49da', userId: 7, inventoryId: 5,
+    expectedQuantity: 4, newQuantity: 9, createdAt: 1, status: 'queued', error: null,
+  });
   await client.logout();
 
   assert.deepEqual(calls.map(call => call.url), [
     'https://inventory.example/api/v1/me',
     'https://inventory.example/api/v1/inventory?limit=50',
+    'https://inventory.example/api/v1/inventory/adjustments',
     'https://inventory.example/api/v1/auth/logout',
   ]);
   for (const call of calls) {
@@ -208,6 +213,12 @@ test('authenticated requests send the server session only as a bearer header', a
     assert.equal(call.options.credentials, 'omit');
   }
   assert.equal(calls[2].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[2].options.body), {
+    operation_id: '6fa457d3-2a56-4c3b-8431-f65761bd49da',
+    inventory_id: 5,
+    expected_quantity: 4,
+    new_quantity: 9,
+  });
 });
 
 test('current-user responses reject malformed records before returning them', async () => {

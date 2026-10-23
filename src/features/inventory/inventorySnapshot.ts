@@ -11,6 +11,11 @@ export function getCachedInventoryItem(id: number): InventoryItem | null | undef
   return snapshot.find(item => item.id === id) ?? null;
 }
 
+export function updateInventorySnapshotItem(item: InventoryItem): void {
+  if (snapshot === null) return;
+  snapshot = snapshot.map(current => current.id === item.id ? {...item} : current);
+}
+
 export function clearInventorySnapshot(): void {
   snapshot = null;
 }

@@ -2,7 +2,7 @@
 
 The approved Spares Tracker SVG logo and mark variants are in `assets/branding/`. Expo uses the supplied icon and Android adaptive icon files in `assets/`.
 
-React Native and Expo client for inventory staff and field-service engineers. The first slice includes invitation-based sign-in, secure session restore/logout, and read-only inventory browsing with local search and refresh.
+React Native and Expo client for inventory staff and field-service engineers. It supports desktop-approved pairing, secure session restore/logout, searchable inventory, stock counts, and offline stock changes that sync when connectivity returns.
 
 ## Checks
 
@@ -13,4 +13,4 @@ npm run typecheck
 npm run bundle:native
 ```
 
-See `docs/superpowers/specs/2026-10-17-expo-mobile-client-design.md` for the API contract, security boundaries, and UI behavior.
+See `docs/superpowers/specs/2026-10-17-expo-mobile-client-design.md` for the original API and session design, and `docs/superpowers/specs/2026-10-23-offline-stock-adjustments.md` for stock editing and offline sync behavior.

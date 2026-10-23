@@ -3,6 +3,7 @@ import {
   parseInventoryPage,
   type InventoryItem,
 } from '../features/inventory/inventoryRepository.ts';
+import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
 
 export type NativeUser = {
   id: number;
@@ -321,6 +322,20 @@ export function createApiClient({
           }
         },
       }));
+    },
+    adjustStock(adjustment: QueuedStockAdjustment): Promise<void> {
+      return authenticated(async token => {
+        await request('/api/v1/inventory/adjustments', {
+          token,
+          method: 'POST',
+          body: {
+            operation_id: adjustment.operationId,
+            inventory_id: adjustment.inventoryId,
+            expected_quantity: adjustment.expectedQuantity,
+            new_quantity: adjustment.newQuantity,
+          },
+        });
+      });
     },
     logout() {
       return authenticated(async token => {
