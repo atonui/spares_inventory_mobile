@@ -1,5 +1,6 @@
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
-import type {InventoryRow} from '../../api/client';
+import type {InventoryRow, NativeUser} from '../../api/client';
+import {canAdjustStock} from '../auth/roleCapabilities';
 import {StockAdjustmentControls} from './StockAdjustmentControls';
 
 const palette = {
@@ -10,12 +11,14 @@ const palette = {
   text: '#15263B',
 };
 
-export function InventoryItemDetails({item, userId, onQuantityChange}: {
+export function InventoryItemDetails({item, user, userId, onQuantityChange}: {
   item: InventoryRow;
+  user: NativeUser | null;
   userId: number;
   onQuantityChange: (quantity: number) => void;
 }) {
   const lowStock = item.quantity <= item.minThreshold;
+  const canChangeStock = user?.id === userId && canAdjustStock(user, item);
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -39,7 +42,14 @@ export function InventoryItemDetails({item, userId, onQuantityChange}: {
         {item.workOrder && <DetailField label="Work order" value={item.workOrder} />}
       </View>
 
-      <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} />
+      {!item.isAllocated && canChangeStock && (
+        <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} />
+      )}
+      {!item.isAllocated && user?.id === userId && !canChangeStock && (
+        <View accessibilityRole="text" style={styles.accessNotice}>
+          <Text style={styles.accessNoticeText}>Stock adjustments are limited to central and assigned stores.</Text>
+        </View>
+      )}
 
       <View style={styles.card}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>Storage location</Text>
@@ -79,6 +89,8 @@ const styles = StyleSheet.create({
   lowStockBadge: {backgroundColor: '#FCE8D9'},
   lowStockText: {color: '#8A3E18'},
   card: {padding: 16, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  accessNotice: {padding: 14, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  accessNoticeText: {fontSize: 13, lineHeight: 19, color: palette.muted},
   sectionTitle: {marginBottom: 4, fontSize: 15, fontWeight: '800', color: palette.navy},
   field: {flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#EDF1F4'},
   label: {flex: 1, fontSize: 13, color: palette.muted},
