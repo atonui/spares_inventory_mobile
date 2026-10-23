@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api} from '../../api/runtime';
@@ -65,8 +65,9 @@ export default function InventoryItemDetailScreen() {
           >
             <Text style={styles.backButtonText}>‹</Text>
           </Pressable>
+          <Image source={require('../../../assets/icon.png')} style={styles.brandIcon} accessible={false} />
           <View>
-            <Text style={styles.wordmark}>SparesFlow</Text>
+            <Text style={styles.wordmark}>Spares Tracker</Text>
             <Text accessibilityRole="header" style={styles.pageTitle}>Stock details</Text>
           </View>
         </View>
@@ -113,6 +114,7 @@ const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
   screen: {flex: 1, paddingHorizontal: 20},
   topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#CBD5E1'},
+  brandIcon: {width: 40, height: 40, borderRadius: 12},
   backButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
   backButtonText: {fontSize: 30, lineHeight: 33, color: palette.navy},
   wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},

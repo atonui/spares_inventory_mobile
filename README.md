@@ -1,4 +1,6 @@
-# SparesFlow Mobile
+# Spares Tracker Mobile
+
+The approved Spares Tracker SVG logo and mark variants are in `assets/branding/`. Expo uses the supplied icon and Android adaptive icon files in `assets/`.
 
 React Native and Expo client for inventory staff and field-service engineers. The first slice includes invitation-based sign-in, secure session restore/logout, and read-only inventory browsing with local search and refresh.
 
