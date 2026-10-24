@@ -81,12 +81,13 @@ describe('inventory scanner screen', () => {
     const screen = await render(<InventoryScanScreen />);
 
     await fireEvent.press(screen.getByRole('button', {name: 'Simulate camera scan'}));
-    expect(screen.getByText('2 matching stock records')).toBeTruthy();
+    expect(screen.getByText('Stock found in 2 locations')).toBeTruthy();
+    expect(screen.getByText('Choose the store you’re checking.')).toBeTruthy();
     expect(screen.getByText('Central store')).toBeTruthy();
     expect(screen.getByText('Field van')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
 
-    await fireEvent.press(screen.getByRole('button', {name: 'Open PN-0042 at Field van'}));
+    await fireEvent.press(screen.getByRole('button', {name: 'View PN-0042 at Field van, 8 units'}));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/inventory/[itemId]',
       params: {itemId: '43', userId: '7'},
@@ -99,7 +100,9 @@ describe('inventory scanner screen', () => {
     const screen = await render(<InventoryScanScreen />);
 
     await fireEvent.press(screen.getByRole('button', {name: 'Simulate camera scan'}));
-    expect(screen.getByText('No stock found for UNKNOWN-99')).toBeTruthy();
+    expect(screen.getByText('No matching part number')).toBeTruthy();
+    expect(screen.getByText('UNKNOWN-99')).toBeTruthy();
+    expect(screen.getByText(/exact part numbers in the inventory saved on this device/)).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Scan again'})).toBeTruthy();
   });
 

@@ -186,18 +186,21 @@ export default function InventoryScanScreen() {
               <View style={styles.results}>
                 {matches.length === 0 ? (
                   <>
-                    <Text style={styles.resultsTitle}>No stock found for {scannedValue}</Text>
-                    <Text style={styles.messageText}>This code did not match a part number in the saved inventory.</Text>
+                    <Text accessibilityRole="header" style={styles.resultsTitle}>No matching part number</Text>
+                    <Text style={styles.scannedCodeLabel}>Scanned code</Text>
+                    <Text selectable style={styles.scannedCode}>{scannedValue}</Text>
+                    <Text style={styles.messageText}>This scan checks exact part numbers in the inventory saved on this device. Refresh Inventory or check the code and try again.</Text>
                   </>
                 ) : (
                   <>
                     <Text accessibilityRole="header" style={styles.resultsTitle}>
-                      {matches.length} matching stock {matches.length === 1 ? 'record' : 'records'}
+                      {matches.length === 1 ? '1 matching stock record' : `Stock found in ${matches.length} locations`}
                     </Text>
+                    {matches.length > 1 && <Text style={styles.resultHint}>Choose the store you’re checking.</Text>}
                     {matches.map(item => (
                       <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel={`Open ${item.partNumber} at ${item.storeName}`}
+                        accessibilityLabel={`View ${item.partNumber} at ${item.storeName}, ${item.quantity} ${item.quantity === 1 ? 'unit' : 'units'}`}
                         key={item.id}
                         onPress={() => openItem(item)}
                         style={styles.resultCard}
@@ -206,8 +209,9 @@ export default function InventoryScanScreen() {
                           <Text style={styles.resultPart}>{item.partNumber}</Text>
                           <Text style={styles.resultDescription}>{item.description}</Text>
                           <Text style={styles.resultStore}>{item.storeName}</Text>
+                          <Text style={styles.resultAction}>View stock details</Text>
                         </View>
-                        <Text style={styles.resultQuantity}>{item.quantity}</Text>
+                        <Text style={styles.resultQuantity}>{item.quantity} <Text style={styles.resultUnit}>{item.quantity === 1 ? 'unit' : 'units'}</Text></Text>
                       </Pressable>
                     ))}
                   </>
@@ -250,10 +254,15 @@ const styles = StyleSheet.create({
   secondaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   results: {marginTop: 16, padding: 14, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   resultsTitle: {fontSize: 16, fontWeight: '800', color: palette.navy},
+  scannedCodeLabel: {marginTop: 12, fontSize: 12, fontWeight: '700', color: palette.slate},
+  scannedCode: {marginTop: 3, fontSize: 16, lineHeight: 22, fontWeight: '700', color: palette.navy},
+  resultHint: {marginTop: 5, fontSize: 13, lineHeight: 19, color: palette.slate},
   resultCard: {minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border},
   resultCopy: {flex: 1},
   resultPart: {fontSize: 14, fontWeight: '800', color: palette.navy},
   resultDescription: {marginTop: 2, fontSize: 13, color: palette.muted},
   resultStore: {marginTop: 4, fontSize: 12, fontWeight: '700', color: palette.slate},
+  resultAction: {marginTop: 8, fontSize: 12, fontWeight: '800', color: palette.navy},
   resultQuantity: {fontSize: 18, fontWeight: '800', color: palette.navy},
+  resultUnit: {fontSize: 11, fontWeight: '600', color: palette.slate},
 });
