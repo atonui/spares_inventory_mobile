@@ -4,6 +4,11 @@ import type {QueuedStockAdjustment} from './offlineStockQueue';
 import type {OfflineStockStorage} from './offlineStockStore';
 
 const webStorageKey = 'spares-tracker.stock-adjustments.v1';
+const queueListeners = new Set<() => void>();
+
+function notifyQueueChanged() {
+  for (const listener of queueListeners) listener();
+}
 
 function isQueuedAdjustment(value: unknown): value is QueuedStockAdjustment {
   if (typeof value !== 'object' || value === null) return false;
@@ -31,8 +36,13 @@ function saveWebEntries(entries: QueuedStockAdjustment[]) {
 }
 
 export const offlineStockStore: OfflineStockStorage = {
+  subscribeQueueChanges(listener) {
+    queueListeners.add(listener);
+    return () => queueListeners.delete(listener);
+  },
   async saveInventorySnapshot(userId: number, items: InventoryItem[]) {
     globalThis.localStorage?.setItem(`spares-tracker.inventory.v1.${userId}`, JSON.stringify(items));
+    globalThis.localStorage?.setItem(`spares-tracker.inventory-saved-at.v1.${userId}`, String(Date.now()));
   },
   async loadInventorySnapshot(userId: number): Promise<InventoryItem[] | null> {
     try {
@@ -42,6 +52,10 @@ export const offlineStockStore: OfflineStockStorage = {
     } catch {
       return null;
     }
+  },
+  async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
+    const value = globalThis.localStorage?.getItem(`spares-tracker.inventory-saved-at.v1.${userId}`);
+    return value && /^\d+$/.test(value) ? Number(value) : null;
   },
   async saveProfile(profile: NativeUser) {
     globalThis.localStorage?.setItem(`spares-tracker.profile.v1.${profile.id}`, JSON.stringify(profile));
@@ -67,6 +81,7 @@ export const offlineStockStore: OfflineStockStorage = {
     const entries = getWebEntries();
     entries.push(adjustment);
     saveWebEntries(entries);
+    notifyQueueChanged();
   },
   async list(userId) {
     return getWebEntries().filter(item => item.userId === userId)
@@ -74,9 +89,11 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async remove(operationId) {
     saveWebEntries(getWebEntries().filter(item => item.operationId !== operationId));
+    notifyQueueChanged();
   },
   async markConflict(operationId, message) {
     saveWebEntries(getWebEntries().map(item => item.operationId === operationId
       ? {...item, status: 'conflict', error: message} : item));
+    notifyQueueChanged();
   },
 };
