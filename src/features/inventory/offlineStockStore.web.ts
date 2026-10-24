@@ -55,7 +55,7 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     const value = globalThis.localStorage?.getItem(`spares-tracker.inventory-saved-at.v1.${userId}`);
-    return value && /^\\d+$/.test(value) ? Number(value) : null;
+    return value && /^\d+$/.test(value) ? Number(value) : null;
   },
   async saveProfile(profile: NativeUser) {
     globalThis.localStorage?.setItem(`spares-tracker.profile.v1.${profile.id}`, JSON.stringify(profile));
