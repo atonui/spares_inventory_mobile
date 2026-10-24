@@ -35,6 +35,17 @@ function normalizeInventorySearchText(value: string): string {
 }
 
 type InventoryFilter = 'all' | 'lowStock' | 'available' | 'allocated';
+type SnapshotStatus = {savedAt: number | null; queued: number; conflicts: number};
+
+function formatSnapshotTime(savedAt: number | null): string {
+  if (savedAt === null) return 'No saved refresh yet';
+  const minutes = Math.max(0, Math.floor((Date.now() - savedAt) / 60_000));
+  if (minutes < 1) return 'Updated just now';
+  if (minutes < 60) return `Updated ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Updated ${hours} hr${hours === 1 ? '' : 's'} ago`;
+  return `Updated ${new Intl.DateTimeFormat(undefined, {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(savedAt))}`;
+}
 
 const inventoryFilterOptions: {value: InventoryFilter; label: string}[] = [
   {value: 'all', label: 'All'},
@@ -58,6 +69,8 @@ export default function InventoryScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus>({savedAt: null, queued: 0, conflicts: 0});
+  const [usingCachedInventory, setUsingCachedInventory] = useState(false);
   const pairingCancelledRef = useRef(false);
   const syncInFlightRef = useRef<Promise<unknown> | null>(null);
   const [search, setSearch] = useState('');
@@ -74,16 +87,22 @@ export default function InventoryScreen() {
     try {
       baseRows = await api.getInventory();
       await offlineStockStore.saveInventorySnapshot(userId, baseRows);
+      setUsingCachedInventory(false);
       setError(current => current.startsWith('Offline mode ·') ? '' : current);
     } catch (reason) {
       const cachedRows = await offlineStockStore.loadInventorySnapshot(userId);
       if (!cachedRows) throw reason;
       baseRows = cachedRows;
+      setUsingCachedInventory(true);
       setError('Offline mode · showing the last saved inventory. Stock changes stay on this device until synced.');
     }
-    const rows = applyQueuedStockCounts(baseRows, await offlineStockStore.list(userId));
+    const queue = await offlineStockStore.list(userId);
+    const rows = applyQueuedStockCounts(baseRows, queue);
     setInventory(rows);
     setInventorySnapshot(rows);
+    setSnapshotStatus({savedAt: await offlineStockStore.getInventorySnapshotSavedAt(userId),
+      queued: queue.filter(item => item.status === 'queued').length,
+      conflicts: queue.filter(item => item.status === 'conflict').length});
   }, []);
 
   const restoreSession = useCallback(async () => {
@@ -148,6 +167,17 @@ export default function InventoryScreen() {
     });
     return () => subscription.remove();
   }, [hasSession, user, loadInventory]);
+
+  useEffect(() => {
+    if (!user) return;
+    const updateQueuedCount = async () => {
+      const queue = await offlineStockStore.list(user.id);
+      setSnapshotStatus(current => ({...current,
+        queued: queue.filter(item => item.status === 'queued').length,
+        conflicts: queue.filter(item => item.status === 'conflict').length}));
+    };
+    return offlineStockStore.subscribeQueueChanges(() => { void updateQueuedCount(); });
+  }, [user]);
 
   async function pairWithDesktop(qrData: string, onApprovalRequired: () => void) {
     setError('');
@@ -319,6 +349,18 @@ export default function InventoryScreen() {
               <Text style={styles.totalNumber}>{inventory.length}</Text>
               <Text style={styles.totalLabel}>LINES</Text>
             </View>
+          </View>
+
+          <View accessibilityRole="summary" style={[styles.syncBanner, usingCachedInventory && styles.syncBannerOffline]}>
+            <View style={styles.syncBannerText}>
+              <Text style={styles.syncBannerTitle}>{usingCachedInventory ? 'Offline · saved inventory' : 'Saved inventory'}</Text>
+              <Text style={styles.syncBannerDetail}>Last refreshed · {formatSnapshotTime(snapshotStatus.savedAt)}</Text>
+            </View>
+            {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
+              <Text style={styles.syncPending}>
+                {snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting to sync`}
+              </Text>
+            )}
           </View>
 
           <View style={styles.searchBox}>
@@ -525,6 +567,12 @@ const styles = StyleSheet.create({
   signOutButton: {paddingVertical: 10, paddingHorizontal: 12},
   signOutText: {fontWeight: '700', color: palette.navy},
   welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 16},
+  syncBanner: {minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: palette.border, borderRadius: 12, backgroundColor: palette.white},
+  syncBannerOffline: {borderColor: palette.amber, backgroundColor: '#FFF8EA'},
+  syncBannerText: {flex: 1},
+  syncBannerTitle: {fontSize: 12, fontWeight: '800', color: palette.navy},
+  syncBannerDetail: {marginTop: 3, fontSize: 11, color: palette.muted},
+  syncPending: {fontSize: 11, fontWeight: '800', color: palette.navy, textAlign: 'right'},
   welcome: {fontSize: 17, fontWeight: '700', color: palette.text},
   muted: {marginTop: 4, color: palette.muted, fontSize: 13},
   totalBadge: {minWidth: 56, alignItems: 'center', borderRadius: 12, backgroundColor: '#FEF3DF', paddingVertical: 7, paddingHorizontal: 9},

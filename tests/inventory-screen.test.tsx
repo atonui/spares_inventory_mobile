@@ -2,6 +2,7 @@ import {fireEvent, render, waitFor} from '@testing-library/react-native';
 import {Keyboard} from 'react-native';
 import {ApiError} from '../src/api/client';
 import {api} from '../src/api/runtime';
+import {offlineStockStore} from '../src/features/inventory/offlineStockStore';
 import InventoryScreen from '../src/app/index';
 import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/inventory/inventorySnapshot';
 
@@ -22,6 +23,7 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
     list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
     markConflict: async () => undefined,
     saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
+    getInventorySnapshotSavedAt: async () => Date.now(), subscribeQueueChanges: () => () => undefined,
     saveProfile: async () => undefined, loadProfile: async () => null,
     getActiveUserId: async () => null, setActiveUserId: async () => undefined,
   },
@@ -51,6 +53,8 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     expect(getMe).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Good to see you, Preview')).toBeTruthy();
+    expect(screen.getByText('Saved inventory')).toBeTruthy();
+    expect(screen.getByText('Last refreshed · Updated just now')).toBeTruthy();
     expect(screen.queryByText('Sign in through your desktop account')).toBeNull();
     getMe.mockRestore();
   });
@@ -149,6 +153,24 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy());
     expect(screen.queryByText('Inventory service unavailable')).toBeNull();
     inventoryRequest.mockRestore();
+  });
+
+  it('shows cached inventory age and queued changes while offline', async () => {
+    const cachedRows = await api.getInventory();
+    jest.spyOn(api, 'getInventory').mockRejectedValue(new Error('Network unavailable'));
+    jest.spyOn(offlineStockStore, 'loadInventorySnapshot').mockResolvedValue(cachedRows);
+    jest.spyOn(offlineStockStore, 'getInventorySnapshotSavedAt').mockResolvedValue(Date.now() - 2 * 60 * 60 * 1000);
+    jest.spyOn(offlineStockStore, 'list').mockResolvedValue([{
+      operationId: 'f0bb08a1-bc7b-4f6a-b8af-ced2fd686de9', userId: 1, inventoryId: 1,
+      expectedQuantity: 2, newQuantity: 3, createdAt: Date.now(), status: 'queued', error: null,
+    }]);
+
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+
+    await waitFor(() => expect(screen.getByText('Offline · saved inventory')).toBeTruthy());
+    expect(screen.getByText('Last refreshed · Updated 2 hrs ago')).toBeTruthy();
+    expect(screen.getByText('1 waiting to sync')).toBeTruthy();
   });
 
   it('navigates to an inventory item detail using the item ID', async () => {
