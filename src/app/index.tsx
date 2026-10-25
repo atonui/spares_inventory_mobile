@@ -357,9 +357,16 @@ export default function InventoryScreen() {
               <Text style={styles.syncBannerDetail}>Last refreshed · {formatSnapshotTime(snapshotStatus.savedAt)}</Text>
             </View>
             {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
-              <Text style={styles.syncPending}>
-                {snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting to sync`}
-              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Review offline changes"
+                onPress={() => router.push('/offline-changes')}
+                style={styles.syncPendingButton}
+              >
+                <Text style={styles.syncPending}>
+                  {snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting to sync`}
+                </Text>
+              </Pressable>
             )}
           </View>
 
@@ -573,6 +580,7 @@ const styles = StyleSheet.create({
   syncBannerTitle: {fontSize: 12, fontWeight: '800', color: palette.navy},
   syncBannerDetail: {marginTop: 3, fontSize: 11, color: palette.muted},
   syncPending: {fontSize: 11, fontWeight: '800', color: palette.navy, textAlign: 'right'},
+  syncPendingButton: {minHeight: 44, justifyContent: 'center', paddingLeft: 8},
   welcome: {fontSize: 17, fontWeight: '700', color: palette.text},
   muted: {marginTop: 4, color: palette.muted, fontSize: 13},
   totalBadge: {minWidth: 56, alignItems: 'center', borderRadius: 12, backgroundColor: '#FEF3DF', paddingVertical: 7, paddingHorizontal: 9},
