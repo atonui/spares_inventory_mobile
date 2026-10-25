@@ -25,7 +25,9 @@ The vector screen board below shows all seven primary screens and the end-to-end
 
 ```mermaid
 flowchart TD
-  Pair["Pair device"] --> Inventory["Inventory"]
+  Pair["Pair device"] --> Home["Home overview"]
+  Home --> Inventory["Inventory"]
+  Home --> Changes["Offline changes"]
   Inventory --> Scanner["Scan part"]
   Scanner --> Inventory
   Inventory --> Details["Stock details"]
@@ -70,6 +72,15 @@ The inventory screen is the home hub. Scanner, details, count editing, and offli
 
 **Primary zone:** Scan action near the lower half of the screen; cancel remains reachable during approval.
 
+## Home overview
+
+**Purpose:** Give a compact view of stock health and a direct route into inventory work.
+
+- Show a small three-metric summary: total items, low stock, and out of stock.
+- List only the most urgent items under “Needs attention”; avoid charts or repeated summary cards.
+- Keep shortcuts to Inventory and Scan visible.
+- Use the persistent bottom navigation for Home, Stock, Scan, Changes, and More.
+
 ## Screen 2 — Inventory home
 
 **Purpose:** Search, triage, and open a stock item quickly.
@@ -79,10 +90,10 @@ The inventory screen is the home hub. Scanner, details, count editing, and offli
 1. Compact branded header with current account/company context and account action.
 2. Offline/sync status strip when relevant. Example: “Offline · saved inventory” plus last refresh time and queued count.
 3. Persistent search field. Hint: “Search part name or number”. Keep the clear action inside the field.
-4. Horizontally scrollable filter pills: All, Out of stock, Low stock, Available, Allocated. Active selection is visibly distinct and text-labeled.
+4. Keep quick filters to a small set such as All and Needs attention; open the full filter sheet for stock status and allocation. This keeps the list uncluttered while common triage stays one tap away.
 5. Result summary with visible count; sort control for Default, Part number, and Lowest stock.
 6. Dense but readable inventory rows.
-7. Thumb-zone scanner action anchored at the bottom, visually prominent and labeled “Scan”.
+7. Persistent bottom navigation for Home, Stock, Scan, Changes, and More, with Scan kept in the thumb zone. The More destination opens account and settings actions.
 
 Each inventory row presents:
 - Part number and short description as the strongest text.
