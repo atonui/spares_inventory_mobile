@@ -40,7 +40,7 @@ export function AppBottomNavigation({
     <>
       <View style={styles.bar}>
         {tabs.map(tab => {
-              const selected = active === tab.key || (tab.key === 'more' && menuVisible);
+          const selected = active === tab.key || (tab.key === 'more' && menuVisible);
           return (
             <Pressable
               key={tab.key}
@@ -61,8 +61,8 @@ export function AppBottomNavigation({
               style={styles.tab}
             >
               {selected && <View style={styles.activeIndicator} />}
-              <View style={[styles.iconWrap, tab.key === 'scan' && styles.scanIconWrap]}>
-                <AppIcon name={tab.icon} color={tab.key === 'scan' ? palette.white : selected ? palette.navy : palette.slate} size={tab.key === 'scan' ? 20 : 22} />
+              <View style={styles.iconWrap}>
+                <AppIcon name={tab.icon} color={selected ? palette.navy : palette.slate} size={22} />
                 {tab.key === 'changes' && pendingCount > 0 && (
                   <View accessible={false} style={styles.badge}>
                     <Text style={styles.badgeText}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
@@ -124,7 +124,6 @@ const styles = StyleSheet.create({
   tab: {flex: 1, minHeight: 70, alignItems: 'center', justifyContent: 'center', gap: 3},
   activeIndicator: {position: 'absolute', top: 0, width: 28, height: 3, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, backgroundColor: palette.amber},
   iconWrap: {position: 'relative', minWidth: 26, minHeight: 25, alignItems: 'center', justifyContent: 'center'},
-  scanIconWrap: {width: 36, height: 36, borderRadius: 18, backgroundColor: palette.navy},
   tabLabel: {fontSize: 10, fontWeight: '600', color: palette.slate},
   tabLabelActive: {fontWeight: '800', color: palette.navy},
   badge: {position: 'absolute', top: -4, right: -9, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8, backgroundColor: palette.red},
