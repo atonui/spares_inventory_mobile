@@ -95,6 +95,9 @@ export default function InventoryScreen() {
   const [search, setSearch] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
   const [inventorySort, setInventorySort] = useState<InventorySort>('default');
+  const [filterSortVisible, setFilterSortVisible] = useState(false);
+  const [draftInventoryFilter, setDraftInventoryFilter] = useState<InventoryFilter>('all');
+  const [draftInventorySort, setDraftInventorySort] = useState<InventorySort>('default');
 
   const loadInventory = useCallback(async (userId: number) => {
     if (!syncInFlightRef.current) {
@@ -386,6 +389,30 @@ export default function InventoryScreen() {
     setInventorySort('default');
   }
 
+  function openFilterSort() {
+    setDraftInventoryFilter(inventoryFilter);
+    setDraftInventorySort(inventorySort);
+    setFilterSortVisible(true);
+  }
+
+  function applyFilterSort() {
+    if (draftInventoryFilter !== inventoryFilter) {
+      const nextVisibleInventory = getVisibleInventory(draftInventoryFilter);
+      announceInventoryResultCount(nextVisibleInventory.length, inventory.length, search, draftInventoryFilter);
+    }
+    setInventoryFilter(draftInventoryFilter);
+    setInventorySort(draftInventorySort);
+    setFilterSortVisible(false);
+  }
+
+  const activeFilterSortLabels = [
+    inventoryFilter !== 'all' ? inventoryFilterOptions.find(option => option.value === inventoryFilter)?.label : undefined,
+    inventorySort !== 'default' ? inventorySortOptions.find(option => option.value === inventorySort)?.label : undefined,
+  ].filter((label): label is string => Boolean(label));
+  const filterSortButtonLabel = activeFilterSortLabels.length > 0
+    ? activeFilterSortLabels.join(' · ')
+    : 'Filter & sort';
+
   if ((!isReady && !user) || (loading && !user && hasSession)) {
     return <LoadingScreen message="Checking your session…" />;
   }
@@ -461,49 +488,26 @@ export default function InventoryScreen() {
             )}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow} accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
-            {inventoryFilterOptions.map(option => {
-              const selected = inventoryFilter === option.value;
-              const count = inventoryFilterCounts[option.value];
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="radio"
-                  accessibilityLabel={option.label}
-                  accessibilityHint={`${count} ${count === 1 ? 'item' : 'items'}`}
-                  accessibilityState={{checked: selected}}
-                  onPress={() => {
-                    const nextVisibleInventory = getVisibleInventory(option.value);
-                    announceInventoryResultCount(nextVisibleInventory.length, inventory.length, search, option.value);
-                    setInventoryFilter(option.value);
-                  }}
-                  style={[styles.filterChip, selected && styles.filterChipSelected]}
-                >
-                  <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label} · {count}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <View style={styles.sortSection}>
-            <Text style={styles.sortLabel}>Sort</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow} accessibilityRole="radiogroup" accessibilityLabel="Sort inventory">
-              {inventorySortOptions.map(option => {
-                const selected = inventorySort === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="radio"
-                    accessibilityLabel={option.label}
-                    accessibilityState={{checked: selected}}
-                    onPress={() => setInventorySort(option.value)}
-                    style={[styles.sortChip, selected && styles.filterChipSelected]}
-                  >
-                    <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+          <View style={styles.controlsRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Filter and sort inventory${activeFilterSortLabels.length ? `, active: ${activeFilterSortLabels.join(', ')}` : ''}`}
+              onPress={openFilterSort}
+              style={[styles.filterSortButton, activeFilterSortLabels.length > 0 && styles.filterSortButtonActive]}
+            >
+              <AppIcon name="filter" color={palette.navy} size={18} />
+              <Text numberOfLines={1} style={styles.filterSortButtonText}>{filterSortButtonLabel}</Text>
+            </Pressable>
+            {activeFilterSortLabels.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Reset filters and sorting"
+                onPress={() => {setInventoryFilter('all'); setInventorySort('default');}}
+                style={styles.resetControlsButton}
+              >
+                <Text style={styles.resetControlsText}>Reset</Text>
+              </Pressable>
+            )}
           </View>
 
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
@@ -581,6 +585,91 @@ export default function InventoryScreen() {
             onSignOut={() => void requestSignOut()}
           />
         </View>
+        <Modal
+          transparent
+          visible={filterSortVisible}
+          animationType="slide"
+          onRequestClose={() => setFilterSortVisible(false)}
+        >
+          <View style={styles.filterSortBackdrop}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close filter and sort options"
+              onPress={() => setFilterSortVisible(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.filterSortSheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.filterSortHeader}>
+                <Text accessibilityRole="header" style={styles.filterSortTitle}>Filter & sort</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close filter and sort options"
+                  onPress={() => setFilterSortVisible(false)}
+                  style={styles.sheetCloseButton}
+                >
+                  <AppIcon name="close" color={palette.muted} size={20} />
+                </Pressable>
+              </View>
+              <ScrollView style={styles.filterSortOptions} showsVerticalScrollIndicator={false}>
+                <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Stock status</Text>
+                <View accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
+                  {inventoryFilterOptions.map(option => {
+                    const selected = draftInventoryFilter === option.value;
+                    const count = inventoryFilterCounts[option.value];
+                    return (
+                      <Pressable
+                        key={option.value}
+                        accessibilityRole="radio"
+                        accessibilityLabel={option.label}
+                        accessibilityHint={`${count} ${count === 1 ? 'item' : 'items'}`}
+                        accessibilityState={{checked: selected}}
+                        onPress={() => setDraftInventoryFilter(option.value)}
+                        style={[styles.filterSortOption, selected && styles.filterSortOptionSelected]}
+                      >
+                        <View style={styles.optionRadio}>{selected && <View style={styles.optionRadioSelected} />}</View>
+                        <Text style={[styles.filterSortOptionText, selected && styles.filterSortOptionTextSelected]}>{option.label}</Text>
+                        <Text style={styles.filterSortOptionCount}>{count}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text accessibilityRole="header" style={[styles.filterSortSectionTitle, styles.sortSectionTitle]}>Sort by</Text>
+                <View accessibilityRole="radiogroup" accessibilityLabel="Sort inventory">
+                  {inventorySortOptions.map(option => {
+                    const selected = draftInventorySort === option.value;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        accessibilityRole="radio"
+                        accessibilityLabel={option.label}
+                        accessibilityState={{checked: selected}}
+                        onPress={() => setDraftInventorySort(option.value)}
+                        style={[styles.filterSortOption, selected && styles.filterSortOptionSelected]}
+                      >
+                        <View style={styles.optionRadio}>{selected && <View style={styles.optionRadioSelected} />}</View>
+                        <Text style={[styles.filterSortOptionText, selected && styles.filterSortOptionTextSelected]}>{option.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+              <View style={styles.filterSortActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Reset filters and sorting"
+                  onPress={() => {setDraftInventoryFilter('all'); setDraftInventorySort('default');}}
+                  style={styles.filterSortResetButton}
+                >
+                  <Text style={styles.filterSortResetText}>Reset</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={applyFilterSort} style={styles.filterSortApplyButton}>
+                  <Text style={styles.filterSortApplyText}>Done</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <Modal
           transparent
           visible={pendingSignOutCount !== null}
@@ -716,16 +805,33 @@ const styles = StyleSheet.create({
   searchInput: {flex: 1, paddingVertical: 10, fontSize: 14, color: palette.text},
   clearSearchButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center'},
   clearSearchText: {fontSize: 25, lineHeight: 29, color: palette.muted},
-  filterScroll: {flexGrow: 0, marginTop: 9},
-  filterRow: {flexDirection: 'row', gap: 8, paddingRight: 2},
-  filterChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
-  filterChipSelected: {borderColor: palette.amber, backgroundColor: palette.amber},
-  filterLabel: {fontSize: 12, fontWeight: '700', color: palette.muted},
-  filterLabelSelected: {color: palette.navy},
-  sortSection: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8},
-  sortLabel: {fontSize: 11, fontWeight: '700', color: palette.muted},
-  sortRow: {flexDirection: 'row', gap: 7, paddingRight: 2},
-  sortChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 11, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
+  controlsRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8},
+  filterSortButton: {flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: palette.border, borderRadius: 11, backgroundColor: palette.white},
+  filterSortButtonActive: {borderColor: palette.amber, backgroundColor: '#FFF8EA'},
+  filterSortButtonText: {flex: 1, fontSize: 13, fontWeight: '700', color: palette.navy},
+  resetControlsButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 8},
+  resetControlsText: {fontSize: 12, fontWeight: '700', color: palette.muted},
+  filterSortBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(21, 38, 59, 0.38)'},
+  filterSortSheet: {maxHeight: '90%', paddingHorizontal: 20, paddingTop: 9, paddingBottom: 24, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
+  sheetHandle: {alignSelf: 'center', width: 42, height: 4, marginBottom: 8, borderRadius: 2, backgroundColor: palette.border},
+  filterSortHeader: {minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  filterSortTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
+  sheetCloseButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
+  filterSortOptions: {flexGrow: 0, flexShrink: 1, maxHeight: 480},
+  filterSortSectionTitle: {marginTop: 9, marginBottom: 4, fontSize: 12, fontWeight: '800', letterSpacing: 0.3, color: palette.muted},
+  filterSortOption: {minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, borderRadius: 9},
+  filterSortOptionSelected: {backgroundColor: '#FFF8EA'},
+  optionRadio: {width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: palette.slate, borderRadius: 10},
+  optionRadioSelected: {width: 10, height: 10, borderRadius: 5, backgroundColor: palette.amber},
+  filterSortOptionText: {flex: 1, fontSize: 14, fontWeight: '600', color: palette.text},
+  filterSortOptionTextSelected: {fontWeight: '800', color: palette.navy},
+  filterSortOptionCount: {minWidth: 24, fontSize: 12, textAlign: 'right', color: palette.muted},
+  sortSectionTitle: {marginTop: 14},
+  filterSortActions: {flexDirection: 'row', gap: 10, paddingTop: 12},
+  filterSortResetButton: {minHeight: 46, minWidth: 100, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderWidth: 1, borderColor: palette.border, borderRadius: 10, backgroundColor: palette.white},
+  filterSortResetText: {fontSize: 13, fontWeight: '700', color: palette.navy},
+  filterSortApplyButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: palette.amber},
+  filterSortApplyText: {fontSize: 13, fontWeight: '800', color: palette.navy},
   listContent: {paddingTop: 8, paddingBottom: 10},
   resultsSummary: {paddingHorizontal: 2, paddingBottom: 2, fontSize: 12, fontWeight: '600', color: palette.muted},
   stockCard: {backgroundColor: 'transparent', borderBottomColor: '#E2E8F0', borderBottomWidth: 1, paddingHorizontal: 4, paddingVertical: 12},
