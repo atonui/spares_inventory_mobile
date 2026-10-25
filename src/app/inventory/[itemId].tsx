@@ -8,6 +8,7 @@ import {getCachedInventoryItem, setInventorySnapshot, updateInventorySnapshotIte
 import {InventoryItemDetails} from '../../features/inventory/InventoryItemDetails';
 import {applyQueuedStockCounts} from '../../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../../features/inventory/offlineStockStore';
+import {AppBottomNavigation} from '../../features/navigation/AppBottomNavigation';
 
 type DetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
 
@@ -172,6 +173,7 @@ export default function InventoryItemDetailScreen() {
           />
         )}
       </View>
+      <AppBottomNavigation active="inventory" />
     </SafeAreaView>
   );
 }

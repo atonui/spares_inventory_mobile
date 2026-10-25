@@ -26,6 +26,8 @@ import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAcc
 import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import DesktopPairing from '../features/auth/DesktopPairing';
+import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
+import {AppIcon} from '../features/navigation/AppIcon';
 
 function responseMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -398,9 +400,6 @@ export default function InventoryScreen() {
               <Text style={styles.wordmark}>Spares Tracker</Text>
               <Text style={styles.pageTitle}>Inventory</Text>
             </View>
-            <Pressable accessibilityRole="button" onPress={() => void requestSignOut()} disabled={loading || checkingSignOut} style={styles.signOutButton}>
-              <Text style={styles.signOutText}>{loading || checkingSignOut ? '…' : 'Sign out'}</Text>
-            </Pressable>
           </View>
 
           <View style={styles.welcomeRow}>
@@ -410,14 +409,14 @@ export default function InventoryScreen() {
             </View>
             <View style={styles.totalBadge}>
               <Text style={styles.totalNumber}>{inventory.length}</Text>
-              <Text style={styles.totalLabel}>LINES</Text>
+              <Text style={styles.totalLabel}>ITEMS</Text>
             </View>
           </View>
 
           <View accessibilityRole="summary" style={[styles.syncBanner, isOffline && styles.syncBannerOffline]}>
             <View style={styles.syncBannerText}>
               <Text style={styles.syncBannerTitle}>{isOffline ? 'Offline · saved inventory' : 'Saved inventory'}</Text>
-              <Text style={styles.syncBannerDetail}>Last refreshed · {formatSnapshotTime(snapshotStatus.savedAt)}</Text>
+              <Text style={styles.syncBannerDetail}>{isOffline ? 'Changes will sync when you’re online' : `Updated · ${formatSnapshotTime(snapshotStatus.savedAt)}`}</Text>
             </View>
             {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
               <Pressable
@@ -434,12 +433,12 @@ export default function InventoryScreen() {
           </View>
 
           <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>⌕</Text>
+            <AppIcon name="search" color={palette.muted} size={20} />
             <TextInput
               accessibilityLabel="Search inventory"
               value={search}
               onChangeText={setSearch}
-              placeholder="Search part, description, store, type, or work order"
+              placeholder="Search part, store, or work order"
               placeholderTextColor={palette.placeholder}
               style={styles.searchInput}
               returnKeyType="search"
@@ -462,7 +461,7 @@ export default function InventoryScreen() {
             )}
           </View>
 
-          <View style={styles.filterRow} accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow} accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
             {inventoryFilterOptions.map(option => {
               const selected = inventoryFilter === option.value;
               const count = inventoryFilterCounts[option.value];
@@ -484,11 +483,11 @@ export default function InventoryScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           <View style={styles.sortSection}>
-            <Text style={styles.sortLabel}>Sort by</Text>
-            <View style={styles.sortRow} accessibilityRole="radiogroup" accessibilityLabel="Sort inventory">
+            <Text style={styles.sortLabel}>Sort</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow} accessibilityRole="radiogroup" accessibilityLabel="Sort inventory">
               {inventorySortOptions.map(option => {
                 const selected = inventorySort === option.value;
                 return (
@@ -504,7 +503,7 @@ export default function InventoryScreen() {
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
           </View>
 
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
@@ -515,9 +514,11 @@ export default function InventoryScreen() {
             contentContainerStyle={styles.listContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.navy} />}
             keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={hasInventoryCriteria && visibleInventory.length > 0 ? (
+            ListHeaderComponent={visibleInventory.length > 0 ? (
               <Text accessibilityRole="text" style={styles.resultsSummary}>
-                Showing {visibleInventory.length} of {inventory.length} {inventory.length === 1 ? 'item' : 'items'}
+                {hasInventoryCriteria
+                  ? `Showing ${visibleInventory.length} of ${inventory.length} ${inventory.length === 1 ? 'item' : 'items'}`
+                  : `${inventory.length} ${inventory.length === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
               </Text>
             ) : undefined}
             ListEmptyComponent={loading && !error ? <InventorySkeleton /> : error ? <></> : (
@@ -573,16 +574,12 @@ export default function InventoryScreen() {
               );
             }}
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Scan barcode or QR code"
-            accessibilityHint="Opens the camera to find a stock item"
-            onPress={() => router.push({pathname: '/scan', params: {userId: String(user.id)}})}
-            style={({pressed}) => [styles.scanAction, pressed && styles.scanActionPressed]}
-          >
-            <Text style={styles.scanActionIcon} accessible={false}>⌗</Text>
-            <Text style={styles.scanActionText}>Scan item</Text>
-          </Pressable>
+          <AppBottomNavigation
+            active="inventory"
+            queuedCount={snapshotStatus.queued}
+            conflictCount={snapshotStatus.conflicts}
+            onSignOut={() => void requestSignOut()}
+          />
         </View>
         <Modal
           transparent
@@ -692,8 +689,6 @@ const styles = StyleSheet.create({
   brandCopy: {flex: 1},
   wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
   pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
-  signOutButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 12},
-  signOutText: {fontWeight: '700', color: palette.navy},
   signOutBackdrop: {flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(21, 38, 59, 0.48)'},
   signOutCard: {padding: 20, borderRadius: 16, backgroundColor: palette.white},
   signOutTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
@@ -704,55 +699,51 @@ const styles = StyleSheet.create({
   signOutKeepText: {fontSize: 13, fontWeight: '700', color: palette.navy},
   signOutConfirmButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: palette.navy},
   signOutConfirmText: {fontSize: 13, fontWeight: '800', color: palette.white},
-  welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 16},
-  syncBanner: {minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: palette.border, borderRadius: 12, backgroundColor: palette.white},
+  welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 10},
+  syncBanner: {minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 9, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: palette.border, borderRadius: 10, backgroundColor: palette.white},
   syncBannerOffline: {borderColor: palette.amber, backgroundColor: '#FFF8EA'},
   syncBannerText: {flex: 1},
   syncBannerTitle: {fontSize: 12, fontWeight: '800', color: palette.navy},
-  syncBannerDetail: {marginTop: 3, fontSize: 11, color: palette.muted},
+  syncBannerDetail: {marginTop: 2, fontSize: 10, color: palette.muted},
   syncPending: {fontSize: 11, fontWeight: '800', color: palette.navy, textAlign: 'right'},
   syncPendingButton: {minHeight: 44, justifyContent: 'center', paddingLeft: 8},
-  welcome: {fontSize: 17, fontWeight: '700', color: palette.text},
-  muted: {marginTop: 4, color: palette.muted, fontSize: 13},
-  totalBadge: {minWidth: 56, alignItems: 'center', borderRadius: 12, backgroundColor: '#FEF3DF', paddingVertical: 7, paddingHorizontal: 9},
-  totalNumber: {fontSize: 19, fontWeight: '800', color: palette.navy},
-  totalLabel: {fontSize: 8, fontWeight: '800', letterSpacing: 1.2, color: palette.navy},
+  welcome: {fontSize: 15, fontWeight: '700', color: palette.text},
+  muted: {marginTop: 3, color: palette.muted, fontSize: 11},
+  totalBadge: {minWidth: 62, alignItems: 'center', borderRadius: 10, backgroundColor: '#FEF3DF', paddingVertical: 5, paddingHorizontal: 8},
+  totalNumber: {fontSize: 17, fontWeight: '800', color: palette.navy},
+  totalLabel: {fontSize: 8, fontWeight: '800', letterSpacing: 0.9, color: palette.navy},
   searchBox: {height: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, backgroundColor: palette.white, borderRadius: 13, borderWidth: 1, borderColor: palette.border},
-  searchIcon: {fontSize: 24, color: palette.muted, transform: [{rotate: '-20deg'}]},
   searchInput: {flex: 1, paddingVertical: 10, fontSize: 14, color: palette.text},
   clearSearchButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center'},
   clearSearchText: {fontSize: 25, lineHeight: 29, color: palette.muted},
-  filterRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10},
-  filterChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
+  filterScroll: {flexGrow: 0, marginTop: 9},
+  filterRow: {flexDirection: 'row', gap: 8, paddingRight: 2},
+  filterChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
   filterChipSelected: {borderColor: palette.amber, backgroundColor: palette.amber},
   filterLabel: {fontSize: 12, fontWeight: '700', color: palette.muted},
   filterLabelSelected: {color: palette.navy},
-  sortSection: {marginTop: 11},
-  sortLabel: {marginBottom: 6, fontSize: 12, fontWeight: '700', color: palette.muted},
-  sortRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 7},
-  sortChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
-  listContent: {paddingTop: 13, paddingBottom: 104, gap: 8},
+  sortSection: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8},
+  sortLabel: {fontSize: 11, fontWeight: '700', color: palette.muted},
+  sortRow: {flexDirection: 'row', gap: 7, paddingRight: 2},
+  sortChip: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 11, borderWidth: 1, borderColor: palette.border, borderRadius: 22, backgroundColor: palette.white},
+  listContent: {paddingTop: 8, paddingBottom: 10},
   resultsSummary: {paddingHorizontal: 2, paddingBottom: 2, fontSize: 12, fontWeight: '600', color: palette.muted},
-  stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, paddingVertical: 11},
+  stockCard: {backgroundColor: 'transparent', borderBottomColor: '#E2E8F0', borderBottomWidth: 1, paddingHorizontal: 4, paddingVertical: 12},
   stockCardPressed: {opacity: 0.72},
   cardTop: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10},
   partNumber: {flex: 1, marginTop: 2, fontSize: 15, fontWeight: '800', letterSpacing: 0.2, color: palette.navy},
   description: {marginTop: 3, fontSize: 13, lineHeight: 18, fontWeight: '500', color: palette.text},
-  quantityBadge: {minWidth: 67, alignItems: 'center', backgroundColor: '#EAF4EC', borderRadius: 10, paddingVertical: 5, paddingHorizontal: 8},
+  quantityBadge: {minWidth: 67, alignItems: 'flex-end', paddingVertical: 2, paddingHorizontal: 2},
   quantityValue: {fontSize: 17, fontWeight: '800', color: '#287441'},
-  quantityCaption: {fontSize: 7, fontWeight: '800', letterSpacing: 0.8, color: '#287441'},
-  lowQuantityBadge: {backgroundColor: '#FFF0E8'},
+  quantityCaption: {fontSize: 9, fontWeight: '800', letterSpacing: 0.4, color: '#287441'},
+  lowQuantityBadge: {backgroundColor: 'transparent'},
   lowQuantityText: {color: '#A54E1E'},
-  outQuantityBadge: {backgroundColor: palette.redTint},
+  outQuantityBadge: {backgroundColor: 'transparent'},
   outQuantityText: {color: palette.red},
   statusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8},
   locationText: {flex: 1, fontSize: 12, fontWeight: '700', color: palette.muted},
   allocatedStatus: {color: palette.slate},
   threshold: {fontSize: 11, color: palette.muted},
-  scanAction: {position: 'absolute', bottom: 16, alignSelf: 'center', minHeight: 56, minWidth: 174, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 22, borderRadius: 28, backgroundColor: palette.navy, borderWidth: 2, borderColor: palette.white, shadowColor: '#152D43', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6},
-  scanActionPressed: {opacity: 0.82, transform: [{scale: 0.98}]},
-  scanActionIcon: {fontSize: 24, lineHeight: 28, color: palette.white},
-  scanActionText: {fontSize: 15, fontWeight: '800', color: palette.white},
   skeletonList: {gap: 8},
   skeletonCard: {paddingHorizontal: 13, paddingVertical: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 13, backgroundColor: palette.white},
   skeletonTopRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},

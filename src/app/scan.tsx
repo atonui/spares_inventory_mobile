@@ -9,6 +9,7 @@ import {getInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {findInventoryMatches} from '../features/inventory/scanLookup';
+import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 
 const scannerBarcodeTypes: BarcodeType[] = [
   'qr', 'ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'code93', 'codabar', 'itf14',
@@ -245,6 +246,7 @@ export default function InventoryScanScreen() {
           </>
         )}
       </View>
+      <AppBottomNavigation active="scan" />
     </SafeAreaView>
   );
 }
