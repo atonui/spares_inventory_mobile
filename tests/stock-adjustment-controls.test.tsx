@@ -1,4 +1,5 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {StyleSheet} from 'react-native';
 import type {QueuedStockAdjustment} from '../src/features/inventory/offlineStockQueue';
 import {api} from '../src/api/runtime';
 import {StockAdjustmentControls} from '../src/features/inventory/StockAdjustmentControls';
@@ -49,6 +50,7 @@ describe('stock adjustment conflict handling', () => {
 
     await waitFor(() => expect(screen.getByRole('button', {name: 'Discard outdated changes'})).toBeTruthy());
     const discardButton = screen.getByRole('button', {name: 'Discard outdated changes'});
+    expect(StyleSheet.flatten(discardButton.props.style).minHeight).toBeGreaterThanOrEqual(44);
     expect(discardButton.props.accessibilityState).toMatchObject({disabled: true});
     await fireEvent.press(screen.getByRole('button', {name: 'Refresh current quantity'}));
     await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
