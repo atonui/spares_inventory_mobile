@@ -18,7 +18,8 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
   onQuantityChange: (quantity: number) => void;
   onRefresh: () => Promise<number>;
 }) {
-  const lowStock = item.quantity <= item.minThreshold;
+  const outOfStock = item.quantity === 0;
+  const lowStock = !outOfStock && item.quantity <= item.minThreshold;
   const canChangeStock = user?.id === userId && canAdjustStock(user, item);
 
   return (
@@ -26,12 +27,12 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
       <View style={styles.hero}>
         <Text accessibilityRole="header" style={styles.partNumber}>{item.partNumber}</Text>
         <Text style={styles.description}>{item.description}</Text>
-        <View style={[styles.stockBadge, lowStock && styles.lowStockBadge]}>
-          <Text style={[styles.stockValue, lowStock && styles.lowStockText]}>
+        <View style={[styles.stockBadge, lowStock && styles.lowStockBadge, outOfStock && styles.outOfStockBadge]}>
+          <Text style={[styles.stockValue, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>
             {item.quantity} {item.quantity === 1 ? 'unit' : 'units'}
           </Text>
-          <Text style={[styles.stockLabel, lowStock && styles.lowStockText]}>
-            {lowStock ? 'LOW STOCK' : 'IN STOCK'}
+          <Text style={[styles.stockLabel, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>
+            {outOfStock ? 'OUT OF STOCK' : lowStock ? 'LOW STOCK' : 'IN STOCK'}
           </Text>
         </View>
       </View>
@@ -89,6 +90,8 @@ const styles = StyleSheet.create({
   stockLabel: {marginTop: 2, fontSize: 9, fontWeight: '800', letterSpacing: 0.8, color: '#21653A'},
   lowStockBadge: {backgroundColor: '#FCE8D9'},
   lowStockText: {color: '#8A3E18'},
+  outOfStockBadge: {backgroundColor: '#FFF0EE'},
+  outOfStockText: {color: '#A13A32'},
   card: {padding: 16, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   accessNotice: {padding: 14, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   accessNoticeText: {fontSize: 13, lineHeight: 19, color: palette.muted},
