@@ -18,6 +18,14 @@ async function openSignOut(screen: ReturnType<typeof render>) {
   await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
 }
 
+async function openFilterSort(screen: ReturnType<typeof render>) {
+  await fireEvent.press(screen.getByRole('button', {name: /Filter and sort inventory/}));
+}
+
+async function applyFilterSort(screen: ReturnType<typeof render>) {
+  await fireEvent.press(screen.getByRole('button', {name: 'Done'}));
+}
+
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 let mockItemId = '2';
@@ -321,26 +329,36 @@ describe('inventory device-pairing flow', () => {
     await pairFromPreview(screen);
 
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+    await applyFilterSort(screen);
 
     expect(screen.getByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeNull();
     expect(screen.queryByRole('button', {name: /View M-410720, Magnetron control cable/})).toBeNull();
     expect(screen.queryByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeNull();
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Allocated'}));
+    await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeNull();
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Available'}));
+    await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeNull();
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+    await applyFilterSort(screen);
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), '6190901970');
     expect(screen.getByText('No matching stock')).toBeTruthy();
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'All'}));
+    await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeTruthy();
   });
 
@@ -350,12 +368,14 @@ describe('inventory device-pairing flow', () => {
     await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
+    await openFilterSort(screen);
     expect(screen.getByRole('radio', {name: 'All'})).toHaveTextContent('All · 4');
     expect(screen.getByRole('radio', {name: 'Low stock'})).toHaveTextContent('Low stock · 1');
     expect(screen.getByRole('radio', {name: 'Out of stock'})).toHaveTextContent('Out of stock · 1');
     expect(screen.getByRole('radio', {name: 'Available'})).toHaveTextContent('Available · 3');
     expect(screen.getByRole('radio', {name: 'Allocated'})).toHaveTextContent('Allocated · 1');
     await fireEvent.press(screen.getByRole('radio', {name: 'Out of stock'}));
+    await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeNull();
   });
@@ -364,9 +384,10 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
     await pairFromPreview(screen);
 
-    await fireEvent.press(screen.getByRole('button', {name: 'Open menu'}));
-    expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Sign out'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
+    await openFilterSort(screen);
+    expect(StyleSheet.flatten(screen.getByRole('button', {name: /Filter and sort inventory/}).props.style).minHeight).toBeGreaterThanOrEqual(44);
     expect(StyleSheet.flatten(screen.getByRole('radio', {name: 'Lowest stock'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
+    await applyFilterSort(screen);
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'filter');
     expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Clear search'}).props.style).height).toBeGreaterThanOrEqual(44);
@@ -431,7 +452,9 @@ describe('inventory device-pairing flow', () => {
     await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Lowest stock'}));
+    await applyFilterSort(screen);
     const inventoryLabels = screen.getAllByRole('button')
       .map(button => button.props.accessibilityLabel)
       .filter((label): label is string => typeof label === 'string' && label.startsWith('View '))
@@ -443,7 +466,9 @@ describe('inventory device-pairing flow', () => {
       '6190901970',
     ]);
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
+    await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeNull();
     expect(screen.queryByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeNull();
@@ -485,7 +510,9 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(announce).toHaveBeenLastCalledWith('Search results: 1 of 4 items.'));
 
     announce.mockClear();
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Out of stock'}));
+    await applyFilterSort(screen);
     await waitFor(() => expect(announce).toHaveBeenLastCalledWith('Search results · Out of stock filter: 0 of 4 items.'));
     announce.mockRestore();
   });
@@ -496,8 +523,10 @@ describe('inventory device-pairing flow', () => {
     await pairFromPreview(screen);
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
+    await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
     await fireEvent.press(screen.getByRole('radio', {name: 'Lowest stock'}));
+    await applyFilterSort(screen);
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'no-such-part');
 
     expect(screen.getByText('No matching stock')).toBeTruthy();
@@ -507,8 +536,10 @@ describe('inventory device-pairing flow', () => {
     expect(dismissKeyboard).toHaveBeenCalledTimes(1);
     dismissKeyboard.mockRestore();
     expect(screen.getByLabelText('Search inventory').props.value).toBe('');
+    await openFilterSort(screen);
     expect(screen.getByRole('radio', {name: 'All'}).props.accessibilityState.checked).toBe(true);
     expect(screen.getByRole('radio', {name: 'Default'}).props.accessibilityState.checked).toBe(true);
+    await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeTruthy();
     expect(screen.getByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeTruthy();
     expect(screen.getByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeTruthy();
