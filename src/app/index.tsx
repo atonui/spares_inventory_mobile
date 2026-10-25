@@ -21,6 +21,7 @@ import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
 import {clearInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
+import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAccessibility';
 import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import DesktopPairing from '../features/auth/DesktopPairing';
@@ -511,7 +512,7 @@ export default function InventoryScreen() {
               return (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`View ${row.partNumber}, ${row.description}`}
+                  accessibilityLabel={inventoryRowAccessibilityLabel(row)}
                   accessibilityHint="Opens stock details"
                   onPress={() => {
                     Keyboard.dismiss();
