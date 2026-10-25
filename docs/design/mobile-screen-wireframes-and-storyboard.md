@@ -7,6 +7,12 @@
 
 This document turns the mobile UX principles into a screen-by-screen design. It is the source of truth for follow-up UI changes: implement and review one screen or one cohesive state family at a time, then validate the end-to-end storyboard.
 
+## Visual wireframes
+
+The vector screen board below shows all seven primary screens and the end-to-end find-to-recovery storyboard. Open the SVG directly for a scalable view.
+
+![Spares Tracker mobile screen wireframes](mobile-screen-wireframes.svg)
+
 ## Product priorities
 
 1. Let a worker identify a part and its available quantity in a glance.
