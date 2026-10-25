@@ -84,6 +84,7 @@ export default function InventoryScreen() {
   const [error, setError] = useState('');
   const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus>({savedAt: null, queued: 0, conflicts: 0});
   const [usingCachedInventory, setUsingCachedInventory] = useState(false);
+  const [networkConnected, setNetworkConnected] = useState<boolean | null>(null);
   const [pendingSignOutCount, setPendingSignOutCount] = useState<number | null>(null);
   const [checkingSignOut, setCheckingSignOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
@@ -177,8 +178,18 @@ export default function InventoryScreen() {
 
   useEffect(() => {
     if (!hasSession || !user) return;
+    let active = true;
+    let listenerReportedState = false;
+    void Network.getNetworkStateAsync().then(state => {
+      if (active && !listenerReportedState) {
+        setNetworkConnected(state.isConnected === true && state.isInternetReachable !== false);
+      }
+    }).catch(() => undefined);
     const subscription = Network.addNetworkStateListener(state => {
-      if (state.isConnected && state.isInternetReachable !== false) {
+      listenerReportedState = true;
+      const connected = state.isConnected === true && state.isInternetReachable !== false;
+      setNetworkConnected(connected);
+      if (connected) {
         void loadInventory(user.id).catch(reason => {
           if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
             void restoreSession();
@@ -188,7 +199,10 @@ export default function InventoryScreen() {
         });
       }
     });
-    return () => subscription.remove();
+    return () => {
+      active = false;
+      subscription.remove();
+    };
   }, [hasSession, user, loadInventory, restoreSession]);
 
   useEffect(() => {
@@ -352,6 +366,7 @@ export default function InventoryScreen() {
   const visibleInventory = useMemo(() => getVisibleInventory(inventoryFilter), [getVisibleInventory, inventoryFilter]);
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
+  const isOffline = usingCachedInventory || networkConnected === false;
 
   const inventoryFilterCounts = useMemo(() => inventory.reduce((counts, row) => {
     counts.all += 1;
@@ -399,9 +414,9 @@ export default function InventoryScreen() {
             </View>
           </View>
 
-          <View accessibilityRole="summary" style={[styles.syncBanner, usingCachedInventory && styles.syncBannerOffline]}>
+          <View accessibilityRole="summary" style={[styles.syncBanner, isOffline && styles.syncBannerOffline]}>
             <View style={styles.syncBannerText}>
-              <Text style={styles.syncBannerTitle}>{usingCachedInventory ? 'Offline · saved inventory' : 'Saved inventory'}</Text>
+              <Text style={styles.syncBannerTitle}>{isOffline ? 'Offline · saved inventory' : 'Saved inventory'}</Text>
               <Text style={styles.syncBannerDetail}>Last refreshed · {formatSnapshotTime(snapshotStatus.savedAt)}</Text>
             </View>
             {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
