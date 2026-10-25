@@ -181,6 +181,35 @@ export const offlineStockStore: OfflineStockStorage = {
       adjustment.expectedQuantity, adjustment.newQuantity, adjustment.createdAt, adjustment.status, adjustment.error);
     notifyQueueChanged();
   },
+  async replaceQueued(adjustment) {
+    if (Platform.OS === 'web') {
+      const entries = getWebEntries();
+      const existing = entries.find(item => item.userId === adjustment.userId &&
+        item.inventoryId === adjustment.inventoryId && item.status === 'queued');
+      const replacement = existing
+        ? {...adjustment, expectedQuantity: existing.expectedQuantity, operationId: existing.operationId, createdAt: existing.createdAt}
+        : adjustment;
+      saveWebEntries([...entries.filter(item => !(item.userId === adjustment.userId &&
+        item.inventoryId === adjustment.inventoryId && item.status === 'queued')), replacement]);
+      notifyQueueChanged();
+      return;
+    }
+    const db = await database();
+    await db.withTransactionAsync(async () => {
+      const existing = await db.getFirstAsync<{operation_id: string; expected_quantity: number; created_at: number}>(
+        "SELECT operation_id,expected_quantity,created_at FROM stock_adjustments WHERE user_id=? AND inventory_id=? AND status='queued' ORDER BY created_at,rowid LIMIT 1",
+        adjustment.userId, adjustment.inventoryId);
+      if (existing) {
+        await db.runAsync("DELETE FROM stock_adjustments WHERE user_id=? AND inventory_id=? AND status='queued'",
+          adjustment.userId, adjustment.inventoryId);
+      }
+      await db.runAsync('INSERT INTO stock_adjustments (operation_id,user_id,inventory_id,expected_quantity,new_quantity,created_at,status,error) VALUES(?,?,?,?,?,?,?,?)',
+        existing?.operation_id ?? adjustment.operationId, adjustment.userId, adjustment.inventoryId,
+        existing?.expected_quantity ?? adjustment.expectedQuantity, adjustment.newQuantity,
+        existing?.created_at ?? adjustment.createdAt, 'queued', null);
+    });
+    notifyQueueChanged();
+  },
   async list(userId) {
     if (Platform.OS === 'web') {
       return getWebEntries().filter(item => item.userId === userId).sort((a, b) => a.createdAt - b.createdAt);

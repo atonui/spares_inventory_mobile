@@ -13,6 +13,7 @@ export type QueuedStockAdjustment = {
 
 export type StockQueueStore = {
   enqueue(adjustment: QueuedStockAdjustment): Promise<void>;
+  replaceQueued(adjustment: QueuedStockAdjustment): Promise<void>;
   list(userId: number): Promise<QueuedStockAdjustment[]>;
   remove(operationId: string): Promise<void>;
   markConflict(operationId: string, message: string): Promise<void>;
@@ -47,6 +48,32 @@ export async function enqueueStockCount(
     error: null,
   };
   await store.enqueue(adjustment);
+  return adjustment;
+}
+
+export async function saveStockCount(
+  store: StockQueueStore,
+  input: Omit<QueuedStockAdjustment, 'operationId' | 'createdAt' | 'status' | 'error'>,
+  now = Date.now(),
+): Promise<QueuedStockAdjustment> {
+  if (!Number.isInteger(input.userId) || input.userId < 1 ||
+      !Number.isInteger(input.inventoryId) || input.inventoryId < 1 ||
+      !Number.isInteger(input.expectedQuantity) || input.expectedQuantity < 0 ||
+      !Number.isInteger(input.newQuantity) || input.newQuantity < 0 ||
+      input.expectedQuantity === input.newQuantity) {
+    throw new Error('Enter a valid stock quantity.');
+  }
+  const entries = await store.list(input.userId);
+  const existing = entries.find(entry => entry.inventoryId === input.inventoryId && entry.status === 'queued');
+  const adjustment: QueuedStockAdjustment = {
+    ...input,
+    expectedQuantity: existing?.expectedQuantity ?? input.expectedQuantity,
+    operationId: existing?.operationId ?? createOperationId(now),
+    createdAt: existing?.createdAt ?? now,
+    status: 'queued',
+    error: null,
+  };
+  await store.replaceQueued(adjustment);
   return adjustment;
 }
 

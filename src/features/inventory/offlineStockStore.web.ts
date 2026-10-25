@@ -83,6 +83,17 @@ export const offlineStockStore: OfflineStockStorage = {
     saveWebEntries(entries);
     notifyQueueChanged();
   },
+  async replaceQueued(adjustment) {
+    const entries = getWebEntries();
+    const existing = entries.find(item => item.userId === adjustment.userId &&
+      item.inventoryId === adjustment.inventoryId && item.status === 'queued');
+    const replacement = existing
+      ? {...adjustment, expectedQuantity: existing.expectedQuantity, operationId: existing.operationId, createdAt: existing.createdAt}
+      : adjustment;
+    saveWebEntries([...entries.filter(item => !(item.userId === adjustment.userId &&
+      item.inventoryId === adjustment.inventoryId && item.status === 'queued')), replacement]);
+    notifyQueueChanged();
+  },
   async list(userId) {
     return getWebEntries().filter(item => item.userId === userId)
       .sort((a, b) => a.createdAt - b.createdAt);
