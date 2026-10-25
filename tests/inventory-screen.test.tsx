@@ -136,6 +136,34 @@ describe('inventory device-pairing flow', () => {
     expect(getCachedInventoryItem(2)).toBeUndefined();
   });
 
+  it('asks before signing out when offline stock changes are still saved', async () => {
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+    jest.spyOn(offlineStockStore, 'list').mockResolvedValue([
+      {operationId: 'queued-1', userId: 1, inventoryId: 1, expectedQuantity: 2, newQuantity: 4,
+        createdAt: 1000, status: 'queued', error: null},
+      {operationId: 'conflict-1', userId: 1, inventoryId: 2, expectedQuantity: 1, newQuantity: 3,
+        createdAt: 2000, status: 'conflict', error: 'Stock changed on the server.'},
+    ]);
+    const remove = jest.spyOn(offlineStockStore, 'remove');
+    const logout = jest.spyOn(api, 'logout');
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+
+    await waitFor(() => expect(screen.getByText(/2 unsynced stock changes are saved on this device/)).toBeTruthy());
+    expect(logout).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', {name: 'Stay signed in'}));
+    expect(screen.getByText('Inventory')).toBeTruthy();
+    expect(logout).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+    await waitFor(() => expect(screen.getByText('Keep your offline changes?')).toBeTruthy());
+    await fireEvent.press(screen.getByRole('button', {name: 'Sign out and keep changes'}));
+    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it('does not report empty stock when the inventory request fails, and retries cleanly', async () => {
     const inventoryRequest = jest.spyOn(api, 'getInventory')
       .mockRejectedValueOnce(new Error('Inventory service unavailable'));

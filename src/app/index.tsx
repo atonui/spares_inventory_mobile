@@ -4,6 +4,7 @@ import {
   FlatList,
   Image,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -71,6 +72,9 @@ export default function InventoryScreen() {
   const [error, setError] = useState('');
   const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus>({savedAt: null, queued: 0, conflicts: 0});
   const [usingCachedInventory, setUsingCachedInventory] = useState(false);
+  const [pendingSignOutCount, setPendingSignOutCount] = useState<number | null>(null);
+  const [checkingSignOut, setCheckingSignOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   const pairingCancelledRef = useRef(false);
   const syncInFlightRef = useRef<Promise<unknown> | null>(null);
   const [search, setSearch] = useState('');
@@ -234,6 +238,7 @@ export default function InventoryScreen() {
       if (!result.success) throw new ApiError('The server could not confirm sign out.', 0);
       await offlineStockStore.setActiveUserId(null);
       clearInventorySnapshot();
+      setPendingSignOutCount(null);
       setHasSession(false);
       setUser(null);
       setInventory([]);
@@ -243,14 +248,35 @@ export default function InventoryScreen() {
         await api.clearSession();
         await offlineStockStore.setActiveUserId(null);
         clearInventorySnapshot();
+        setPendingSignOutCount(null);
         setHasSession(false);
         setUser(null);
         setInventory([]);
         setSearch('');
       }
-      setError(`Sign out failed: ${responseMessage(reason)}`);
+      const message = `Sign out failed: ${responseMessage(reason)}`;
+      setSignOutError(message);
+      setError(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function requestSignOut() {
+    if (!user || loading || checkingSignOut) return;
+    setCheckingSignOut(true);
+    setSignOutError('');
+    try {
+      const pending = await offlineStockStore.list(user.id);
+      if (pending.length > 0) {
+        setPendingSignOutCount(pending.length);
+      } else {
+        await signOut();
+      }
+    } catch {
+      setError('Could not check saved stock changes. Try again before signing out.');
+    } finally {
+      setCheckingSignOut(false);
     }
   }
 
@@ -335,8 +361,8 @@ export default function InventoryScreen() {
             >
               <Text style={styles.signOutText}>Scan</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={signOut} disabled={loading} style={styles.signOutButton}>
-              <Text style={styles.signOutText}>{loading ? '…' : 'Sign out'}</Text>
+            <Pressable accessibilityRole="button" onPress={() => void requestSignOut()} disabled={loading || checkingSignOut} style={styles.signOutButton}>
+              <Text style={styles.signOutText}>{loading || checkingSignOut ? '…' : 'Sign out'}</Text>
             </Pressable>
           </View>
 
@@ -506,6 +532,32 @@ export default function InventoryScreen() {
             }}
           />
         </View>
+        <Modal
+          transparent
+          visible={pendingSignOutCount !== null}
+          animationType="fade"
+          onRequestClose={() => {if (!loading) {setPendingSignOutCount(null); setSignOutError('');}}}
+        >
+          <View style={styles.signOutBackdrop}>
+            <View accessibilityRole="alert" style={styles.signOutCard}>
+              <Text accessibilityRole="header" style={styles.signOutTitle}>Keep your offline changes?</Text>
+              <Text style={styles.signOutMessage}>
+                {pendingSignOutCount} unsynced stock change{pendingSignOutCount === 1 ? ' is' : 's are'} saved on this device. They will remain tied to this account and be available when you sign in again.
+              </Text>
+              {!!signOutError && <Text accessibilityRole="alert" style={styles.signOutError}>{signOutError}</Text>}
+              <View style={styles.signOutActions}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Stay signed in" disabled={loading}
+                  onPress={() => {setPendingSignOutCount(null); setSignOutError('');}} style={styles.signOutKeepButton}>
+                  <Text style={styles.signOutKeepText}>Stay signed in</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Sign out and keep changes" disabled={loading}
+                  onPress={() => void signOut()} style={styles.signOutConfirmButton}>
+                  <Text style={styles.signOutConfirmText}>{loading ? 'Signing out…' : 'Sign out'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -573,6 +625,16 @@ const styles = StyleSheet.create({
   pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
   signOutButton: {paddingVertical: 10, paddingHorizontal: 12},
   signOutText: {fontWeight: '700', color: palette.navy},
+  signOutBackdrop: {flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(21, 38, 59, 0.48)'},
+  signOutCard: {padding: 20, borderRadius: 16, backgroundColor: palette.white},
+  signOutTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
+  signOutMessage: {marginTop: 9, fontSize: 14, lineHeight: 21, color: palette.muted},
+  signOutError: {marginTop: 9, fontSize: 13, lineHeight: 19, color: palette.red},
+  signOutActions: {flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 18},
+  signOutKeepButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  signOutKeepText: {fontSize: 13, fontWeight: '700', color: palette.navy},
+  signOutConfirmButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: palette.navy},
+  signOutConfirmText: {fontSize: 13, fontWeight: '800', color: palette.white},
   welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingBottom: 16},
   syncBanner: {minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: palette.border, borderRadius: 12, backgroundColor: palette.white},
   syncBannerOffline: {borderColor: palette.amber, backgroundColor: '#FFF8EA'},
