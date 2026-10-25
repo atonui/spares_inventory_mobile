@@ -19,6 +19,9 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
   const [notice, setNotice] = useState('');
   const [pendingCount, setPendingCount] = useState(0);
   const [hasConflict, setHasConflict] = useState(false);
+  const [confirmDiscardVisible, setConfirmDiscardVisible] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState('');
   const syncInFlight = useRef(false);
 
   async function refreshPending() {
@@ -114,6 +117,25 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
     }
   }
 
+  async function discardOutdatedChanges() {
+    if (discarding) return;
+    setDiscarding(true);
+    setDiscardError('');
+    try {
+      const entries = await offlineStockStore.list(userId);
+      for (const entry of entries) {
+        if (entry.inventoryId === item.id && entry.status === 'conflict') await offlineStockStore.remove(entry.operationId);
+      }
+      await refreshPending();
+      setNotice('Outdated offline changes removed. The displayed quantity is ready for a new count.');
+      setConfirmDiscardVisible(false);
+    } catch {
+      setDiscardError('Could not remove these changes. Try again.');
+    } finally {
+      setDiscarding(false);
+    }
+  }
+
   return (
     <View>
       {!item.isAllocated && (
@@ -128,18 +150,32 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
       )}
       {pendingCount > 0 && <Text accessibilityRole="text" style={styles.pending}>{hasConflict ? 'Stock changes need review' : `${pendingCount} change${pendingCount === 1 ? '' : 's'} waiting to sync`}</Text>}
       {hasConflict && (
-        <Pressable accessibilityRole="button" onPress={async () => {
-          const entries = await offlineStockStore.list(userId);
-          for (const entry of entries) {
-            if (entry.inventoryId === item.id && entry.status === 'conflict') await offlineStockStore.remove(entry.operationId);
-          }
-          await refreshPending();
-          setNotice('Outdated offline changes removed. The displayed quantity is ready for a new count.');
-        }} style={styles.discardButton}>
+        <Pressable accessibilityRole="button" onPress={() => {setDiscardError(''); setConfirmDiscardVisible(true);}} style={styles.discardButton}>
           <Text style={styles.discardText}>Discard outdated changes</Text>
         </Pressable>
       )}
       {!!notice && <Text accessibilityRole="status" style={styles.notice}>{notice}</Text>}
+      <Modal visible={confirmDiscardVisible} animationType="fade" transparent onRequestClose={() => {if (!discarding) setConfirmDiscardVisible(false);}}>
+        <View style={styles.confirmBackdrop}>
+          <View accessibilityRole="alert" style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Discard these outdated stock changes?</Text>
+            <Text style={styles.helper}>
+              The conflicted count for {item.partNumber} will be removed from this device. Refresh the item before entering a new count.
+            </Text>
+            {!!discardError && <Text accessibilityRole="alert" style={styles.discardError}>{discardError}</Text>}
+            <View style={styles.actions}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Keep outdated changes" disabled={discarding}
+                onPress={() => setConfirmDiscardVisible(false)} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Keep changes</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Confirm discard outdated changes" disabled={discarding}
+                onPress={() => void discardOutdatedChanges()} style={styles.dangerButton}>
+                <Text style={styles.dangerButtonText}>{discarding ? 'Discarding…' : 'Discard'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={mode !== null} animationType="slide" transparent onRequestClose={() => {if (!saving) setMode(null);}}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -189,4 +225,10 @@ const styles = StyleSheet.create({
   title: {fontSize: 20, fontWeight: '800', color: palette.navy},
   helper: {marginTop: 8, fontSize: 14, lineHeight: 20, color: palette.slate},
   input: {minHeight: 54, marginTop: 18, borderWidth: 1, borderColor: palette.line, borderRadius: 12, paddingHorizontal: 14, fontSize: 20, fontWeight: '700', color: palette.navy},
+  confirmBackdrop: {flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#15263B80'},
+  confirmCard: {padding: 20, borderRadius: 16, backgroundColor: palette.white},
+  confirmTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
+  dangerButton: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#A13A32', paddingHorizontal: 12},
+  dangerButtonText: {fontSize: 14, fontWeight: '800', color: palette.white},
+  discardError: {marginTop: 8, fontSize: 13, color: '#A13A32'},
 });
