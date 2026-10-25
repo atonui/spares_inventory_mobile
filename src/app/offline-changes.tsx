@@ -191,6 +191,7 @@ function ChangeCard({change, item, conflict = false, onReview, onDiscard}: {
         <View style={styles.itemCopy}>
           <Text style={styles.partNumber}>{title}</Text>
           <Text style={styles.body}>{item?.description ?? 'Item details are not saved on this device.'}</Text>
+          {item?.storeName && <Text style={styles.storeName}>Store: {item.storeName}</Text>}
         </View>
         <View style={[styles.statusPill, conflict && styles.conflictPill]}>
           <Text style={[styles.statusText, conflict && styles.conflictText]}>{conflict ? 'Review' : 'Queued'}</Text>
@@ -250,6 +251,7 @@ const styles = StyleSheet.create({
   cardTop: {flexDirection: 'row', alignItems: 'flex-start', gap: 10},
   itemCopy: {flex: 1},
   partNumber: {fontSize: 15, fontWeight: '800', color: palette.navy},
+  storeName: {marginTop: 4, fontSize: 12, fontWeight: '700', color: palette.slate},
   statusPill: {paddingHorizontal: 9, paddingVertical: 5, borderRadius: 11, backgroundColor: palette.amberTint},
   conflictPill: {backgroundColor: palette.redTint},
   statusText: {fontSize: 10, fontWeight: '800', color: palette.navy},
