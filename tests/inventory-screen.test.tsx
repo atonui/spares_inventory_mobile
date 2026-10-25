@@ -16,8 +16,12 @@ async function pairFromPreview(screen: ReturnType<typeof render>) {
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 let mockItemId = '2';
+let mockNetworkListener: ((state: {isConnected: boolean; isInternetReachable: boolean}) => void) | null = null;
 
-jest.mock('expo-network', () => ({addNetworkStateListener: () => ({remove: jest.fn()})}));
+jest.mock('expo-network', () => ({addNetworkStateListener: (listener: typeof mockNetworkListener) => {
+  mockNetworkListener = listener;
+  return {remove: jest.fn()};
+}}));
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
@@ -72,6 +76,35 @@ describe('inventory device-pairing flow', () => {
     getMe.mockRestore();
   });
 
+  it.each([
+    {status: 401, message: 'Your session expired. Please sign in again.'},
+    {status: 403, message: 'This account does not have an active company membership.'},
+  ])('does not show cached inventory after an API $status response', async ({status, message}) => {
+    const session = await api.login({email: 'field@company.example', password: 'preview-password', rememberMe: true});
+    await api.saveSession(session);
+    const cachedRows = await api.getInventory();
+    const loadSnapshot = jest.spyOn(offlineStockStore, 'loadInventorySnapshot').mockResolvedValue(cachedRows);
+    jest.spyOn(api, 'getInventory').mockRejectedValue(new ApiError('Access denied', status));
+
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
+    expect(await api.getSession()).toBeNull();
+    expect(loadSnapshot).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
+  });
+
+  it('clears the session when a network refresh reveals a 403 response', async () => {
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+    jest.spyOn(api, 'getInventory').mockRejectedValue(new ApiError('Access denied', 403));
+
+    mockNetworkListener?.({isConnected: true, isInternetReachable: true});
+
+    await waitFor(() => expect(screen.getByText('This account does not have an active company membership.')).toBeTruthy());
+    expect(await api.getSession()).toBeNull();
+  });
+
   it('keeps a session after a temporary restore failure and retries successfully', async () => {
     const session = await api.login({email: 'field@company.example', password: 'preview-password', rememberMe: true});
     await api.saveSession(session);
@@ -117,6 +150,7 @@ describe('inventory device-pairing flow', () => {
     mockPush.mockClear();
     mockBack.mockClear();
     mockItemId = '2';
+    mockNetworkListener = null;
   });
 
   it('pairs a preview device and opens the read-only inventory preview', async () => {

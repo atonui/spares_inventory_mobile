@@ -94,6 +94,7 @@ export default function InventoryScreen() {
       setUsingCachedInventory(false);
       setError(current => current.startsWith('Offline mode ·') ? '' : current);
     } catch (reason) {
+      if (reason instanceof ApiError && [401, 403].includes(reason.status)) throw reason;
       const cachedRows = await offlineStockStore.loadInventorySnapshot(userId);
       if (!cachedRows) throw reason;
       baseRows = cachedRows;
@@ -166,11 +167,17 @@ export default function InventoryScreen() {
     if (!hasSession || !user) return;
     const subscription = Network.addNetworkStateListener(state => {
       if (state.isConnected && state.isInternetReachable !== false) {
-        void loadInventory(user.id).catch(() => undefined);
+        void loadInventory(user.id).catch(reason => {
+          if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
+            void restoreSession();
+          } else {
+            setError(responseMessage(reason));
+          }
+        });
       }
     });
     return () => subscription.remove();
-  }, [hasSession, user, loadInventory]);
+  }, [hasSession, user, loadInventory, restoreSession]);
 
   useEffect(() => {
     if (!user) return;
