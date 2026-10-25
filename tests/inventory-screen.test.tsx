@@ -1,5 +1,5 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
-import {Keyboard, StyleSheet} from 'react-native';
+import {AccessibilityInfo, Keyboard, StyleSheet} from 'react-native';
 import {ApiError} from '../src/api/client';
 import {api} from '../src/api/runtime';
 import {offlineStockStore} from '../src/features/inventory/offlineStockStore';
@@ -453,6 +453,22 @@ describe('inventory device-pairing flow', () => {
     expect(screen.getByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeTruthy();
     expect(screen.getByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: 'Clear search'})).toBeNull();
+  });
+
+  it('announces result counts after submitting search or changing a filter', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+
+    const search = screen.getByLabelText('Search inventory');
+    await fireEvent.changeText(search, '6190901970');
+    await fireEvent(search, 'submitEditing');
+    await waitFor(() => expect(announce).toHaveBeenLastCalledWith('Search results: 1 of 4 items.'));
+
+    announce.mockClear();
+    await fireEvent.press(screen.getByRole('radio', {name: 'Out of stock'}));
+    await waitFor(() => expect(announce).toHaveBeenLastCalledWith('Search results · Out of stock filter: 0 of 4 items.'));
+    announce.mockRestore();
   });
 
   it('clears search, filter, and sort from the no-results state', async () => {

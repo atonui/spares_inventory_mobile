@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  AccessibilityInfo,
   FlatList,
   Image,
   Keyboard,
@@ -38,6 +39,15 @@ function normalizeInventorySearchText(value: string): string {
 
 type InventoryFilter = 'all' | 'outOfStock' | 'lowStock' | 'available' | 'allocated';
 type SnapshotStatus = {savedAt: number | null; queued: number; conflicts: number};
+
+function announceInventoryResultCount(count: number, total: number, query: string, filter: InventoryFilter) {
+  if (Platform.OS === 'web') return;
+  const activeFilter = inventoryFilterOptions.find(option => option.value === filter)?.label;
+  const context = [query.trim() ? 'Search results' : '', filter !== 'all' ? `${activeFilter} filter` : '']
+    .filter(Boolean)
+    .join(' · ');
+  AccessibilityInfo.announceForAccessibility(`${context || 'Inventory'}: ${count} of ${total} items.`);
+}
 
 function formatSnapshotTime(savedAt: number | null): string {
   if (savedAt === null) return 'No saved refresh yet';
@@ -321,22 +331,25 @@ export default function InventoryScreen() {
     ),
   })), [inventory]);
 
-  const visibleInventory = useMemo(() => {
+  const queryTerms = useMemo(() => normalizeInventorySearchText(search.trim()).split(' ').filter(Boolean), [search]);
+
+  const getVisibleInventory = useCallback((filter: InventoryFilter) => {
     const query = search.trim();
-    const queryTerms = normalizeInventorySearchText(query).split(' ').filter(Boolean);
     const filtered = searchableInventory
       .filter(({row, searchableText}) => {
         const matchesSearch = !query || (queryTerms.length > 0 && queryTerms.every(term => searchableText.includes(term)));
-        const matchesFilter = inventoryFilter === 'all' ||
-          (inventoryFilter === 'outOfStock' && row.quantity === 0) ||
-          (inventoryFilter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
-          (inventoryFilter === 'available' && !row.isAllocated) ||
-          (inventoryFilter === 'allocated' && row.isAllocated);
+        const matchesFilter = filter === 'all' ||
+          (filter === 'outOfStock' && row.quantity === 0) ||
+          (filter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
+          (filter === 'available' && !row.isAllocated) ||
+          (filter === 'allocated' && row.isAllocated);
         return matchesSearch && matchesFilter;
       })
       .map(({row}) => row);
     return sortInventory(filtered, inventorySort);
-  }, [searchableInventory, search, inventoryFilter, inventorySort]);
+  }, [searchableInventory, search, queryTerms, inventorySort]);
+
+  const visibleInventory = useMemo(() => getVisibleInventory(inventoryFilter), [getVisibleInventory, inventoryFilter]);
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
 
@@ -415,7 +428,10 @@ export default function InventoryScreen() {
               placeholderTextColor={palette.placeholder}
               style={styles.searchInput}
               returnKeyType="search"
-              onSubmitEditing={() => Keyboard.dismiss()}
+              onSubmitEditing={() => {
+                Keyboard.dismiss();
+                announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);
+              }}
             />
             {search.length > 0 && (
               <Pressable
@@ -442,7 +458,11 @@ export default function InventoryScreen() {
                   accessibilityLabel={option.label}
                   accessibilityHint={`${count} ${count === 1 ? 'item' : 'items'}`}
                   accessibilityState={{checked: selected}}
-                  onPress={() => setInventoryFilter(option.value)}
+                  onPress={() => {
+                    const nextVisibleInventory = getVisibleInventory(option.value);
+                    announceInventoryResultCount(nextVisibleInventory.length, inventory.length, search, option.value);
+                    setInventoryFilter(option.value);
+                  }}
                   style={[styles.filterChip, selected && styles.filterChipSelected]}
                 >
                   <Text style={[styles.filterLabel, selected && styles.filterLabelSelected]}>{option.label} · {count}</Text>
