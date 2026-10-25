@@ -1,5 +1,5 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
-import {Keyboard} from 'react-native';
+import {Keyboard, StyleSheet} from 'react-native';
 import {ApiError} from '../src/api/client';
 import {api} from '../src/api/runtime';
 import {offlineStockStore} from '../src/features/inventory/offlineStockStore';
@@ -340,6 +340,17 @@ describe('inventory device-pairing flow', () => {
     await fireEvent.press(screen.getByRole('radio', {name: 'Out of stock'}));
     expect(screen.getByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeTruthy();
     expect(screen.queryByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/})).toBeNull();
+  });
+
+  it('keeps compact inventory controls at a thumb-friendly minimum target', async () => {
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+
+    expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Sign out'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
+    expect(StyleSheet.flatten(screen.getByRole('radio', {name: 'Lowest stock'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
+
+    await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'filter');
+    expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Clear search'}).props.style).height).toBeGreaterThanOrEqual(44);
   });
 
   it('finds allocated stock by its work-order number', async () => {
