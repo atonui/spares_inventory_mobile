@@ -156,4 +156,41 @@ describe('stock adjustment conflict handling', () => {
     expect(adjustStock.mock.calls[1]?.[0]).toMatchObject({expectedQuantity: 6, newQuantity: 4});
     expect(onQuantityChange).toHaveBeenLastCalledWith(4);
   });
+
+  it('requires an explicit confirmation before saving a zero stock count', async () => {
+    mockQueue = [];
+    const adjustStock = jest.spyOn(api, 'adjustStock').mockRejectedValue(new TypeError('offline'));
+    const onQuantityChange = jest.fn();
+    const screen = await render(<StockAdjustmentControls
+      item={{id: 11, partId: 101, storeId: 1, partNumber: 'PART-11', description: 'Filter element',
+        storeName: 'Main', storeType: 'warehouse', storeOwner: null, quantity: 4,
+        minThreshold: 1, isAllocated: false, workOrder: null}}
+      userId={7}
+      onQuantityChange={onQuantityChange}
+      onRefresh={jest.fn(async () => 4)}
+    />);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Edit count'}));
+    await fireEvent.changeText(screen.getByLabelText('New stock quantity'), '0');
+    await fireEvent.press(screen.getByRole('button', {name: 'Save change'}));
+
+    expect(screen.getByText('Set this item to zero?')).toBeTruthy();
+    expect(screen.getByText(/Confirm the physical count for PART-11 from 4 units to 0/)).toBeTruthy();
+    expect(adjustStock).not.toHaveBeenCalled();
+    expect(onQuantityChange).not.toHaveBeenCalled();
+    expect(mockQueue).toHaveLength(0);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Keep editing count'}));
+    expect(screen.getByLabelText('New stock quantity').props.value).toBe('0');
+    expect(adjustStock).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Save change'}));
+    await fireEvent.press(screen.getByRole('button', {name: 'Confirm zero count'}));
+
+    await waitFor(() => expect(screen.getByText('Saved on this device. It will sync when you’re back online.')).toBeTruthy());
+    expect(adjustStock).toHaveBeenCalledTimes(1);
+    expect(onQuantityChange).toHaveBeenLastCalledWith(0);
+    expect(mockQueue).toHaveLength(1);
+    expect(mockQueue[0]).toMatchObject({expectedQuantity: 4, newQuantity: 0});
+  });
 });
