@@ -22,7 +22,7 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
         storeName: 'Main', storeType: 'warehouse', storeOwner: null, quantity: 4,
         minThreshold: 1, isAllocated: false, workOrder: null},
       {id: 12, partId: 102, storeId: 1, partNumber: 'PART-12', description: 'Drive belt',
-        storeName: 'Main', storeType: 'warehouse', storeOwner: null, quantity: 1,
+        storeName: 'Service van 3', storeType: 'vehicle', storeOwner: 7, quantity: 1,
         minThreshold: 1, isAllocated: false, workOrder: null},
     ]),
     subscribeQueueChanges: jest.fn(() => () => undefined),
@@ -42,6 +42,8 @@ describe('offline changes screen', () => {
 
     await waitFor(() => expect(screen.getByText('PART-11')).toBeTruthy());
     expect(screen.getByText('PART-12')).toBeTruthy();
+    expect(screen.getByText('Store: Main')).toBeTruthy();
+    expect(screen.getByText('Store: Service van 3')).toBeTruthy();
     expect(screen.getByLabelText('Stock count changes from 4 to 6')).toBeTruthy();
     expect(screen.getByLabelText('Stock count changes from 1 to 3')).toBeTruthy();
     expect(screen.getAllByText('Waiting to sync')).toHaveLength(2);
