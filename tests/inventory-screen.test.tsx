@@ -306,7 +306,8 @@ describe('inventory device-pairing flow', () => {
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
 
     expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
-    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'View M-410720, Magnetron control cable'})).toBeNull();
     expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
 
     await fireEvent.press(screen.getByRole('radio', {name: 'Allocated'}));
@@ -332,9 +333,13 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
 
     expect(screen.getByRole('radio', {name: 'All'})).toHaveTextContent('All · 4');
-    expect(screen.getByRole('radio', {name: 'Low stock'})).toHaveTextContent('Low stock · 2');
+    expect(screen.getByRole('radio', {name: 'Low stock'})).toHaveTextContent('Low stock · 1');
+    expect(screen.getByRole('radio', {name: 'Out of stock'})).toHaveTextContent('Out of stock · 1');
     expect(screen.getByRole('radio', {name: 'Available'})).toHaveTextContent('Available · 3');
     expect(screen.getByRole('radio', {name: 'Allocated'})).toHaveTextContent('Allocated · 1');
+    await fireEvent.press(screen.getByRole('radio', {name: 'Out of stock'}));
+    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeNull();
   });
 
   it('finds allocated stock by its work-order number', async () => {
@@ -408,12 +413,13 @@ describe('inventory device-pairing flow', () => {
     ]);
 
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
-    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
     expect(screen.getByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
     expect(screen.queryByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeNull();
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'cooling');
-    expect(screen.getByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeTruthy();
+    expect(screen.getByText('No matching stock')).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'View D-008214, Cooling fan assembly'})).toBeNull();
     expect(screen.queryByRole('button', {name: 'View 110245012, PCB THYRATRON GRID CONTROL'})).toBeNull();
   });
 
