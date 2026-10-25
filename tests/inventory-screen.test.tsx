@@ -261,6 +261,21 @@ describe('inventory device-pairing flow', () => {
     expect(mockPush).toHaveBeenCalledWith({pathname: '/scan', params: {userId: '1'}});
   });
 
+  it('shows inventory-shaped skeleton rows during the first inventory load', async () => {
+    const session = await api.login({email: 'field@company.example', password: 'preview-password', rememberMe: true});
+    await api.saveSession(session);
+    const rows = await api.getInventory();
+    let resolveInventory: ((items: typeof rows) => void) | undefined;
+    jest.spyOn(api, 'getInventory').mockImplementation(() => new Promise(resolve => { resolveInventory = resolve; }));
+
+    const screen = await render(<InventoryScreen />);
+
+    await waitFor(() => expect(screen.getByLabelText('Loading inventory')).toBeTruthy());
+    expect(screen.getByRole('button', {name: 'Scan barcode or QR code'})).toBeTruthy();
+    resolveInventory?.(rows);
+    await waitFor(() => expect(screen.getByRole('button', {name: 'View 6190901970, THYRATRON CX1140LG'})).toBeTruthy());
+  });
+
   it('dismisses the keyboard on search submit and before opening a stock item', async () => {
     const screen = await render(<InventoryScreen />);
 

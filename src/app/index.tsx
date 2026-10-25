@@ -346,7 +346,7 @@ export default function InventoryScreen() {
     setInventorySort('default');
   }
 
-  if (!isReady || (loading && !user && hasSession)) {
+  if ((!isReady && !user) || (loading && !user && hasSession)) {
     return <LoadingScreen message="Checking your session…" />;
   }
 
@@ -360,14 +360,6 @@ export default function InventoryScreen() {
               <Text style={styles.wordmark}>Spares Tracker</Text>
               <Text style={styles.pageTitle}>Inventory</Text>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Scan barcode or QR code"
-              onPress={() => router.push({pathname: '/scan', params: {userId: String(user.id)}})}
-              style={styles.signOutButton}
-            >
-              <Text style={styles.signOutText}>Scan</Text>
-            </Pressable>
             <Pressable accessibilityRole="button" onPress={() => void requestSignOut()} disabled={loading || checkingSignOut} style={styles.signOutButton}>
               <Text style={styles.signOutText}>{loading || checkingSignOut ? '…' : 'Sign out'}</Text>
             </Pressable>
@@ -483,7 +475,7 @@ export default function InventoryScreen() {
                 Showing {visibleInventory.length} of {inventory.length} {inventory.length === 1 ? 'item' : 'items'}
               </Text>
             ) : undefined}
-            ListEmptyComponent={error ? <></> : (
+            ListEmptyComponent={loading && !error ? <InventorySkeleton /> : error ? <></> : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>
@@ -505,6 +497,7 @@ export default function InventoryScreen() {
               </View>
             )}
             renderItem={({item: row}) => {
+              const outOfStock = row.quantity === 0;
               const lowStock = row.quantity <= row.minThreshold;
               return (
                 <Pressable
@@ -519,25 +512,32 @@ export default function InventoryScreen() {
                 >
                   <View style={styles.cardTop}>
                     <Text style={styles.partNumber}>{row.partNumber}</Text>
-                    <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge]}>
-                      <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText]}>{row.quantity}</Text>
-                      <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText]}>{lowStock ? 'LOW STOCK' : 'IN STOCK'}</Text>
+                    <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge, outOfStock && styles.outQuantityBadge]}>
+                      <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{row.quantity}</Text>
+                      <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{outOfStock ? 'OUT OF STOCK' : lowStock ? 'LOW STOCK' : 'IN STOCK'}</Text>
                     </View>
                   </View>
                   <Text style={styles.description}>{row.description}</Text>
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.storeName}>{row.storeName}</Text>
-                    <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
-                  </View>
                   <View style={styles.statusRow}>
-                    <Text style={row.isAllocated ? styles.allocatedStatus : styles.availableStatus}>
-                      {row.isAllocated ? `Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : 'Available'}
+                    <Text style={[styles.locationText, row.isAllocated && styles.allocatedStatus]} numberOfLines={1}>
+                      {row.storeName}{row.isAllocated ? ` · Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : ''}
                     </Text>
+                    <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
                   </View>
                 </Pressable>
               );
             }}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Scan barcode or QR code"
+            accessibilityHint="Opens the camera to find a stock item"
+            onPress={() => router.push({pathname: '/scan', params: {userId: String(user.id)}})}
+            style={({pressed}) => [styles.scanAction, pressed && styles.scanActionPressed]}
+          >
+            <Text style={styles.scanActionIcon} accessible={false}>⌗</Text>
+            <Text style={styles.scanActionText}>Scan item</Text>
+          </Pressable>
         </View>
         <Modal
           transparent
@@ -607,6 +607,23 @@ function ErrorNotice({message, onRetry}: {message: string; onRetry?: () => void}
   );
 }
 
+function InventorySkeleton() {
+  return (
+    <View accessibilityRole="progressbar" accessibilityLabel="Loading inventory" style={styles.skeletonList}>
+      {[0, 1, 2, 3].map(index => (
+        <View key={index} style={styles.skeletonCard}>
+          <View style={styles.skeletonTopRow}>
+            <View style={[styles.skeletonLine, styles.skeletonPartNumber]} />
+            <View style={styles.skeletonQuantity} />
+          </View>
+          <View style={[styles.skeletonLine, styles.skeletonDescription]} />
+          <View style={[styles.skeletonLine, styles.skeletonLocation]} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const palette = {
   navy: '#15263B',
   amber: '#E9A23B',
@@ -669,24 +686,36 @@ const styles = StyleSheet.create({
   sortLabel: {marginBottom: 6, fontSize: 12, fontWeight: '700', color: palette.muted},
   sortRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 7},
   sortChip: {minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 20, backgroundColor: palette.white},
-  listContent: {paddingTop: 13, paddingBottom: 28, gap: 10},
+  listContent: {paddingTop: 13, paddingBottom: 104, gap: 8},
   resultsSummary: {paddingHorizontal: 2, paddingBottom: 2, fontSize: 12, fontWeight: '600', color: palette.muted},
-  stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 15, padding: 15, shadowColor: '#152D43', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.045, shadowRadius: 9, elevation: 1},
+  stockCard: {backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, paddingVertical: 11},
   stockCardPressed: {opacity: 0.72},
   cardTop: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10},
   partNumber: {flex: 1, marginTop: 2, fontSize: 15, fontWeight: '800', letterSpacing: 0.2, color: palette.navy},
-  description: {marginTop: 5, fontSize: 14, lineHeight: 20, fontWeight: '500', color: palette.text},
+  description: {marginTop: 3, fontSize: 13, lineHeight: 18, fontWeight: '500', color: palette.text},
   quantityBadge: {minWidth: 67, alignItems: 'center', backgroundColor: '#EAF4EC', borderRadius: 10, paddingVertical: 5, paddingHorizontal: 8},
   quantityValue: {fontSize: 17, fontWeight: '800', color: '#287441'},
   quantityCaption: {fontSize: 7, fontWeight: '800', letterSpacing: 0.8, color: '#287441'},
   lowQuantityBadge: {backgroundColor: '#FFF0E8'},
   lowQuantityText: {color: '#A54E1E'},
-  cardFooter: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 13, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EDF1F4'},
-  statusRow: {marginTop: 8},
-  availableStatus: {fontSize: 12, fontWeight: '700', color: '#287441'},
-  allocatedStatus: {fontSize: 12, fontWeight: '700', color: palette.slate},
-  storeName: {flex: 1, marginRight: 8, fontSize: 12, fontWeight: '700', color: palette.muted},
+  outQuantityBadge: {backgroundColor: palette.redTint},
+  outQuantityText: {color: palette.red},
+  statusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8},
+  locationText: {flex: 1, fontSize: 12, fontWeight: '700', color: palette.muted},
+  allocatedStatus: {color: palette.slate},
   threshold: {fontSize: 11, color: palette.muted},
+  scanAction: {position: 'absolute', bottom: 16, alignSelf: 'center', minHeight: 56, minWidth: 174, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 22, borderRadius: 28, backgroundColor: palette.navy, borderWidth: 2, borderColor: palette.white, shadowColor: '#152D43', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6},
+  scanActionPressed: {opacity: 0.82, transform: [{scale: 0.98}]},
+  scanActionIcon: {fontSize: 24, lineHeight: 28, color: palette.white},
+  scanActionText: {fontSize: 15, fontWeight: '800', color: palette.white},
+  skeletonList: {gap: 8},
+  skeletonCard: {paddingHorizontal: 13, paddingVertical: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 13, backgroundColor: palette.white},
+  skeletonTopRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
+  skeletonLine: {borderRadius: 6, backgroundColor: '#E8EDF2'},
+  skeletonPartNumber: {width: '48%', height: 17},
+  skeletonQuantity: {width: 62, height: 39, borderRadius: 10, backgroundColor: '#E8EDF2'},
+  skeletonDescription: {width: '76%', height: 14, marginTop: 9},
+  skeletonLocation: {width: '57%', height: 12, marginTop: 12},
   emptyState: {alignItems: 'center', paddingHorizontal: 24, paddingTop: 70},
   emptyTitle: {fontSize: 17, fontWeight: '800', color: palette.text},
   emptyResetButton: {minHeight: 44, justifyContent: 'center', marginTop: 15, paddingHorizontal: 16, borderWidth: 1, borderColor: palette.amber, borderRadius: 22, backgroundColor: palette.white},
