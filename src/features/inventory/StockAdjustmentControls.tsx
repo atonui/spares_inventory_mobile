@@ -17,6 +17,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [value, setValue] = useState('');
+  const [zeroCountConfirmationVisible, setZeroCountConfirmationVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [pendingCount, setPendingCount] = useState(0);
@@ -80,7 +81,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     return () => subscription.remove();
   }, [userId, item.id, onQuantityChange]);
 
-  async function save() {
+  async function save(confirmZeroCount = false) {
     const amount = Number(value);
     if (!Number.isSafeInteger(amount) || amount < 0 || (mode === 'add' && amount < 1)) {
       setNotice(mode === 'add' ? 'Enter a whole number greater than zero.' : 'Enter a whole number of zero or more.');
@@ -93,6 +94,11 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     }
     if (nextQuantity === item.quantity) {
       setNotice('The count matches the current quantity.');
+      return;
+    }
+    if (mode === 'count' && item.quantity > 0 && amount === 0 && !confirmZeroCount) {
+      setNotice('');
+      setZeroCountConfirmationVisible(true);
       return;
     }
 
@@ -111,6 +117,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       onQuantityChange(nextQuantity);
       setMode(null);
       setValue('');
+      setZeroCountConfirmationVisible(false);
       const sync = await syncQueuedStock(offlineStockStore, userId, api.adjustStock);
       const entries = await offlineStockStore.list(userId);
       const itemEntries = entries.filter(entry => entry.inventoryId === item.id);
@@ -227,10 +234,10 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     <View>
       {!item.isAllocated && (
         <View style={styles.actions}>
-          <Pressable accessibilityRole="button" disabled={hasConflict} onPress={() => {setMode('add'); setValue(''); setNotice('');}} style={styles.primaryButton}>
+          <Pressable accessibilityRole="button" disabled={hasConflict} onPress={() => {setMode('add'); setValue(''); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Add stock</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" disabled={hasConflict} onPress={() => {setMode('count'); setValue(String(item.quantity)); setNotice('');}} style={styles.secondaryButton}>
+          <Pressable accessibilityRole="button" disabled={hasConflict} onPress={() => {setMode('count'); setValue(String(item.quantity)); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Edit count</Text>
           </Pressable>
         </View>
@@ -280,31 +287,56 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
           </View>
         </View>
       </Modal>
-      <Modal visible={mode !== null} animationType="slide" transparent onRequestClose={() => {if (!saving) setMode(null);}}>
+      <Modal visible={mode !== null} animationType="slide" transparent onRequestClose={() => {
+        if (saving) return;
+        if (zeroCountConfirmationVisible) setZeroCountConfirmationVisible(false);
+        else setMode(null);
+      }}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text accessibilityRole="header" style={styles.title}>{mode === 'add' ? 'Add stock' : 'Edit stock count'}</Text>
-            <Text style={styles.helper}>
-              {mode === 'add' ? `Current quantity: ${item.quantity}. Enter units received.` : `Current quantity: ${item.quantity}. Enter the new counted total.`}
-            </Text>
-            <TextInput
-              accessibilityLabel={mode === 'add' ? 'Quantity to add' : 'New stock quantity'}
-              value={value}
-              onChangeText={setValue}
-              keyboardType="number-pad"
-              inputMode="numeric"
-              selectTextOnFocus
-              editable={!saving}
-              style={styles.input}
-            />
-            <View style={styles.actions}>
-              <Pressable accessibilityRole="button" disabled={saving} onPress={() => setMode(null)} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" disabled={saving} onPress={() => void save()} style={styles.primaryButton}>
-                {saving ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.primaryButtonText}>Save change</Text>}
-              </Pressable>
-            </View>
+            {zeroCountConfirmationVisible ? (
+              <View accessibilityRole="alert">
+                <Text accessibilityRole="header" style={styles.title}>Set this item to zero?</Text>
+                <Text style={styles.helper}>
+                  Confirm the physical count for {item.partNumber} from {item.quantity} units to 0. This change will be recorded.
+                </Text>
+                <View style={styles.actions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Keep editing count" disabled={saving}
+                    onPress={() => setZeroCountConfirmationVisible(false)} style={styles.secondaryButton}>
+                    <Text style={styles.secondaryButtonText}>Keep editing</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Confirm zero count" disabled={saving}
+                    onPress={() => {setZeroCountConfirmationVisible(false); void save(true);}} style={styles.primaryButton}>
+                    {saving ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.primaryButtonText}>Confirm zero count</Text>}
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <>
+                <Text accessibilityRole="header" style={styles.title}>{mode === 'add' ? 'Add stock' : 'Edit stock count'}</Text>
+                <Text style={styles.helper}>
+                  {mode === 'add' ? `Current quantity: ${item.quantity}. Enter units received.` : `Current quantity: ${item.quantity}. Enter the new counted total.`}
+                </Text>
+                <TextInput
+                  accessibilityLabel={mode === 'add' ? 'Quantity to add' : 'New stock quantity'}
+                  value={value}
+                  onChangeText={setValue}
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  selectTextOnFocus
+                  editable={!saving}
+                  style={styles.input}
+                />
+                <View style={styles.actions}>
+                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => setMode(null)} style={styles.secondaryButton}>
+                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => void save()} style={styles.primaryButton}>
+                    {saving ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.primaryButtonText}>Save change</Text>}
+                  </Pressable>
+                </View>
+              </>
+            )}
             {!!notice && <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text>}
           </View>
         </View>
