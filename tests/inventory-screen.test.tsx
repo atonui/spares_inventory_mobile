@@ -1,4 +1,4 @@
-import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 import {AccessibilityInfo, Keyboard, StyleSheet} from 'react-native';
 import {ApiError} from '../src/api/client';
 import {api} from '../src/api/runtime';
@@ -21,7 +21,7 @@ let mockNetworkListener: ((state: {isConnected: boolean; isInternetReachable: bo
 jest.mock('expo-network', () => ({addNetworkStateListener: (listener: typeof mockNetworkListener) => {
   mockNetworkListener = listener;
   return {remove: jest.fn()};
-}}));
+}, getNetworkStateAsync: jest.fn(async () => ({isConnected: true, isInternetReachable: true}))}));
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
@@ -103,6 +103,19 @@ describe('inventory device-pairing flow', () => {
 
     await waitFor(() => expect(screen.getByText('This account does not have an active company membership.')).toBeTruthy());
     expect(await api.getSession()).toBeNull();
+  });
+
+  it('shows offline status immediately when connectivity drops after inventory loads', async () => {
+    const screen = await render(<InventoryScreen />);
+    await pairFromPreview(screen);
+    await waitFor(() => expect(screen.getByText('Saved inventory')).toBeTruthy());
+
+    await act(async () => {
+      mockNetworkListener?.({isConnected: false, isInternetReachable: false});
+    });
+
+    await waitFor(() => expect(screen.getByText('Offline · saved inventory')).toBeTruthy());
+    expect(screen.getByText(/Last refreshed · Updated/)).toBeTruthy();
   });
 
   it('keeps a session after a temporary restore failure and retries successfully', async () => {
