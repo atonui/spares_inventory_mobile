@@ -99,6 +99,19 @@ export default function InventoryItemDetailScreen() {
     return () => { active = false; };
   }, [itemId, userIdParam, attempt]);
 
+  async function refreshCurrentQuantity(): Promise<number> {
+    if (userId === null) throw new Error('No active account');
+    const serverRows = await api.getInventory();
+    const queue = await offlineStockStore.list(userId);
+    const rows = applyQueuedStockCounts(serverRows, queue);
+    await offlineStockStore.saveInventorySnapshot(userId, serverRows);
+    setInventorySnapshot(rows);
+    const current = rows.find(row => row.id === Number(itemId));
+    if (!current) throw new Error('Stock item is no longer available');
+    setItem(current);
+    return current.quantity;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
@@ -147,6 +160,7 @@ export default function InventoryItemDetailScreen() {
             item={item}
             user={user}
             userId={userId}
+            onRefresh={refreshCurrentQuantity}
             onQuantityChange={quantity => {
               setItem(current => {
                 if (!current) return current;

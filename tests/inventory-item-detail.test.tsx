@@ -4,15 +4,18 @@ import InventoryItemDetailScreen from '../src/app/inventory/[itemId]';
 import {clearInventorySnapshot, setInventorySnapshot} from '../src/features/inventory/inventorySnapshot';
 import type {NativeUser} from '../src/api/client';
 import type {InventoryItem} from '../src/features/inventory/inventoryRepository';
+import type {QueuedStockAdjustment} from '../src/features/inventory/offlineStockQueue';
 
 const mockBack = jest.fn();
 let mockItemId = '2';
 let mockProfile: NativeUser | null = null;
+let mockQueue: QueuedStockAdjustment[] = [];
 
 jest.mock('expo-network', () => ({addNetworkStateListener: () => ({remove: jest.fn()})}));
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
-    list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
+    list: async () => mockQueue, enqueue: async () => undefined,
+    remove: async (operationId: string) => {mockQueue = mockQueue.filter(entry => entry.operationId !== operationId);},
     markConflict: async () => undefined,
     saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
     saveProfile: async () => undefined, loadProfile: async () => mockProfile,
@@ -32,6 +35,7 @@ describe('inventory item detail screen', () => {
     mockBack.mockClear();
     mockItemId = '2';
     mockProfile = null;
+    mockQueue = [];
   });
 
   it('loads a mock inventory row by route ID and shows its details', async () => {
@@ -115,5 +119,27 @@ describe('inventory item detail screen', () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
     await waitFor(() => expect(screen.getByRole('button', {name: 'Add stock'})).toBeTruthy());
+  });
+
+  it('fetches and displays the current server count when resolving an offline conflict', async () => {
+    const staleRow: InventoryItem = {
+      id: 91, partId: 3, storeId: 10, partNumber: 'PART-91', description: 'Pump seal',
+      storeName: 'Main', storeType: 'warehouse', storeOwner: null, quantity: 4,
+      minThreshold: 1, isAllocated: false, workOrder: null,
+    };
+    mockProfile = {id: 1, email: 'admin@example.com', name: 'Admin', role: 'admin', territory: null};
+    mockItemId = '91';
+    mockQueue = [{operationId: 'conflict-91', userId: 1, inventoryId: 91, expectedQuantity: 4,
+      newQuantity: 6, createdAt: 1000, status: 'conflict', error: 'Stock changed on the server.'}];
+    setInventorySnapshot([staleRow]);
+    const getInventory = jest.spyOn(api, 'getInventory').mockResolvedValue([{...staleRow, quantity: 8}]);
+    const screen = await render(<InventoryItemDetailScreen />);
+
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Refresh current quantity'})).toBeTruthy());
+    await fireEvent.press(screen.getByRole('button', {name: 'Refresh current quantity'}));
+
+    await waitFor(() => expect(getInventory).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('8 units')).toBeTruthy();
+    expect(screen.getByText('Current server quantity refreshed. Review it before discarding this change.')).toBeTruthy();
   });
 });

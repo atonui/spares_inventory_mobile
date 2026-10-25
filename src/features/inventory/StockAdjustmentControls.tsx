@@ -8,10 +8,11 @@ import {offlineStockStore} from './offlineStockStore';
 
 type Mode = 'add' | 'count';
 
-export function StockAdjustmentControls({item, userId, onQuantityChange}: {
+export function StockAdjustmentControls({item, userId, onQuantityChange, onRefresh}: {
   item: InventoryRow;
   userId: number;
   onQuantityChange: (quantity: number) => void;
+  onRefresh: () => Promise<number>;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [value, setValue] = useState('');
@@ -22,6 +23,8 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
   const [confirmDiscardVisible, setConfirmDiscardVisible] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [discardError, setDiscardError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [quantityRefreshed, setQuantityRefreshed] = useState(false);
   const syncInFlight = useRef(false);
 
   async function refreshPending() {
@@ -29,6 +32,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
     const itemEntries = entries.filter(entry => entry.inventoryId === item.id);
     setPendingCount(itemEntries.length);
     setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
+    if (itemEntries.some(entry => entry.status === 'conflict')) setQuantityRefreshed(false);
   }
 
   useEffect(() => {
@@ -38,6 +42,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
       const itemEntries = entries.filter(entry => entry.inventoryId === item.id);
       setPendingCount(itemEntries.length);
       setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
+      if (itemEntries.some(entry => entry.status === 'conflict')) setQuantityRefreshed(false);
     });
     return () => { active = false; };
   }, [userId, item.id]);
@@ -54,6 +59,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
         const itemEntries = remaining.filter(entry => entry.inventoryId === item.id);
         setPendingCount(itemEntries.length);
         setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
+        if (itemEntries.some(entry => entry.status === 'conflict')) setQuantityRefreshed(false);
         const latest = (await api.getInventory()).find(row => row.id === item.id);
         if (latest) onQuantityChange(latest.quantity);
         if (itemEntries.some(entry => entry.status === 'conflict')) {
@@ -99,6 +105,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
       const itemEntries = entries.filter(entry => entry.inventoryId === item.id);
       setPendingCount(itemEntries.length);
       setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
+      if (itemEntries.some(entry => entry.status === 'conflict')) setQuantityRefreshed(false);
       if (itemEntries.some(entry => entry.status === 'conflict')) {
         setNotice('Stock changed before this count synced. Refresh and review the current quantity.');
         try {
@@ -136,6 +143,23 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
     }
   }
 
+  async function refreshCurrentQuantity() {
+    if (refreshing || discarding) return;
+    setRefreshing(true);
+    setNotice('');
+    try {
+      const quantity = await onRefresh();
+      if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error('Invalid stock quantity');
+      onQuantityChange(quantity);
+      setQuantityRefreshed(true);
+      setNotice('Current server quantity refreshed. Review it before discarding this change.');
+    } catch {
+      setNotice('Could not refresh the server quantity. Check your connection and try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <View>
       {!item.isAllocated && (
@@ -150,9 +174,17 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
       )}
       {pendingCount > 0 && <Text accessibilityRole="text" style={styles.pending}>{hasConflict ? 'Stock changes need review' : `${pendingCount} change${pendingCount === 1 ? '' : 's'} waiting to sync`}</Text>}
       {hasConflict && (
-        <Pressable accessibilityRole="button" onPress={() => {setDiscardError(''); setConfirmDiscardVisible(true);}} style={styles.discardButton}>
-          <Text style={styles.discardText}>Discard outdated changes</Text>
-        </Pressable>
+        <View style={styles.conflictActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Refresh current quantity" disabled={refreshing || discarding}
+            onPress={() => void refreshCurrentQuantity()} style={styles.refreshButton}>
+            {refreshing ? <ActivityIndicator size="small" color={palette.navy} /> : <Text style={styles.refreshText}>Refresh current quantity</Text>}
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityHint="Refresh the current server quantity first."
+            disabled={refreshing || !quantityRefreshed} onPress={() => {setDiscardError(''); setConfirmDiscardVisible(true);}}
+            style={[styles.discardButton, (!quantityRefreshed || refreshing) && styles.disabledAction]}>
+            <Text style={styles.discardText}>Discard outdated changes</Text>
+          </Pressable>
+        </View>
       )}
       {!!notice && <Text accessibilityRole="status" style={styles.notice}>{notice}</Text>}
       <Modal visible={confirmDiscardVisible} animationType="fade" transparent onRequestClose={() => {if (!discarding) setConfirmDiscardVisible(false);}}>
@@ -212,12 +244,16 @@ export function StockAdjustmentControls({item, userId, onQuantityChange}: {
 const palette = {navy: '#15263B', amber: '#E9A23B', slate: '#64748B', white: '#FFFFFF', line: '#CBD5E1', pale: '#F5F7FA'};
 const styles = StyleSheet.create({
   actions: {flexDirection: 'row', gap: 10, marginTop: 14},
+  conflictActions: {alignItems: 'flex-start', gap: 2},
+  refreshButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 10},
+  refreshText: {fontSize: 13, fontWeight: '700', color: palette.navy, textDecorationLine: 'underline'},
   primaryButton: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.amber, paddingHorizontal: 12},
   primaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   secondaryButton: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white, paddingHorizontal: 12},
   secondaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   pending: {marginTop: 10, fontSize: 12, fontWeight: '700', color: palette.slate},
   discardButton: {alignSelf: 'flex-start', marginTop: 8, paddingVertical: 8, paddingHorizontal: 10},
+  disabledAction: {opacity: 0.5},
   discardText: {fontSize: 12, fontWeight: '700', color: palette.navy, textDecorationLine: 'underline'},
   notice: {marginTop: 8, fontSize: 13, lineHeight: 19, color: palette.slate},
   modalBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: '#0008'},
