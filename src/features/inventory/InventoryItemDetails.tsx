@@ -11,11 +11,12 @@ const palette = {
   text: '#15263B',
 };
 
-export function InventoryItemDetails({item, user, userId, onQuantityChange}: {
+export function InventoryItemDetails({item, user, userId, onQuantityChange, onRefresh}: {
   item: InventoryRow;
   user: NativeUser | null;
   userId: number;
   onQuantityChange: (quantity: number) => void;
+  onRefresh: () => Promise<number>;
 }) {
   const lowStock = item.quantity <= item.minThreshold;
   const canChangeStock = user?.id === userId && canAdjustStock(user, item);
@@ -43,7 +44,7 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange}: {
       </View>
 
       {!item.isAllocated && canChangeStock && (
-        <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} />
+        <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} onRefresh={onRefresh} />
       )}
       {!item.isAllocated && user?.id === userId && !canChangeStock && (
         <View accessibilityRole="text" style={styles.accessNotice}>
