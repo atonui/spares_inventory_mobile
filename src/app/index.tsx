@@ -372,6 +372,16 @@ export default function InventoryScreen() {
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
   const isOffline = usingCachedInventory || networkConnected === false;
+  const connectionStatusTitle = isOffline
+    ? snapshotStatus.savedAt === null
+      ? 'Offline · No stock saved on this device'
+      : 'Offline · Showing the last saved stock'
+    : snapshotStatus.savedAt === null
+      ? 'Checking connection…'
+      : `Online · ${formatSnapshotTime(snapshotStatus.savedAt)}`;
+  const connectionStatusDetail = isOffline && snapshotStatus.savedAt !== null
+    ? 'Changes sync when you’re back online.'
+    : '';
 
   const inventoryFilterCounts = useMemo(() => inventory.reduce((counts, row) => {
     counts.all += 1;
@@ -440,10 +450,11 @@ export default function InventoryScreen() {
             </View>
           </View>
 
-          <View accessibilityRole="summary" style={[styles.syncBanner, isOffline && styles.syncBannerOffline]}>
-            <View style={styles.syncBannerText}>
-              <Text style={styles.syncBannerTitle}>{isOffline ? 'Offline · saved inventory' : 'Saved inventory'}</Text>
-              <Text style={styles.syncBannerDetail}>{isOffline ? 'Changes will sync when you’re online' : `Updated · ${formatSnapshotTime(snapshotStatus.savedAt)}`}</Text>
+          <View accessibilityRole="summary" style={styles.connectionStatus}>
+            <View style={[styles.connectionDot, isOffline ? styles.connectionDotOffline : styles.connectionDotOnline]} />
+            <View style={styles.connectionStatusCopy}>
+              <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline]}>{connectionStatusTitle}</Text>
+              {!!connectionStatusDetail && <Text style={styles.connectionStatusDetail}>{connectionStatusDetail}</Text>}
             </View>
             {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
               <Pressable
@@ -453,7 +464,7 @@ export default function InventoryScreen() {
                 style={styles.syncPendingButton}
               >
                 <Text style={styles.syncPending}>
-                  {snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting to sync`}
+                  {snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting`}
                 </Text>
               </Pressable>
             )}
@@ -789,13 +800,16 @@ const styles = StyleSheet.create({
   signOutConfirmButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: palette.navy},
   signOutConfirmText: {fontSize: 13, fontWeight: '800', color: palette.white},
   welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 10},
-  syncBanner: {minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 9, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: palette.border, borderRadius: 10, backgroundColor: palette.white},
-  syncBannerOffline: {borderColor: palette.amber, backgroundColor: '#FFF8EA'},
-  syncBannerText: {flex: 1},
-  syncBannerTitle: {fontSize: 12, fontWeight: '800', color: palette.navy},
-  syncBannerDetail: {marginTop: 2, fontSize: 10, color: palette.muted},
-  syncPending: {fontSize: 11, fontWeight: '800', color: palette.navy, textAlign: 'right'},
-  syncPendingButton: {minHeight: 44, justifyContent: 'center', paddingLeft: 8},
+  connectionStatus: {minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 7},
+  connectionDot: {width: 7, height: 7, borderRadius: 4},
+  connectionDotOnline: {backgroundColor: '#287441'},
+  connectionDotOffline: {backgroundColor: '#A16207'},
+  connectionStatusCopy: {flex: 1},
+  connectionStatusText: {fontSize: 11, lineHeight: 15, color: palette.muted},
+  connectionStatusTextOffline: {fontWeight: '700', color: '#8A5A00'},
+  connectionStatusDetail: {fontSize: 10, lineHeight: 14, color: palette.muted},
+  syncPending: {fontSize: 10, fontWeight: '700', color: palette.navy, textAlign: 'right'},
+  syncPendingButton: {minHeight: 32, justifyContent: 'center', paddingLeft: 6},
   welcome: {fontSize: 15, fontWeight: '700', color: palette.text},
   muted: {marginTop: 3, color: palette.muted, fontSize: 11},
   totalBadge: {minWidth: 62, alignItems: 'center', borderRadius: 10, backgroundColor: '#FEF3DF', paddingVertical: 5, paddingHorizontal: 8},
