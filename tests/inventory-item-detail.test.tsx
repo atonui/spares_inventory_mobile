@@ -76,6 +76,21 @@ describe('inventory item detail screen', () => {
     expect(inventoryRequest).not.toHaveBeenCalled();
   });
 
+  it('labels zero quantity as out of stock on the detail screen', async () => {
+    const row: InventoryItem = {
+      id: 92, partId: 3, storeId: 10, partNumber: 'PART-92', description: 'Pump seal',
+      storeName: 'Main', storeType: 'warehouse', storeOwner: null, quantity: 0,
+      minThreshold: 1, isAllocated: false, workOrder: null,
+    };
+    mockItemId = '92';
+    setInventorySnapshot([row]);
+    const screen = await render(<InventoryItemDetailScreen />);
+
+    await waitFor(() => expect(screen.getByText('PART-92')).toBeTruthy());
+    expect(screen.getByText('OUT OF STOCK')).toBeTruthy();
+    expect(screen.queryByText('LOW STOCK')).toBeNull();
+  });
+
   it('shows stock actions for a manager assigned to the inventory store', async () => {
     const row: InventoryItem = {
       id: 88, partId: 3, storeId: 8, partNumber: 'PART-88', description: 'Pump seal',
