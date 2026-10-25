@@ -3,10 +3,11 @@ import {ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View} 
 import * as Network from 'expo-network';
 import {api} from '../../api/runtime';
 import type {InventoryRow} from '../../api/client';
-import {saveStockCount, syncQueuedStock} from './offlineStockQueue';
+import {saveStockCount, syncQueuedStock, type QueuedStockAdjustment} from './offlineStockQueue';
 import {offlineStockStore} from './offlineStockStore';
 
 type Mode = 'add' | 'count';
+type UndoableCount = {adjustment: QueuedStockAdjustment; previousQuantity: number};
 
 export function StockAdjustmentControls({item, userId, onQuantityChange, onRefresh}: {
   item: InventoryRow;
@@ -25,7 +26,14 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
   const [discardError, setDiscardError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [quantityRefreshed, setQuantityRefreshed] = useState(false);
+  const [undoableCount, setUndoableCount] = useState<UndoableCount | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const syncInFlight = useRef(false);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (undoTimer.current !== null) clearTimeout(undoTimer.current);
+  }, []);
 
   async function refreshPending() {
     const entries = await offlineStockStore.list(userId);
@@ -91,12 +99,15 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     setSaving(true);
     setNotice('');
     try {
-      await saveStockCount(offlineStockStore, {
+      const adjustment = await saveStockCount(offlineStockStore, {
         userId,
         inventoryId: item.id,
         expectedQuantity: item.quantity,
         newQuantity: nextQuantity,
       });
+      setUndoableCount({adjustment, previousQuantity: adjustment.expectedQuantity});
+      if (undoTimer.current !== null) clearTimeout(undoTimer.current);
+      undoTimer.current = setTimeout(() => setUndoableCount(null), 8000);
       onQuantityChange(nextQuantity);
       setMode(null);
       setValue('');
@@ -107,6 +118,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
       if (itemEntries.some(entry => entry.status === 'conflict')) setQuantityRefreshed(false);
       if (itemEntries.some(entry => entry.status === 'conflict')) {
+        setUndoableCount(null);
         setNotice('Stock changed before this count synced. Refresh and review the current quantity.');
         try {
           const latest = (await api.getInventory()).find(row => row.id === item.id);
@@ -121,6 +133,57 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       setNotice(error instanceof Error ? error.message : 'Could not save this stock change.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function undoSavedCount() {
+    const undo = undoableCount;
+    if (!undo || undoing) return;
+    setUndoing(true);
+    setNotice('');
+    try {
+      const entries = await offlineStockStore.list(userId);
+      const queued = entries.find(entry => entry.operationId === undo.adjustment.operationId && entry.status === 'queued');
+      if (queued) {
+        await offlineStockStore.remove(queued.operationId);
+        const remaining = await offlineStockStore.list(userId);
+        const itemEntries = remaining.filter(entry => entry.inventoryId === item.id);
+        setPendingCount(itemEntries.length);
+        setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
+        onQuantityChange(undo.previousQuantity);
+        setNotice('Stock change undone.');
+      } else {
+        await saveStockCount(offlineStockStore, {
+          userId,
+          inventoryId: item.id,
+          expectedQuantity: undo.adjustment.newQuantity,
+          newQuantity: undo.previousQuantity,
+        });
+        onQuantityChange(undo.previousQuantity);
+        const sync = await syncQueuedStock(offlineStockStore, userId, api.adjustStock);
+        const remaining = await offlineStockStore.list(userId);
+        const itemEntries = remaining.filter(entry => entry.inventoryId === item.id);
+        setPendingCount(itemEntries.length);
+        setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
+        if (itemEntries.some(entry => entry.status === 'conflict')) {
+          setQuantityRefreshed(false);
+          try {
+            const latest = (await api.getInventory()).find(row => row.id === item.id);
+            if (latest) onQuantityChange(latest.quantity);
+          } catch { /* Keep the queued undo visible until the current quantity can be refreshed. */ }
+          setNotice('Could not undo because stock changed on the server. Review the current quantity.');
+        } else if (sync.blocked || itemEntries.length > 0) {
+          setNotice('Undo saved on this device. It will sync when you’re back online.');
+        } else {
+          setNotice('Stock change undone.');
+        }
+      }
+      if (undoTimer.current !== null) clearTimeout(undoTimer.current);
+      setUndoableCount(null);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Could not undo this stock change: ${error.message}` : 'Could not undo this stock change.');
+    } finally {
+      setUndoing(false);
     }
   }
 
@@ -173,6 +236,15 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
         </View>
       )}
       {pendingCount > 0 && <Text accessibilityRole="text" style={styles.pending}>{hasConflict ? 'Stock changes need review' : `${pendingCount} change${pendingCount === 1 ? '' : 's'} waiting to sync`}</Text>}
+      {undoableCount && !hasConflict && (
+        <View accessibilityRole="summary" style={styles.undoNotice}>
+          <Text accessibilityRole="status" style={styles.undoText}>Stock quantity changed.</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Undo stock change" disabled={undoing}
+            onPress={() => void undoSavedCount()} style={styles.undoButton}>
+            <Text style={styles.undoButtonText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
+          </Pressable>
+        </View>
+      )}
       {hasConflict && (
         <View style={styles.conflictActions}>
           <Pressable accessibilityRole="button" accessibilityLabel="Refresh current quantity" disabled={refreshing || discarding}
@@ -252,6 +324,10 @@ const styles = StyleSheet.create({
   secondaryButton: {flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white, paddingHorizontal: 12},
   secondaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   pending: {marginTop: 10, fontSize: 12, fontWeight: '700', color: palette.slate},
+  undoNotice: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10, paddingLeft: 12, borderRadius: 11, backgroundColor: palette.navy},
+  undoText: {flex: 1, fontSize: 13, fontWeight: '600', color: palette.white},
+  undoButton: {minWidth: 60, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14},
+  undoButtonText: {fontSize: 14, fontWeight: '800', color: palette.amber},
   discardButton: {alignSelf: 'flex-start', marginTop: 8, paddingVertical: 8, paddingHorizontal: 10},
   disabledAction: {opacity: 0.5},
   discardText: {fontSize: 12, fontWeight: '700', color: palette.navy, textDecorationLine: 'underline'},
