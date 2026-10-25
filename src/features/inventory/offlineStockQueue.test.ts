@@ -1,6 +1,7 @@
 import {
   applyQueuedStockCounts,
   enqueueStockCount,
+  saveStockCount,
   syncQueuedStock,
   type QueuedStockAdjustment,
   type StockQueueStore,
@@ -10,6 +11,15 @@ import type {InventoryItem} from './inventoryRepository';
 class MemoryQueue implements StockQueueStore {
   entries: QueuedStockAdjustment[] = [];
   async enqueue(item: QueuedStockAdjustment) { this.entries.push(item); }
+  async replaceQueued(item: QueuedStockAdjustment) {
+    const existing = this.entries.find(entry => entry.userId === item.userId &&
+      entry.inventoryId === item.inventoryId && entry.status === 'queued');
+    const replacement = existing
+      ? {...item, expectedQuantity: existing.expectedQuantity, operationId: existing.operationId, createdAt: existing.createdAt}
+      : item;
+    this.entries = [...this.entries.filter(entry => !(entry.userId === item.userId &&
+      entry.inventoryId === item.inventoryId && entry.status === 'queued')), replacement];
+  }
   async list(userId: number) { return this.entries.filter(item => item.userId === userId); }
   async remove(id: string) { this.entries = this.entries.filter(item => item.operationId !== id); }
   async markConflict(id: string, error: string) {
@@ -40,6 +50,39 @@ describe('offline stock queue', () => {
     });
     expect(result).toEqual({synced: 1, blocked: false});
     expect(await store.list(7)).toEqual([]);
+  });
+
+  it('coalesces repeated edits to one item into one server adjustment', async () => {
+    const store = new MemoryQueue();
+    const first = await saveStockCount(store, {
+      userId: 7, inventoryId: 11, expectedQuantity: 4, newQuantity: 8,
+    }, 1000);
+    const second = await saveStockCount(store, {
+      userId: 7, inventoryId: 11, expectedQuantity: 8, newQuantity: 12,
+    }, 2000);
+
+    expect(await store.list(7)).toEqual([{...first, newQuantity: 12}]);
+    expect(second).toMatchObject({operationId: first.operationId, expectedQuantity: 4, newQuantity: 12, createdAt: 1000});
+
+    const sent: QueuedStockAdjustment[] = [];
+    const result = await syncQueuedStock(store, 7, async operation => { sent.push(operation); });
+    expect(result).toEqual({synced: 1, blocked: false});
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({expectedQuantity: 4, newQuantity: 12});
+  });
+
+  it('keeps conflicted counts separate when a new count is saved', async () => {
+    const store = new MemoryQueue();
+    const conflict = await enqueueStockCount(store, {
+      userId: 7, inventoryId: 11, expectedQuantity: 4, newQuantity: 8,
+    }, 1000);
+    await store.markConflict(conflict.operationId, 'Needs review');
+
+    const next = await saveStockCount(store, {
+      userId: 7, inventoryId: 11, expectedQuantity: 4, newQuantity: 10,
+    }, 2000);
+
+    expect(await store.list(7)).toEqual([{...conflict, status: 'conflict', error: 'Needs review'}, next]);
   });
 
   it('retains offline operations and marks stale counts for review', async () => {

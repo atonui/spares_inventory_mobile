@@ -3,7 +3,7 @@ import {ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View} 
 import * as Network from 'expo-network';
 import {api} from '../../api/runtime';
 import type {InventoryRow} from '../../api/client';
-import {enqueueStockCount, syncQueuedStock} from './offlineStockQueue';
+import {saveStockCount, syncQueuedStock} from './offlineStockQueue';
 import {offlineStockStore} from './offlineStockStore';
 
 type Mode = 'add' | 'count';
@@ -91,7 +91,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     setSaving(true);
     setNotice('');
     try {
-      await enqueueStockCount(offlineStockStore, {
+      await saveStockCount(offlineStockStore, {
         userId,
         inventoryId: item.id,
         expectedQuantity: item.quantity,
