@@ -16,8 +16,8 @@ export function AppIcon({name, color, size = 22}: {name: AppIconName; color: str
         <Path d="M8 8v8M11 9v6M14 8v8M17 9v6" {...shared} />
       </>}
       {name === 'changes' && <>
-        <Path d="M20 7v5h-5M4 17v-5h5" {...shared} />
-        <Path d="M5.6 9A7 7 0 0 1 17 5l3 2M4 17l3 2a7 7 0 0 0 11.4-4" {...shared} />
+        <Path d="M6 3.5h9l4 4v13H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" {...shared} />
+        <Path d="M15 4v4h4M8 11h8M8 14.5h8M8 18h5" {...shared} />
       </>}
       {name === 'more' && <>
         <Circle cx="5" cy="12" r="1.2" fill={color} stroke="none" />
