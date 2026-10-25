@@ -70,8 +70,8 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
     expect(getMe).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Good to see you, Preview')).toBeTruthy();
-    expect(screen.getByText('Saved inventory')).toBeTruthy();
-    expect(screen.getByText('Last refreshed · Updated just now')).toBeTruthy();
+    expect(screen.getByText('Online · Updated just now')).toBeTruthy();
+    expect(screen.getByText('4 items · Updated just now')).toBeTruthy();
     expect(screen.queryByText('Sign in through your desktop account')).toBeNull();
     getMe.mockRestore();
   });
@@ -121,14 +121,14 @@ describe('inventory device-pairing flow', () => {
   it('shows offline status immediately when connectivity drops after inventory loads', async () => {
     const screen = await render(<InventoryScreen />);
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Saved inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Online · Updated just now')).toBeTruthy());
 
     await act(async () => {
       mockNetworkListener?.({isConnected: false, isInternetReachable: false});
     });
 
-    await waitFor(() => expect(screen.getByText('Offline · saved inventory')).toBeTruthy());
-    expect(screen.getByText(/Last refreshed · Updated/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Offline · Showing the last saved stock')).toBeTruthy());
+    expect(screen.getByText('Changes sync when you’re back online.')).toBeTruthy();
   });
 
   it('keeps a session after a temporary restore failure and retries successfully', async () => {
@@ -256,9 +256,10 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
     await pairFromPreview(screen);
 
-    await waitFor(() => expect(screen.getByText('Offline · saved inventory')).toBeTruthy());
-    expect(screen.getByText('Last refreshed · Updated 2 hrs ago')).toBeTruthy();
-    expect(screen.getByText('1 waiting to sync')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Offline · Showing the last saved stock')).toBeTruthy());
+    expect(screen.getByText('Changes sync when you’re back online.')).toBeTruthy();
+    expect(screen.getByText('4 items · Updated 2 hrs ago')).toBeTruthy();
+    expect(screen.getByText('1 waiting')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', {name: 'Review offline changes'}));
     expect(mockPush).toHaveBeenCalledWith('/offline-changes');
   });
