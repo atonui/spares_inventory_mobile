@@ -313,23 +313,29 @@ export default function InventoryScreen() {
     }
   }
 
+  const searchableInventory = useMemo(() => inventory.map(row => ({
+    row,
+    searchableText: normalizeInventorySearchText(
+      `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
+    ),
+  })), [inventory]);
+
   const visibleInventory = useMemo(() => {
     const query = search.trim();
     const queryTerms = normalizeInventorySearchText(query).split(' ').filter(Boolean);
-    const filtered = inventory.filter(row => {
-      const searchableText = normalizeInventorySearchText(
-        `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
-      );
-      const matchesSearch = !query || (queryTerms.length > 0 && queryTerms.every(term => searchableText.includes(term)));
-      const matchesFilter = inventoryFilter === 'all' ||
-        (inventoryFilter === 'outOfStock' && row.quantity === 0) ||
-        (inventoryFilter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
-        (inventoryFilter === 'available' && !row.isAllocated) ||
-        (inventoryFilter === 'allocated' && row.isAllocated);
-      return matchesSearch && matchesFilter;
-    });
+    const filtered = searchableInventory
+      .filter(({row, searchableText}) => {
+        const matchesSearch = !query || (queryTerms.length > 0 && queryTerms.every(term => searchableText.includes(term)));
+        const matchesFilter = inventoryFilter === 'all' ||
+          (inventoryFilter === 'outOfStock' && row.quantity === 0) ||
+          (inventoryFilter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
+          (inventoryFilter === 'available' && !row.isAllocated) ||
+          (inventoryFilter === 'allocated' && row.isAllocated);
+        return matchesSearch && matchesFilter;
+      })
+      .map(({row}) => row);
     return sortInventory(filtered, inventorySort);
-  }, [inventory, search, inventoryFilter, inventorySort]);
+  }, [searchableInventory, search, inventoryFilter, inventorySort]);
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
 
