@@ -1,4 +1,5 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {StyleSheet} from 'react-native';
 import OfflineChangesScreen from '../src/app/offline-changes';
 import {api} from '../src/api/runtime';
 import {offlineStockStore} from '../src/features/inventory/offlineStockStore';
@@ -49,6 +50,19 @@ describe('offline changes screen', () => {
     expect(screen.getAllByText('Waiting to sync')).toHaveLength(2);
     expect(screen.getByText('Need review')).toBeTruthy();
     expect(screen.getByText('Stock changed on the server.')).toBeTruthy();
+  });
+
+  it('uses at least 44-point targets for offline review, sync, and discard actions', async () => {
+    const screen = await render(<OfflineChangesScreen />);
+    await waitFor(() => expect(screen.getByText('PART-11')).toBeTruthy());
+
+    for (const name of ['Sync changes now', 'Review PART-12', 'Discard PART-12 change']) {
+      expect(StyleSheet.flatten(screen.getByRole('button', {name}).props.style).minHeight).toBeGreaterThanOrEqual(44);
+    }
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Discard PART-12 change'}));
+    expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Keep change'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
+    expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Confirm discard'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
   });
 
   it('opens the inventory item for a conflicted change', async () => {

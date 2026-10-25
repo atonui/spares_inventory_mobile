@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   undoText: {flex: 1, fontSize: 13, fontWeight: '600', color: palette.white},
   undoButton: {minWidth: 60, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14},
   undoButtonText: {fontSize: 14, fontWeight: '800', color: palette.amber},
-  discardButton: {alignSelf: 'flex-start', marginTop: 8, paddingVertical: 8, paddingHorizontal: 10},
+  discardButton: {alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: 8, paddingHorizontal: 10},
   disabledAction: {opacity: 0.5},
   discardText: {fontSize: 12, fontWeight: '700', color: palette.navy, textDecorationLine: 'underline'},
   notice: {marginTop: 8, fontSize: 13, lineHeight: 19, color: palette.slate},
