@@ -171,6 +171,8 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(screen.getByText('Offline · saved inventory')).toBeTruthy());
     expect(screen.getByText('Last refreshed · Updated 2 hrs ago')).toBeTruthy();
     expect(screen.getByText('1 waiting to sync')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', {name: 'Review offline changes'}));
+    expect(mockPush).toHaveBeenCalledWith('/offline-changes');
   });
 
   it('navigates to an inventory item detail using the item ID', async () => {
