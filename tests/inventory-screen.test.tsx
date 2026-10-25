@@ -13,6 +13,11 @@ async function pairFromPreview(screen: ReturnType<typeof render>) {
   await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy(), {timeout: 5000});
 }
 
+async function openSignOut(screen: ReturnType<typeof render>) {
+  await fireEvent.press(screen.getByRole('button', {name: 'Open menu'}));
+  await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+}
+
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 let mockItemId = '2';
@@ -178,7 +183,7 @@ describe('inventory device-pairing flow', () => {
     expect(screen.getAllByText('LOW STOCK').length).toBeGreaterThan(0);
     expect(screen.queryByText('Adjust stock')).toBeNull();
 
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+    await openSignOut(screen);
     await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
     expect(getCachedInventoryItem(2)).toBeUndefined();
   });
@@ -195,7 +200,7 @@ describe('inventory device-pairing flow', () => {
     const remove = jest.spyOn(offlineStockStore, 'remove');
     const logout = jest.spyOn(api, 'logout');
 
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+    await openSignOut(screen);
 
     await waitFor(() => expect(screen.getByText(/2 unsynced stock changes are saved on this device/)).toBeTruthy());
     expect(logout).not.toHaveBeenCalled();
@@ -203,7 +208,7 @@ describe('inventory device-pairing flow', () => {
     expect(screen.getByText('Inventory')).toBeTruthy();
     expect(logout).not.toHaveBeenCalled();
 
-    await fireEvent.press(screen.getByRole('button', {name: 'Sign out'}));
+    await openSignOut(screen);
     await waitFor(() => expect(screen.getByText('Keep your offline changes?')).toBeTruthy());
     await fireEvent.press(screen.getByRole('button', {name: 'Sign out and keep changes'}));
     await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
@@ -359,6 +364,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
     await pairFromPreview(screen);
 
+    await fireEvent.press(screen.getByRole('button', {name: 'Open menu'}));
     expect(StyleSheet.flatten(screen.getByRole('button', {name: 'Sign out'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
     expect(StyleSheet.flatten(screen.getByRole('radio', {name: 'Lowest stock'}).props.style).minHeight).toBeGreaterThanOrEqual(44);
 

@@ -6,6 +6,7 @@ import {api} from '../api/runtime';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import {syncQueuedStock, type QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
+import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 
 type StockItemMap = Map<number, InventoryItem>;
 
@@ -146,6 +147,7 @@ export default function OfflineChangesScreen() {
           )}
         </ScrollView>
       </View>
+      <AppBottomNavigation active="changes" queuedCount={queued.length} conflictCount={conflicts.length} />
       <Modal transparent visible={pendingDiscard !== null} animationType="fade" onRequestClose={() => setPendingDiscard(null)}>
         <View style={styles.modalBackdrop}>
           <View accessibilityRole="alert" style={styles.confirmCard}>
