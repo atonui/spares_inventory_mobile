@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions, type BarcodeType} from 'expo-camera';
-import {ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View} from 'react-native';
+import * as Haptics from 'expo-haptics';
+import {ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
@@ -71,6 +72,26 @@ export default function InventoryScanScreen() {
     void loadInventory();
     return () => { active = false; };
   }, [userIdParam]);
+
+  useEffect(() => {
+    if (!hasScanned) return;
+    const sendScanFeedback = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          await Haptics.performAndroidHapticsAsync(matches.length > 0
+            ? Haptics.AndroidHaptics.Confirm
+            : Haptics.AndroidHaptics.Reject);
+        } else {
+          await Haptics.notificationAsync(matches.length > 0
+            ? Haptics.NotificationFeedbackType.Success
+            : Haptics.NotificationFeedbackType.Error);
+        }
+      } catch {
+        // Visual scan results remain available when device haptics are unavailable.
+      }
+    };
+    void sendScanFeedback();
+  }, [hasScanned, matches.length]);
 
   function onBarcodeScanned(value: string) {
     if (scanned.current || inventory === null) return;

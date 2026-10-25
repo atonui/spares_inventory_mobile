@@ -1,10 +1,13 @@
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {Platform} from 'react-native';
 import InventoryScanScreen from '../src/app/scan';
 import {clearInventorySnapshot, setInventorySnapshot} from '../src/features/inventory/inventorySnapshot';
 import type {InventoryItem} from '../src/features/inventory/inventoryRepository';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockPerformAndroidHapticsAsync = jest.fn(async () => undefined);
+const mockNotificationAsync = jest.fn(async () => undefined);
 let mockBarcodeValue = 'PN-0042';
 let mockCameraGranted = true;
 
@@ -34,6 +37,13 @@ jest.mock('expo-camera', () => {
   };
 });
 
+jest.mock('expo-haptics', () => ({
+  AndroidHaptics: {Confirm: 'confirm', Reject: 'reject'},
+  NotificationFeedbackType: {Success: 'success', Error: 'error'},
+  performAndroidHapticsAsync: (...args: unknown[]) => mockPerformAndroidHapticsAsync(...args),
+  notificationAsync: (...args: unknown[]) => mockNotificationAsync(...args),
+}));
+
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     getActiveUserId: async () => 7,
@@ -62,6 +72,8 @@ describe('inventory scanner screen', () => {
     clearInventorySnapshot();
     mockPush.mockClear();
     mockBack.mockClear();
+    mockPerformAndroidHapticsAsync.mockClear();
+    mockNotificationAsync.mockClear();
     mockBarcodeValue = 'PN-0042';
     mockCameraGranted = true;
   });
@@ -82,6 +94,11 @@ describe('inventory scanner screen', () => {
 
     await fireEvent.press(screen.getByRole('button', {name: 'Simulate camera scan'}));
     expect(screen.getByText('Stock found in 2 locations')).toBeTruthy();
+    if (Platform.OS === 'android') {
+      await waitFor(() => expect(mockPerformAndroidHapticsAsync).toHaveBeenCalledWith('confirm'));
+    } else {
+      await waitFor(() => expect(mockNotificationAsync).toHaveBeenCalledWith('success'));
+    }
     expect(screen.getByText('Choose the store you’re checking.')).toBeTruthy();
     expect(screen.getByText('Central store')).toBeTruthy();
     expect(screen.getByText('Field van')).toBeTruthy();
@@ -101,6 +118,11 @@ describe('inventory scanner screen', () => {
 
     await fireEvent.press(screen.getByRole('button', {name: 'Simulate camera scan'}));
     expect(screen.getByText('No matching part number')).toBeTruthy();
+    if (Platform.OS === 'android') {
+      await waitFor(() => expect(mockPerformAndroidHapticsAsync).toHaveBeenCalledWith('reject'));
+    } else {
+      await waitFor(() => expect(mockNotificationAsync).toHaveBeenCalledWith('error'));
+    }
     expect(screen.getByText('UNKNOWN-99')).toBeTruthy();
     expect(screen.getByText(/exact part numbers in the inventory saved on this device/)).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Scan again'})).toBeTruthy();
