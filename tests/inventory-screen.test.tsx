@@ -28,6 +28,10 @@ async function applyFilterSort(screen: ReturnType<typeof render>) {
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+let mockUpdateRouteParams: ((updater: (current: Record<string, string | undefined>) => Record<string, string | undefined>) => void) | null = null;
+const mockSetParams = jest.fn((updates: Record<string, string | undefined>) => {
+  mockUpdateRouteParams?.(current => ({...current, ...updates}));
+});
 let mockItemId = '2';
 let mockNetworkListener: ((state: {isConnected: boolean; isInternetReachable: boolean}) => void) | null = null;
 
@@ -47,8 +51,13 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
 }));
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({push: mockPush, back: mockBack}),
-  useLocalSearchParams: () => ({itemId: mockItemId}),
+  useRouter: () => ({push: mockPush, back: mockBack, setParams: mockSetParams}),
+  useLocalSearchParams: () => {
+    const React = require('react');
+    const [params, setParams] = React.useState(() => ({itemId: mockItemId}));
+    mockUpdateRouteParams = setParams;
+    return params;
+  },
 }));
 
 describe('inventory device-pairing flow', () => {

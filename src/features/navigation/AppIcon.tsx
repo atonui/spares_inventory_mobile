@@ -1,12 +1,16 @@
 import Svg, {Circle, Path} from 'react-native-svg';
 
-export type AppIconName = 'inventory' | 'scan' | 'changes' | 'more' | 'filter' | 'search' | 'sort' | 'close' | 'signOut' | 'flashlight' | 'profile' | 'settings' | 'chevronRight';
+export type AppIconName = 'home' | 'inventory' | 'scan' | 'changes' | 'more' | 'filter' | 'search' | 'sort' | 'close' | 'signOut' | 'flashlight' | 'profile' | 'settings' | 'chevronRight';
 
 export function AppIcon({name, color, size = 22}: {name: AppIconName; color: string; size?: number}) {
   const shared = {stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const};
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" accessible={false}>
+      {name === 'home' && <>
+        <Path d="m3.5 10.5 8.5-7 8.5 7" {...shared} />
+        <Path d="M5.5 9.5V20h13V9.5M9.5 20v-6h5v6" {...shared} />
+      </>}
       {name === 'inventory' && <>
         <Path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" {...shared} />
         <Path d="m12 12 8-4.5M12 12 4 7.5M12 12v9M8 5.25l8 4.5" {...shared} />
