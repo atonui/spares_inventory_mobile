@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions, type BarcodeType} from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import {StatusBar} from 'expo-status-bar';
 import {ActivityIndicator, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
@@ -28,12 +29,12 @@ export default function InventoryScanScreen() {
   const [scannedValue, setScannedValue] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
   const [matches, setMatches] = useState<InventoryItem[]>([]);
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [permissionError, setPermissionError] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [manualPartNumber, setManualPartNumber] = useState('');
-  const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const scanned = useRef(false);
 
   useEffect(() => {
@@ -110,7 +111,9 @@ export default function InventoryScanScreen() {
     scanned.current = true;
     setHasScanned(true);
     setScannedValue(value);
-    setMatches(findInventoryMatches(inventory, value));
+    const found = findInventoryMatches(inventory, value);
+    setMatches(found);
+    setSelectedMatchId(found.length === 1 ? found[0].id : null);
   }
 
   function scanAgain() {
@@ -118,6 +121,7 @@ export default function InventoryScanScreen() {
     setHasScanned(false);
     setScannedValue('');
     setMatches([]);
+    setSelectedMatchId(null);
     setTorchEnabled(false);
   }
 
@@ -126,6 +130,10 @@ export default function InventoryScanScreen() {
     if (!partNumber) return;
     Keyboard.dismiss();
     setTorchEnabled(false);
+    scanned.current = false;
+    setHasScanned(false);
+    setScannedValue('');
+    setMatches([]);
     onBarcodeScanned(partNumber);
   }
 
@@ -152,6 +160,7 @@ export default function InventoryScanScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.backButton}>
@@ -200,7 +209,7 @@ export default function InventoryScanScreen() {
           <>
             <ScrollView style={styles.scanContent} contentContainerStyle={styles.scanContentInner} keyboardShouldPersistTaps="handled">
             {permission?.granted ? (
-              <View style={styles.cameraFrame}>
+              !hasScanned && <View style={styles.cameraFrame}>
                 {!hasScanned && (
                   <CameraView
                     style={StyleSheet.absoluteFill}
@@ -243,51 +252,26 @@ export default function InventoryScanScreen() {
               </View>
             )}
 
-            {!hasScanned && (
-              <View style={styles.manualEntry}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{expanded: manualEntryVisible}}
-                  onPress={() => setManualEntryVisible(value => !value)}
-                  style={styles.manualFallbackToggle}
-                >
-                  <Text style={styles.manualFallbackText}>
-                    {manualEntryVisible ? 'Hide manual lookup' : 'Enter part number manually'}
-                  </Text>
+            {!hasScanned && <View style={styles.manualEntry}>
+              <Text style={styles.manualTitle}>Can’t scan?</Text>
+              <Text style={styles.manualHint}>Enter a part number to look it up.</Text>
+              <View style={styles.manualForm}>
+                <TextInput accessibilityLabel="Part number" value={manualPartNumber} onChangeText={setManualPartNumber}
+                  onSubmitEditing={findPartNumber} placeholder="e.g. BRK-2048" placeholderTextColor="#94A3B8"
+                  autoCapitalize="characters" autoCorrect={false} returnKeyType="search" style={styles.manualInput} />
+                <Pressable accessibilityRole="button" disabled={!manualPartNumber.trim()} onPress={findPartNumber}
+                  style={[styles.manualButton, !manualPartNumber.trim() && styles.manualButtonDisabled]}>
+                  <Text style={styles.manualButtonText}>Look up part</Text>
                 </Pressable>
-                {manualEntryVisible && (
-                  <View style={styles.manualForm}>
-                    <TextInput
-                      accessibilityLabel="Part number"
-                      value={manualPartNumber}
-                      onChangeText={setManualPartNumber}
-                      onSubmitEditing={findPartNumber}
-                      placeholder="e.g. BRK-2048"
-                      placeholderTextColor="#94A3B8"
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      returnKeyType="search"
-                      style={styles.manualInput}
-                    />
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={!manualPartNumber.trim()}
-                      onPress={findPartNumber}
-                      style={[styles.manualButton, !manualPartNumber.trim() && styles.manualButtonDisabled]}
-                    >
-                      <Text style={styles.manualButtonText}>Find</Text>
-                    </Pressable>
-                  </View>
-                )}
               </View>
-            )}
+            </View>}
 
             {hasScanned && (
               <View style={styles.results}>
                 {matches.length === 0 ? (
                   <>
                     <View style={styles.noMatchHeader}>
-                      <View style={styles.noMatchDot} />
+                      <View style={styles.noMatchDot}><AppIcon name="close" color="#A13A32" size={17} /></View>
                       <View style={styles.noMatchCopy}>
                         <Text accessibilityRole="header" style={styles.resultsTitle}>No matching part found</Text>
                         <Text style={styles.resultHint}>Check the code or try a manual search.</Text>
@@ -297,32 +281,42 @@ export default function InventoryScanScreen() {
                   </>
                 ) : (
                   <>
-                    <Text accessibilityRole="header" style={styles.resultsTitle}>
-                      {matches.length === 1 ? '1 stock record found' : `${matches.length} locations found`}
-                    </Text>
-                    {matches.length > 0 && <Text style={styles.resultHint}>Choose the location you’re checking.</Text>}
+                    <View style={styles.matchHeader}>
+                      <View style={styles.matchDot}><Text style={styles.matchCheck}>✓</Text></View>
+                      <View style={styles.noMatchCopy}>
+                        <Text accessibilityRole="header" style={styles.resultsTitle}>Match found</Text>
+                        <Text style={styles.resultHint}>{matches.length === 1 ? '1 stock record found' : `${matches.length} locations found`}</Text>
+                        {matches.length > 1 && <Text style={styles.resultInstruction}>Choose the location you’re checking.</Text>}
+                      </View>
+                    </View>
                     {matches.map(item => (
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`View ${item.partNumber} at ${item.storeName}, ${item.quantity} ${item.quantity === 1 ? 'unit' : 'units'}`}
+                        accessibilityState={{selected: selectedMatchId === item.id}}
                         key={item.id}
-                        onPress={() => openItem(item)}
-                        style={styles.resultCard}
+                        onPress={() => setSelectedMatchId(item.id)}
+                        style={[styles.resultCard, selectedMatchId === item.id && styles.resultCardSelected]}
                       >
+                        <View style={styles.locationMark}><AppIcon name="inventory" color={palette.navy} size={18} /></View>
                         <View style={styles.resultCopy}>
                           <Text style={styles.resultPart}>{item.partNumber}</Text>
                           <Text style={styles.resultDescription} numberOfLines={2}>{item.description}</Text>
                           <Text style={styles.resultStore}>{item.storeName}</Text>
                           <Text style={styles.resultQuantityInline}>{item.quantity} {item.quantity === 1 ? 'unit' : 'units'} · {item.quantity === 0 ? 'Out of stock' : item.quantity <= item.minThreshold ? 'Low stock' : 'In stock'}</Text>
                         </View>
-                        <AppIcon name="chevronRight" color={palette.slate} size={18} />
+                        <View style={[styles.radio, selectedMatchId === item.id && styles.radioSelected]}>{selectedMatchId === item.id && <View style={styles.radioDot} />}</View>
                       </Pressable>
                     ))}
                   </>
                 )}
-                <Pressable accessibilityRole="button" onPress={scanAgain} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>Scan again</Text>
-                </Pressable>
+                {matches.length > 0 && <Pressable accessibilityRole="button" disabled={selectedMatchId === null}
+                  onPress={() => {const selected = matches.find(item => item.id === selectedMatchId); if (selected) openItem(selected);}}
+                  style={[styles.openDetailsButton, selectedMatchId === null && styles.actionDisabled]}><Text style={styles.openDetailsText}>Open item details</Text></Pressable>}
+                <View style={styles.resultActions}>
+                  <Pressable accessibilityRole="button" onPress={scanAgain} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Scan again</Text></Pressable>
+                  {matches.length === 0 && <Pressable accessibilityRole="button" onPress={scanAgain} style={styles.manualSearchButton}><Text style={styles.manualSearchText}>Search manually</Text></Pressable>}
+                </View>
               </View>
             )}
             </ScrollView>
@@ -336,21 +330,21 @@ export default function InventoryScanScreen() {
 
 const palette = {navy: '#15263B', amber: '#E9A23B', slate: '#64748B', background: '#F5F7FA', white: '#FFFFFF', border: '#CBD5E1', muted: '#475569'};
 const styles = StyleSheet.create({
-  safeArea: {flex: 1, backgroundColor: palette.background},
+  safeArea: {flex: 1, backgroundColor: palette.navy},
   screen: {flex: 1, paddingHorizontal: 16},
-  topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: palette.border},
+  topBar: {minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#34475C'},
   backButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
-  backButtonText: {fontSize: 30, lineHeight: 33, color: palette.navy},
+  backButtonText: {fontSize: 30, lineHeight: 33, color: palette.white},
   brandIcon: {width: 40, height: 40, borderRadius: 12},
   brandCopy: {flex: 1},
-  wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
-  pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
-  scanHeading: {marginTop: 14},
-  scanTitle: {fontSize: 22, lineHeight: 28, fontWeight: '800', color: palette.navy},
-  intro: {marginTop: 3, fontSize: 13, lineHeight: 19, color: palette.muted},
-  scanContent: {flex: 1, marginTop: 12},
-  scanContentInner: {paddingBottom: 16},
-  cameraFrame: {height: 300, overflow: 'hidden', borderRadius: 18, backgroundColor: palette.navy},
+  wordmark: {fontSize: 17, fontWeight: '800', color: palette.white},
+  pageTitle: {fontSize: 12, fontWeight: '600', color: '#C4D0DC'},
+  scanHeading: {marginTop: 12},
+  scanTitle: {fontSize: 21, lineHeight: 27, fontWeight: '800', color: palette.white},
+  intro: {marginTop: 3, fontSize: 13, lineHeight: 19, color: '#C4D0DC'},
+  scanContent: {flex: 1, marginTop: 11},
+  scanContentInner: {paddingBottom: 14},
+  cameraFrame: {height: 320, overflow: 'hidden', borderRadius: 17, borderWidth: 1, borderColor: '#43576D', backgroundColor: '#0D1B2B'},
   scanFrame: {position: 'absolute', top: '18%', right: '14%', bottom: '18%', left: '14%', borderWidth: 2, borderColor: palette.amber, borderRadius: 16},
   scanCorners: {flex: 1, margin: -3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 18},
   scanPrompt: {position: 'absolute', top: 10, left: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(21,38,59,0.84)'},
@@ -359,14 +353,14 @@ const styles = StyleSheet.create({
   torchButtonActive: {backgroundColor: palette.amber, borderColor: palette.amber},
   torchLabel: {fontSize: 12, fontWeight: '800', color: palette.white},
   torchLabelActive: {color: palette.navy},
-  manualEntry: {marginTop: 8, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
-  manualFallbackToggle: {minHeight: 44, alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: 2},
-  manualFallbackText: {fontSize: 14, fontWeight: '800', color: palette.navy},
-  manualForm: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4},
-  manualInput: {flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 15, color: palette.navy},
-  manualButton: {minWidth: 68, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
+  manualEntry: {marginTop: 10, padding: 13, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  manualTitle: {fontSize: 14, fontWeight: '800', color: palette.navy},
+  manualHint: {marginTop: 2, fontSize: 11, color: palette.slate},
+  manualForm: {flexDirection: 'column', gap: 8, marginTop: 9},
+  manualInput: {height: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 14, color: palette.navy},
+  manualButton: {height: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
   manualButtonDisabled: {opacity: 0.5},
-  manualButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
+  manualButtonText: {fontSize: 13, fontWeight: '800', color: palette.navy},
   permissionCard: {marginTop: 12, padding: 18, alignItems: 'center', borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   permissionTitle: {fontSize: 16, fontWeight: '700', textAlign: 'center', color: palette.navy},
   permissionDescription: {marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', color: palette.muted},
@@ -375,24 +369,39 @@ const styles = StyleSheet.create({
   permissionButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
   permissionError: {marginTop: 10, fontSize: 13, lineHeight: 19, textAlign: 'center', color: '#A13A32'},
   messageState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24},
-  messageTitle: {fontSize: 17, fontWeight: '800', textAlign: 'center', color: palette.navy},
-  messageText: {marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', color: palette.muted},
+  messageTitle: {fontSize: 17, fontWeight: '800', textAlign: 'center', color: palette.white},
+  messageText: {marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', color: '#C4D0DC'},
   primaryButton: {minHeight: 48, minWidth: 144, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.amber, paddingHorizontal: 14},
   primaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   secondaryButton: {minHeight: 48, marginTop: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white},
   secondaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
-  results: {marginTop: 14, padding: 14, borderRadius: 17, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
-  resultsTitle: {fontSize: 16, fontWeight: '800', color: palette.navy},
+  results: {marginTop: 12, padding: 13, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  resultsTitle: {fontSize: 15, fontWeight: '800', color: palette.navy},
+  matchHeader: {flexDirection: 'row', alignItems: 'center', gap: 10},
+  matchDot: {width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#D9F0E2'},
+  matchCheck: {fontSize: 19, fontWeight: '900', color: '#21653A'},
   noMatchHeader: {flexDirection: 'row', alignItems: 'center', gap: 12},
-  noMatchDot: {width: 38, height: 38, borderRadius: 19, backgroundColor: '#FCE8E6'},
+  noMatchDot: {width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#FCE8E6'},
   noMatchCopy: {flex: 1},
   scannedCodeLabel: {marginTop: 12, fontSize: 12, fontWeight: '700', color: palette.slate},
   scannedCode: {marginTop: 3, fontSize: 16, lineHeight: 22, fontWeight: '700', color: palette.navy},
   resultHint: {marginTop: 4, fontSize: 13, lineHeight: 19, color: palette.slate},
-  resultCard: {minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, padding: 12, borderRadius: 13, borderWidth: 1, borderColor: palette.border},
+  resultInstruction: {marginTop: 2, fontSize: 11, lineHeight: 16, color: palette.slate},
+  resultCard: {minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 9, padding: 9, borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  resultCardSelected: {borderColor: palette.navy, borderWidth: 1.5},
+  locationMark: {width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.background},
   resultCopy: {flex: 1},
   resultPart: {fontSize: 14, fontWeight: '800', color: palette.navy},
   resultDescription: {marginTop: 2, fontSize: 13, color: palette.muted},
   resultStore: {marginTop: 4, fontSize: 12, fontWeight: '700', color: palette.slate},
   resultQuantityInline: {marginTop: 5, fontSize: 12, fontWeight: '800', color: palette.navy},
+  radio: {width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1.5, borderColor: palette.slate},
+  radioSelected: {borderColor: palette.navy},
+  radioDot: {width: 10, height: 10, borderRadius: 5, backgroundColor: palette.navy},
+  openDetailsButton: {minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 11, borderRadius: 10, backgroundColor: palette.navy},
+  openDetailsText: {fontSize: 13, fontWeight: '800', color: palette.white},
+  resultActions: {flexDirection: 'row', gap: 8, marginTop: 8},
+  actionDisabled: {opacity: 0.5},
+  manualSearchButton: {flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  manualSearchText: {fontSize: 12, fontWeight: '700', color: palette.navy},
 });

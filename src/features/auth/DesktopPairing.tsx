@@ -1,6 +1,7 @@
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions} from 'expo-camera';
-import {ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {AppIcon} from '../navigation/AppIcon';
 
 const palette = {
   navy: '#15263B',
@@ -18,18 +19,21 @@ type Props = {
   mockMode: boolean;
   onPair: (qrData: string, onApprovalRequired: () => void) => Promise<void>;
   onCancel?: () => void;
+  onPhaseChange?: (phase: Phase) => void;
 };
 
 type Phase = 'welcome' | 'scan' | 'pending';
 
 export const PREVIEW_PAIRING_QR = 'sparesflow://pair?token=preview-pairing-token';
 
-export default function DesktopPairing({mockMode, onPair, onCancel}: Props) {
+export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChange}: Props) {
   const [phase, setPhase] = useState<Phase>('welcome');
   const [permission, requestPermission] = useCameraPermissions();
   const [error, setError] = useState('');
   const [approvalRequired, setApprovalRequired] = useState(false);
   const scanned = useRef(false);
+
+  useEffect(() => {onPhaseChange?.(phase);}, [onPhaseChange, phase]);
 
   async function beginPairing(qrData: string) {
     if (scanned.current) return;
@@ -55,24 +59,29 @@ export default function DesktopPairing({mockMode, onPair, onCancel}: Props) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <View style={styles.brandMark} accessibilityElementsHidden>
-        <Image source={require('../../../assets/icon.png')} style={styles.brandIcon} />
-      </View>
       <Text accessibilityRole="header" style={styles.title}>
-        {phase === 'pending' ? 'Approve this device' : 'Sign in through your desktop account'}
+        {phase === 'pending' ? 'Approve this device' : 'Pair with your desktop'}
       </Text>
       {phase === 'welcome' && (
         <>
           <Text style={styles.body}>
-            Sign in to Spares Tracker on your desktop first. In Profile, choose Connect mobile app and generate a one-time QR code.
+            On your signed-in desktop, open your profile and generate a one-time QR code to connect this phone.
           </Text>
           <View style={styles.steps}>
             <Step number="1" text="Open Spares Tracker on your desktop" />
             <Step number="2" text="Go to Profile → Connect mobile app" />
             <Step number="3" text="Scan the QR code and approve this device there" />
           </View>
+          <View style={styles.qrGuide}>
+            <View style={styles.qrMark}><AppIcon name="scan" color={palette.white} size={20} /></View>
+            <View style={styles.qrCopy}>
+              <Text style={styles.qrTitle}>Ready to connect</Text>
+              <Text style={styles.qrDescription}>Point your camera at the one-time QR code on your desktop.</Text>
+            </View>
+          </View>
           <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('scan');}} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Scan QR code</Text>
+            <AppIcon name="scan" color={palette.white} size={18} />
+            <Text style={styles.primaryButtonText}>Scan pairing QR</Text>
           </Pressable>
           <Text style={styles.privacyNote}>The QR code expires quickly and can only be used once.</Text>
           {mockMode && (
@@ -149,18 +158,21 @@ function Step({number, text}: {number: string; text: string}) {
 }
 
 const styles = StyleSheet.create({
-  page: {flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: palette.white, borderRadius: 22, borderWidth: 1, borderColor: palette.border},
-  brandMark: {width: 50, height: 50, marginBottom: 16, borderRadius: 15, overflow: 'hidden'},
-  brandIcon: {width: 50, height: 50},
-  title: {fontSize: 24, lineHeight: 30, fontWeight: '800', letterSpacing: -0.4, color: palette.navy},
-  body: {marginTop: 9, fontSize: 15, lineHeight: 23, color: palette.muted},
-  steps: {gap: 14, marginTop: 24, marginBottom: 25},
+  page: {flexGrow: 1, justifyContent: 'center', padding: 18, backgroundColor: palette.white, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, borderWidth: 1, borderColor: palette.border},
+  title: {fontSize: 20, lineHeight: 26, fontWeight: '800', letterSpacing: -0.2, color: palette.navy},
+  body: {marginTop: 6, fontSize: 13, lineHeight: 19, color: palette.muted},
+  steps: {gap: 11, marginTop: 18, marginBottom: 18},
   step: {flexDirection: 'row', alignItems: 'center', gap: 12},
   stepNumber: {width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#FEF3DF'},
   stepNumberText: {fontSize: 13, fontWeight: '800', color: palette.navy},
   stepText: {flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '600', color: palette.navy},
-  primaryButton: {minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: palette.amber},
-  primaryButtonText: {fontSize: 15, fontWeight: '800', color: palette.navy},
+  qrGuide: {flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 13, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: palette.border, backgroundColor: palette.background},
+  qrMark: {width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.navy},
+  qrCopy: {flex: 1},
+  qrTitle: {fontSize: 12, fontWeight: '800', color: palette.navy},
+  qrDescription: {marginTop: 2, fontSize: 11, lineHeight: 16, color: palette.muted},
+  primaryButton: {minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 11, backgroundColor: palette.navy},
+  primaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.white},
   privacyNote: {marginTop: 13, textAlign: 'center', fontSize: 12, lineHeight: 18, color: palette.slate},
   previewButton: {minHeight: 46, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background},
   previewButtonText: {fontSize: 13, fontWeight: '700', color: palette.navy},

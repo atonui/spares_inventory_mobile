@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {ActivityIndicator, Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api} from '../../api/runtime';
@@ -125,11 +125,17 @@ export default function InventoryItemDetailScreen() {
           >
             <Text style={styles.backButtonText}>‹</Text>
           </Pressable>
-          <Image source={require('../../../assets/icon.png')} style={styles.brandIcon} accessible={false} />
-          <View>
-            <Text style={styles.wordmark}>Spares Tracker</Text>
-            <Text accessibilityRole="header" style={styles.pageTitle}>Stock details</Text>
+          <View style={styles.headerCopy}>
+            <Text accessibilityRole="header" style={styles.wordmark}>Item details</Text>
+            <Text style={styles.pageTitle}>{item?.partNumber ?? 'Stock item'}</Text>
           </View>
+          {item && <View style={[styles.headerStatus, item.quantity === 0 && styles.headerStatusOut,
+            item.quantity > 0 && item.quantity <= item.minThreshold && styles.headerStatusLow]}>
+            <Text style={[styles.headerStatusText, item.quantity === 0 && styles.headerStatusOutText,
+              item.quantity > 0 && item.quantity <= item.minThreshold && styles.headerStatusLowText]}>
+              {item.quantity === 0 ? 'Out of stock' : item.quantity <= item.minThreshold ? 'Low stock' : 'In stock'}
+            </Text>
+          </View>}
         </View>
 
         {status === 'loading' && (
@@ -184,17 +190,24 @@ const palette = {
   background: '#F5F7FA',
   amber: '#E9A23B',
   white: '#FFFFFF',
+  red: '#A13A32',
 };
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
-  screen: {flex: 1, paddingHorizontal: 20},
-  topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#CBD5E1'},
-  brandIcon: {width: 40, height: 40, borderRadius: 12},
+  screen: {flex: 1, paddingHorizontal: 16},
+  topBar: {minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: -16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#34475C', backgroundColor: palette.navy},
   backButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
-  backButtonText: {fontSize: 30, lineHeight: 33, color: palette.navy},
-  wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
-  pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
+  backButtonText: {fontSize: 30, lineHeight: 33, color: palette.white},
+  headerCopy: {flex: 1},
+  wordmark: {fontSize: 16, fontWeight: '800', color: palette.white},
+  pageTitle: {marginTop: 2, fontSize: 11, fontWeight: '600', color: '#C4D0DC'},
+  headerStatus: {paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: '#D9F0E2'},
+  headerStatusLow: {backgroundColor: '#FFF2D0'},
+  headerStatusOut: {backgroundColor: '#FCE8E6'},
+  headerStatusText: {fontSize: 10, fontWeight: '800', color: '#21653A'},
+  headerStatusLowText: {color: '#8A4B08'},
+  headerStatusOutText: {color: palette.red},
   messageState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24},
   messageTitle: {fontSize: 17, fontWeight: '800', color: palette.navy, textAlign: 'center'},
   messageText: {marginTop: 8, fontSize: 14, lineHeight: 20, color: palette.muted, textAlign: 'center'},

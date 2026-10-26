@@ -5,7 +5,7 @@ describe('desktop pairing onboarding', () => {
   it('explains that pairing starts from the signed-in desktop account', async () => {
     const screen = await render(<DesktopPairing mockMode={false} onPair={jest.fn()} />);
 
-    expect(screen.getByText('Sign in through your desktop account')).toBeTruthy();
+    expect(screen.getByText('Pair with your desktop')).toBeTruthy();
     expect(screen.getByText(/In Profile, choose Connect mobile app/i)).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Scan QR code'})).toBeTruthy();
     expect(screen.queryByLabelText('Email address')).toBeNull();

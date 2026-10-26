@@ -2,6 +2,7 @@ import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import type {InventoryRow, NativeUser} from '../../api/client';
 import {canAdjustStock} from '../auth/roleCapabilities';
 import {StockAdjustmentControls} from './StockAdjustmentControls';
+import {AppIcon} from '../navigation/AppIcon';
 
 const palette = {
   navy: '#15263B',
@@ -27,7 +28,7 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <View style={styles.heroHeading}>
-          <View style={styles.itemMark}><Text style={styles.itemMarkText}>{item.partNumber.slice(0, 1).toUpperCase()}</Text></View>
+          <View style={styles.itemMark}><AppIcon name="inventory" color={palette.navy} size={22} /></View>
           <View style={styles.heroCopy}>
             <Text accessibilityRole="header" style={styles.partNumber}>{item.partNumber}</Text>
             <Text style={styles.description}>{item.description}</Text>
@@ -42,11 +43,6 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
           <View style={styles.metric}>
             <Text style={[styles.metricValue, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>{item.minThreshold}</Text>
             <Text style={styles.stockLabel}>Reorder at</Text>
-          </View>
-          <View style={[styles.stockBadge, lowStock && styles.lowStockBadge, outOfStock && styles.outOfStockBadge]}>
-            <Text style={[styles.statusText, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>
-              {outOfStock ? 'Out of stock' : lowStock ? 'Low stock' : 'In stock'}
-            </Text>
           </View>
         </View>
       </View>
@@ -97,8 +93,7 @@ const styles = StyleSheet.create({
   content: {paddingTop: 14, paddingBottom: 24, gap: 12},
   hero: {padding: 16, borderRadius: 18, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   heroHeading: {flexDirection: 'row', alignItems: 'flex-start', gap: 12},
-  itemMark: {width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: palette.background},
-  itemMarkText: {fontSize: 20, fontWeight: '800', color: palette.navy},
+  itemMark: {width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#FFF2D9'},
   heroCopy: {flex: 1},
   partNumber: {fontSize: 17, fontWeight: '800', color: palette.navy},
   description: {marginTop: 3, fontSize: 13, lineHeight: 19, color: palette.muted},
@@ -106,13 +101,9 @@ const styles = StyleSheet.create({
   metricsRow: {flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 16},
   metric: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: palette.background},
   metricValue: {fontSize: 17, fontWeight: '800', color: palette.navy},
-  stockBadge: {flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRadius: 12, backgroundColor: '#E3F3E8'},
   stockValue: {fontSize: 19, fontWeight: '800', color: palette.navy},
   stockLabel: {marginTop: 3, fontSize: 11, fontWeight: '600', color: palette.muted},
-  statusText: {fontSize: 12, fontWeight: '800', color: '#21653A'},
-  lowStockBadge: {backgroundColor: '#FFF2D0'},
   lowStockText: {color: '#8A3E18'},
-  outOfStockBadge: {backgroundColor: '#FFF0EE'},
   outOfStockText: {color: '#A13A32'},
   card: {padding: 16, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   accessNotice: {padding: 14, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
