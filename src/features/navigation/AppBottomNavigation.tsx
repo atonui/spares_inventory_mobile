@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useRouter} from 'expo-router';
 import {AppIcon, type AppIconName} from './AppIcon';
 
@@ -31,7 +31,7 @@ export function AppBottomNavigation({
     {key: 'more', label: 'More', icon: 'more'},
   ];
 
-  function navigateTo(path: '/' | '/scan' | '/offline-changes') {
+  function navigateTo(path: '/' | '/scan' | '/offline-changes' | '/profile' | '/settings') {
     setMenuVisible(false);
     router.push(path);
   }
@@ -81,23 +81,29 @@ export function AppBottomNavigation({
           <View style={styles.sheet}>
             <View style={styles.handle} />
             <View style={styles.sheetHeader}>
-              <Text accessibilityRole="header" style={styles.sheetTitle}>Menu</Text>
+              <Text accessibilityRole="header" style={styles.sheetTitle}>More</Text>
               <Pressable accessibilityRole="button" accessibilityLabel="Close menu" onPress={() => setMenuVisible(false)} style={styles.closeButton}>
                 <AppIcon name="close" color={palette.slate} size={20} />
               </Pressable>
             </View>
-            <MenuAction icon="inventory" title="Inventory" subtitle="Search and browse stock" onPress={() => navigateTo('/')} />
-            <MenuAction icon="scan" title="Scan a part" subtitle="Find an item by barcode or QR code" onPress={() => navigateTo('/scan')} />
-            <MenuAction
-              icon="changes"
-              title="Offline changes"
-              subtitle={pendingCount ? `${queuedCount} waiting · ${conflictCount} need review` : 'View sync status'}
-              onPress={() => navigateTo('/offline-changes')}
-            />
-            {onSignOut ? (
-              <MenuAction icon="signOut" title="Sign out" subtitle="Saved offline changes stay on this device" onPress={() => {setMenuVisible(false); onSignOut();}} />
-            ) : (
-              <MenuAction icon="more" title="Account" subtitle="Return to Inventory for account actions" onPress={() => navigateTo('/')} />
+            <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.groupLabel}>WORK</Text>
+              <MenuAction icon="inventory" title="Inventory" subtitle="Search and browse stock" onPress={() => navigateTo('/')} />
+              <MenuAction icon="scan" title="Scan a part" subtitle="Find stock by barcode or QR code" onPress={() => navigateTo('/scan')} />
+              <MenuAction
+                icon="changes"
+                title="Offline changes"
+                subtitle={pendingCount ? `${queuedCount} waiting · ${conflictCount} need review` : 'No changes waiting to sync'}
+                onPress={() => navigateTo('/offline-changes')}
+              />
+              <Text style={[styles.groupLabel, styles.accountGroupLabel]}>ACCOUNT & APP</Text>
+              <MenuAction icon="profile" title="Profile" subtitle="View your account details" onPress={() => navigateTo('/profile')} />
+              <MenuAction icon="settings" title="Settings" subtitle="Scanner feedback and offline data" onPress={() => navigateTo('/settings')} />
+            </ScrollView>
+            {onSignOut && (
+              <View style={styles.signOutSection}>
+                <MenuAction icon="signOut" title="Sign out" subtitle="Saved offline changes stay on this device" onPress={() => {setMenuVisible(false); onSignOut();}} />
+              </View>
             )}
           </View>
         </View>
@@ -108,13 +114,13 @@ export function AppBottomNavigation({
 
 function MenuAction({icon, title, subtitle, onPress}: {icon: AppIconName; title: string; subtitle: string; onPress: () => void}) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={styles.menuAction}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={({pressed}) => [styles.menuAction, pressed && styles.menuActionPressed]}>
       <View style={styles.menuIcon}><AppIcon name={icon} color={title === 'Sign out' ? palette.red : palette.navy} size={21} /></View>
       <View style={styles.menuCopy}>
         <Text style={[styles.menuTitle, title === 'Sign out' && styles.signOutTitle]}>{title}</Text>
         <Text style={styles.menuSubtitle}>{subtitle}</Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <AppIcon name="chevronRight" color={palette.slate} size={17} />
     </Pressable>
   );
 }
@@ -129,16 +135,21 @@ const styles = StyleSheet.create({
   badge: {position: 'absolute', top: -4, right: -9, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8, backgroundColor: palette.red},
   badgeText: {fontSize: 9, lineHeight: 12, fontWeight: '800', color: palette.white},
   backdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(21, 38, 59, 0.38)'},
-  sheet: {paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
+  sheet: {maxHeight: '88%', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
   handle: {alignSelf: 'center', width: 42, height: 4, marginBottom: 10, borderRadius: 2, backgroundColor: palette.border},
   sheetHeader: {minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},
-  sheetTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
+  sheetTitle: {fontSize: 20, fontWeight: '800', color: palette.navy},
   closeButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
-  menuAction: {minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: '#E8EDF2'},
+  menuScroll: {flexShrink: 1},
+  menuContent: {paddingBottom: 8},
+  groupLabel: {marginTop: 4, marginBottom: 2, fontSize: 10, fontWeight: '800', letterSpacing: 1, color: palette.slate},
+  accountGroupLabel: {marginTop: 16},
+  signOutSection: {marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: palette.border},
+  menuAction: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: '#E8EDF2'},
+  menuActionPressed: {opacity: 0.72},
   menuIcon: {width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: palette.background},
   menuCopy: {flex: 1},
-  menuTitle: {fontSize: 13, fontWeight: '800', color: palette.navy},
+  menuTitle: {fontSize: 14, fontWeight: '700', color: palette.navy},
   signOutTitle: {color: palette.red},
-  menuSubtitle: {marginTop: 3, fontSize: 11, color: palette.muted},
-  chevron: {fontSize: 23, color: palette.slate},
+  menuSubtitle: {marginTop: 3, fontSize: 12, lineHeight: 16, color: palette.muted},
 });

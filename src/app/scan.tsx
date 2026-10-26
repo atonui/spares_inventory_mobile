@@ -31,6 +31,7 @@ export default function InventoryScanScreen() {
   const [permissionError, setPermissionError] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [manualPartNumber, setManualPartNumber] = useState('');
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const scanned = useRef(false);
@@ -50,6 +51,12 @@ export default function InventoryScanScreen() {
         return;
       }
       if (active) setSignedInUserId(activeUserId);
+      try {
+        const enabled = await offlineStockStore.getScanHapticsEnabled(activeUserId);
+        if (active) setHapticsEnabled(enabled);
+      } catch {
+        // Keep scan feedback enabled if the local preference cannot be read.
+      }
       const snapshot = getInventorySnapshot();
       if (snapshot !== null) {
         if (active) {
@@ -79,7 +86,7 @@ export default function InventoryScanScreen() {
   }, [userIdParam]);
 
   useEffect(() => {
-    if (!hasScanned) return;
+    if (!hasScanned || !hapticsEnabled) return;
     const sendScanFeedback = async () => {
       try {
         if (Platform.OS === 'android') {
@@ -96,7 +103,7 @@ export default function InventoryScanScreen() {
       }
     };
     void sendScanFeedback();
-  }, [hasScanned, matches.length]);
+  }, [hasScanned, hapticsEnabled, matches.length]);
 
   function onBarcodeScanned(value: string) {
     if (scanned.current || inventory === null) return;
