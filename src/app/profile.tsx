@@ -100,7 +100,7 @@ function formatRole(role: string) {
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
-  screen: {flex: 1, paddingHorizontal: 20},
+  screen: {flex: 1, paddingHorizontal: 16},
   header: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: palette.border},
   backButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
   backGlyph: {fontSize: 30, lineHeight: 33, color: palette.navy},
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   title: {fontSize: 13, fontWeight: '600', color: palette.muted},
   content: {paddingTop: 18, paddingBottom: 20},
   intro: {marginBottom: 18, fontSize: 14, lineHeight: 21, color: palette.muted},
-  identityCard: {alignItems: 'center', padding: 22, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  identityCard: {alignItems: 'center', padding: 20, borderRadius: 18, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   avatar: {width: 68, height: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 34, backgroundColor: '#FFF2D9'},
   avatarText: {fontSize: 22, fontWeight: '800', color: palette.navy},
   name: {marginTop: 14, fontSize: 20, fontWeight: '800', textAlign: 'center', color: palette.navy},

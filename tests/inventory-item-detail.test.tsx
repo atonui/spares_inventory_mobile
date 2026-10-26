@@ -45,7 +45,8 @@ describe('inventory item detail screen', () => {
     expect(screen.getByText('Spares Tracker')).toBeTruthy();
     expect(screen.getByText('110245012')).toBeTruthy();
     expect(screen.getByText('PCB THYRATRON GRID CONTROL')).toBeTruthy();
-    expect(screen.getByText('1 unit')).toBeTruthy();
+    expect(screen.getByLabelText('1 unit on hand')).toBeTruthy();
+    expect(screen.getByText('On hand')).toBeTruthy();
     expect(screen.getByText('2 units')).toBeTruthy();
     expect(screen.getByText('Allocated')).toBeTruthy();
     expect(screen.getByText('Nairobi Main Store')).toBeTruthy();
@@ -87,8 +88,8 @@ describe('inventory item detail screen', () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
     await waitFor(() => expect(screen.getByText('PART-92')).toBeTruthy());
-    expect(screen.getByText('OUT OF STOCK')).toBeTruthy();
-    expect(screen.queryByText('LOW STOCK')).toBeNull();
+    expect(screen.getByText('Out of stock')).toBeTruthy();
+    expect(screen.queryByText('Low stock')).toBeNull();
   });
 
   it('shows stock actions for a manager assigned to the inventory store', async () => {
@@ -154,7 +155,7 @@ describe('inventory item detail screen', () => {
     await fireEvent.press(screen.getByRole('button', {name: 'Refresh current quantity'}));
 
     await waitFor(() => expect(getInventory).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('8 units')).toBeTruthy();
+    expect(screen.getByText('8', {exact: true})).toBeTruthy();
     expect(screen.getByText('Current server quantity refreshed. Review it before discarding this change.')).toBeTruthy();
   });
 });

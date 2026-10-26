@@ -94,13 +94,13 @@ describe('inventory scanner screen', () => {
     const screen = await render(<InventoryScanScreen />);
 
     await fireEvent.press(screen.getByRole('button', {name: 'Simulate camera scan'}));
-    expect(screen.getByText('Stock found in 2 locations')).toBeTruthy();
+    expect(screen.getByText('2 locations found')).toBeTruthy();
     if (Platform.OS === 'android') {
       await waitFor(() => expect(mockPerformAndroidHapticsAsync).toHaveBeenCalledWith('confirm'));
     } else {
       await waitFor(() => expect(mockNotificationAsync).toHaveBeenCalledWith('success'));
     }
-    expect(screen.getByText('Choose the store you’re checking.')).toBeTruthy();
+    expect(screen.getByText('Choose the location you’re checking.')).toBeTruthy();
     expect(screen.getByText('Central store')).toBeTruthy();
     expect(screen.getByText('Field van')).toBeTruthy();
     expect(mockPush).not.toHaveBeenCalled();
@@ -118,14 +118,14 @@ describe('inventory scanner screen', () => {
     const screen = await render(<InventoryScanScreen />);
 
     await fireEvent.press(screen.getByRole('button', {name: 'Simulate camera scan'}));
-    expect(screen.getByText('No matching part number')).toBeTruthy();
+    expect(screen.getByText('No matching part found')).toBeTruthy();
     if (Platform.OS === 'android') {
       await waitFor(() => expect(mockPerformAndroidHapticsAsync).toHaveBeenCalledWith('reject'));
     } else {
       await waitFor(() => expect(mockNotificationAsync).toHaveBeenCalledWith('error'));
     }
-    expect(screen.getByText('UNKNOWN-99')).toBeTruthy();
-    expect(screen.getByText(/exact part numbers in the inventory saved on this device/)).toBeTruthy();
+    expect(screen.getAllByText('UNKNOWN-99')).toHaveLength(2);
+    expect(screen.getByText('Check the code or try a manual search.')).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Scan again'})).toBeTruthy();
   });
 

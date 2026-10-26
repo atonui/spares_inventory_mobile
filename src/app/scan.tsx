@@ -164,7 +164,10 @@ export default function InventoryScanScreen() {
           </View>
         </View>
 
-        <Text style={styles.intro}>Scan a code or enter a part number to check stock saved on this device.</Text>
+        <View style={styles.scanHeading}>
+          <Text accessibilityRole="header" style={styles.scanTitle}>{hasScanned ? 'Scan result' : 'Scan stock'}</Text>
+          <Text style={styles.intro}>{hasScanned ? scannedValue : 'Align a barcode inside the frame or look up a part number.'}</Text>
+        </View>
 
         {inventoryState === 'loading' && (
           <View style={styles.messageState}>
@@ -208,6 +211,7 @@ export default function InventoryScanScreen() {
                   />
                 )}
                 <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
+                {!hasScanned && <View pointerEvents="none" style={styles.scanPrompt}><Text style={styles.scanPromptText}>Align code inside frame</Text></View>}
                 {!hasScanned && Platform.OS !== 'web' && (
                   <Pressable
                     accessibilityRole="button"
@@ -225,6 +229,7 @@ export default function InventoryScanScreen() {
               <View style={styles.permissionCard}>
                 <Text accessibilityRole="header" style={styles.permissionTitle}>Use your camera to scan stock</Text>
                 <Text style={styles.permissionDescription}>Spares Tracker uses the camera to read barcodes and QR codes.</Text>
+                <Text style={styles.permissionNote}>You can also enter a part number below.</Text>
                 {permissionError ? <Text accessibilityRole="alert" style={styles.permissionError}>{permissionError}</Text> : null}
                 {!permission?.canAskAgain && permission?.granted === false ? (
                   <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} style={styles.permissionButton}>
@@ -247,7 +252,7 @@ export default function InventoryScanScreen() {
                   style={styles.manualFallbackToggle}
                 >
                   <Text style={styles.manualFallbackText}>
-                    {manualEntryVisible ? 'Hide part-number entry' : 'Can’t scan? Enter part number'}
+                    {manualEntryVisible ? 'Hide manual lookup' : 'Enter part number manually'}
                   </Text>
                 </Pressable>
                 {manualEntryVisible && (
@@ -281,17 +286,21 @@ export default function InventoryScanScreen() {
               <View style={styles.results}>
                 {matches.length === 0 ? (
                   <>
-                    <Text accessibilityRole="header" style={styles.resultsTitle}>No matching part number</Text>
-                    <Text style={styles.scannedCodeLabel}>Scanned code</Text>
+                    <View style={styles.noMatchHeader}>
+                      <View style={styles.noMatchDot} />
+                      <View style={styles.noMatchCopy}>
+                        <Text accessibilityRole="header" style={styles.resultsTitle}>No matching part found</Text>
+                        <Text style={styles.resultHint}>Check the code or try a manual search.</Text>
+                      </View>
+                    </View>
                     <Text selectable style={styles.scannedCode}>{scannedValue}</Text>
-                    <Text style={styles.messageText}>This scan checks exact part numbers in the inventory saved on this device. Refresh Inventory or check the code and try again.</Text>
                   </>
                 ) : (
                   <>
                     <Text accessibilityRole="header" style={styles.resultsTitle}>
-                      {matches.length === 1 ? '1 matching stock record' : `Stock found in ${matches.length} locations`}
+                      {matches.length === 1 ? '1 stock record found' : `${matches.length} locations found`}
                     </Text>
-                    {matches.length > 1 && <Text style={styles.resultHint}>Choose the store you’re checking.</Text>}
+                    {matches.length > 0 && <Text style={styles.resultHint}>Choose the location you’re checking.</Text>}
                     {matches.map(item => (
                       <Pressable
                         accessibilityRole="button"
@@ -302,11 +311,11 @@ export default function InventoryScanScreen() {
                       >
                         <View style={styles.resultCopy}>
                           <Text style={styles.resultPart}>{item.partNumber}</Text>
-                          <Text style={styles.resultDescription}>{item.description}</Text>
+                          <Text style={styles.resultDescription} numberOfLines={2}>{item.description}</Text>
                           <Text style={styles.resultStore}>{item.storeName}</Text>
-                          <Text style={styles.resultAction}>View stock details</Text>
+                          <Text style={styles.resultQuantityInline}>{item.quantity} {item.quantity === 1 ? 'unit' : 'units'} · {item.quantity === 0 ? 'Out of stock' : item.quantity <= item.minThreshold ? 'Low stock' : 'In stock'}</Text>
                         </View>
-                        <Text style={styles.resultQuantity}>{item.quantity} <Text style={styles.resultUnit}>{item.quantity === 1 ? 'unit' : 'units'}</Text></Text>
+                        <AppIcon name="chevronRight" color={palette.slate} size={18} />
                       </Pressable>
                     ))}
                   </>
@@ -328,7 +337,7 @@ export default function InventoryScanScreen() {
 const palette = {navy: '#15263B', amber: '#E9A23B', slate: '#64748B', background: '#F5F7FA', white: '#FFFFFF', border: '#CBD5E1', muted: '#475569'};
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
-  screen: {flex: 1, paddingHorizontal: 20},
+  screen: {flex: 1, paddingHorizontal: 16},
   topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: palette.border},
   backButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
   backButtonText: {fontSize: 30, lineHeight: 33, color: palette.navy},
@@ -336,28 +345,33 @@ const styles = StyleSheet.create({
   brandCopy: {flex: 1},
   wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
   pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
-  intro: {marginTop: 18, fontSize: 14, lineHeight: 21, color: palette.muted},
-  scanContent: {flex: 1, marginTop: 16},
+  scanHeading: {marginTop: 14},
+  scanTitle: {fontSize: 22, lineHeight: 28, fontWeight: '800', color: palette.navy},
+  intro: {marginTop: 3, fontSize: 13, lineHeight: 19, color: palette.muted},
+  scanContent: {flex: 1, marginTop: 12},
   scanContentInner: {paddingBottom: 16},
-  cameraFrame: {height: 280, overflow: 'hidden', borderRadius: 18, backgroundColor: palette.navy},
+  cameraFrame: {height: 300, overflow: 'hidden', borderRadius: 18, backgroundColor: palette.navy},
   scanFrame: {position: 'absolute', top: '18%', right: '14%', bottom: '18%', left: '14%', borderWidth: 2, borderColor: palette.amber, borderRadius: 16},
   scanCorners: {flex: 1, margin: -3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 18},
+  scanPrompt: {position: 'absolute', top: 10, left: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(21,38,59,0.84)'},
+  scanPromptText: {fontSize: 12, fontWeight: '700', color: palette.white},
   torchButton: {position: 'absolute', right: 12, bottom: 12, minWidth: 78, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, borderRadius: 12, backgroundColor: 'rgba(21,38,59,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)'},
   torchButtonActive: {backgroundColor: palette.amber, borderColor: palette.amber},
   torchLabel: {fontSize: 12, fontWeight: '800', color: palette.white},
   torchLabelActive: {color: palette.navy},
-  manualEntry: {marginTop: 8},
-  manualFallbackToggle: {minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10},
-  manualFallbackText: {fontSize: 13, fontWeight: '700', color: palette.slate, textDecorationLine: 'underline'},
+  manualEntry: {marginTop: 8, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  manualFallbackToggle: {minHeight: 44, alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: 2},
+  manualFallbackText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   manualForm: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4},
   manualInput: {flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 15, color: palette.navy},
   manualButton: {minWidth: 68, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
   manualButtonDisabled: {opacity: 0.5},
   manualButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
-  permissionCard: {marginTop: 18, padding: 18, alignItems: 'center', borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  permissionCard: {marginTop: 12, padding: 18, alignItems: 'center', borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   permissionTitle: {fontSize: 16, fontWeight: '700', textAlign: 'center', color: palette.navy},
   permissionDescription: {marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', color: palette.muted},
   permissionButton: {minHeight: 48, minWidth: 144, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white, paddingHorizontal: 14},
+  permissionNote: {marginTop: 9, fontSize: 12, color: palette.slate},
   permissionButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
   permissionError: {marginTop: 10, fontSize: 13, lineHeight: 19, textAlign: 'center', color: '#A13A32'},
   messageState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24},
@@ -367,17 +381,18 @@ const styles = StyleSheet.create({
   primaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   secondaryButton: {minHeight: 48, marginTop: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white},
   secondaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
-  results: {marginTop: 16, padding: 14, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  results: {marginTop: 14, padding: 14, borderRadius: 17, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   resultsTitle: {fontSize: 16, fontWeight: '800', color: palette.navy},
+  noMatchHeader: {flexDirection: 'row', alignItems: 'center', gap: 12},
+  noMatchDot: {width: 38, height: 38, borderRadius: 19, backgroundColor: '#FCE8E6'},
+  noMatchCopy: {flex: 1},
   scannedCodeLabel: {marginTop: 12, fontSize: 12, fontWeight: '700', color: palette.slate},
   scannedCode: {marginTop: 3, fontSize: 16, lineHeight: 22, fontWeight: '700', color: palette.navy},
-  resultHint: {marginTop: 5, fontSize: 13, lineHeight: 19, color: palette.slate},
-  resultCard: {minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border},
+  resultHint: {marginTop: 4, fontSize: 13, lineHeight: 19, color: palette.slate},
+  resultCard: {minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, padding: 12, borderRadius: 13, borderWidth: 1, borderColor: palette.border},
   resultCopy: {flex: 1},
   resultPart: {fontSize: 14, fontWeight: '800', color: palette.navy},
   resultDescription: {marginTop: 2, fontSize: 13, color: palette.muted},
   resultStore: {marginTop: 4, fontSize: 12, fontWeight: '700', color: palette.slate},
-  resultAction: {marginTop: 8, fontSize: 12, fontWeight: '800', color: palette.navy},
-  resultQuantity: {fontSize: 18, fontWeight: '800', color: palette.navy},
-  resultUnit: {fontSize: 11, fontWeight: '600', color: palette.slate},
+  resultQuantityInline: {marginTop: 5, fontSize: 12, fontWeight: '800', color: palette.navy},
 });

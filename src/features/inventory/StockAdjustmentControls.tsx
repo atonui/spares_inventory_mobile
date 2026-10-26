@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import * as Network from 'expo-network';
 import {api} from '../../api/runtime';
 import type {InventoryRow} from '../../api/client';
@@ -292,7 +292,8 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
         if (zeroCountConfirmationVisible) setZeroCountConfirmationVisible(false);
         else setMode(null);
       }}>
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
           <View style={styles.modalCard}>
             {zeroCountConfirmationVisible ? (
               <View accessibilityRole="alert">
@@ -328,10 +329,10 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
                   style={styles.input}
                 />
                 <View style={styles.actions}>
-                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => setMode(null)} style={styles.secondaryButton}>
+                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => {Keyboard.dismiss(); setMode(null);}} style={styles.secondaryButton}>
                     <Text style={styles.secondaryButtonText}>Cancel</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => void save()} style={styles.primaryButton}>
+                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => {Keyboard.dismiss(); void save();}} style={styles.primaryButton}>
                     {saving ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.primaryButtonText}>Save change</Text>}
                   </Pressable>
                 </View>
@@ -339,7 +340,8 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
             )}
             {!!notice && <Text accessibilityRole="alert" style={styles.notice}>{notice}</Text>}
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -365,7 +367,8 @@ const styles = StyleSheet.create({
   discardText: {fontSize: 12, fontWeight: '700', color: palette.navy, textDecorationLine: 'underline'},
   notice: {marginTop: 8, fontSize: 13, lineHeight: 19, color: palette.slate},
   modalBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: '#0008'},
-  modalCard: {padding: 22, paddingBottom: 32, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
+  modalScrollContent: {flexGrow: 1, justifyContent: 'flex-end'},
+  modalCard: {maxHeight: '88%', padding: 22, paddingBottom: 32, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
   title: {fontSize: 20, fontWeight: '800', color: palette.navy},
   helper: {marginTop: 8, fontSize: 14, lineHeight: 20, color: palette.slate},
   input: {minHeight: 54, marginTop: 18, borderWidth: 1, borderColor: palette.line, borderRadius: 12, paddingHorizontal: 14, fontSize: 20, fontWeight: '700', color: palette.navy},
