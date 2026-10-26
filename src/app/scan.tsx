@@ -32,6 +32,7 @@ export default function InventoryScanScreen() {
   const [requestingPermission, setRequestingPermission] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [manualPartNumber, setManualPartNumber] = useState('');
+  const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const scanned = useRef(false);
 
   useEffect(() => {
@@ -232,29 +233,41 @@ export default function InventoryScanScreen() {
 
             {!hasScanned && (
               <View style={styles.manualEntry}>
-                <Text style={styles.manualLabel}>Enter part number</Text>
-                <View style={styles.manualRow}>
-                  <TextInput
-                    accessibilityLabel="Part number"
-                    value={manualPartNumber}
-                    onChangeText={setManualPartNumber}
-                    onSubmitEditing={findPartNumber}
-                    placeholder="e.g. BRK-2048"
-                    placeholderTextColor="#94A3B8"
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    returnKeyType="search"
-                    style={styles.manualInput}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={!manualPartNumber.trim()}
-                    onPress={findPartNumber}
-                    style={[styles.manualButton, !manualPartNumber.trim() && styles.manualButtonDisabled]}
-                  >
-                    <Text style={styles.manualButtonText}>Find</Text>
-                  </Pressable>
-                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{expanded: manualEntryVisible}}
+                  onPress={() => setManualEntryVisible(value => !value)}
+                  style={styles.manualFallbackToggle}
+                >
+                  <Text style={styles.manualFallbackText}>
+                    {manualEntryVisible ? 'Hide part-number entry' : 'Can’t scan? Enter part number'}
+                  </Text>
+                  <Text style={styles.manualFallbackChevron}>{manualEntryVisible ? '⌃' : '⌄'}</Text>
+                </Pressable>
+                {manualEntryVisible && (
+                  <View style={styles.manualForm}>
+                    <TextInput
+                      accessibilityLabel="Part number"
+                      value={manualPartNumber}
+                      onChangeText={setManualPartNumber}
+                      onSubmitEditing={findPartNumber}
+                      placeholder="e.g. BRK-2048"
+                      placeholderTextColor="#94A3B8"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      returnKeyType="search"
+                      style={styles.manualInput}
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={!manualPartNumber.trim()}
+                      onPress={findPartNumber}
+                      style={[styles.manualButton, !manualPartNumber.trim() && styles.manualButtonDisabled]}
+                    >
+                      <Text style={styles.manualButtonText}>Find</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
 
@@ -327,9 +340,11 @@ const styles = StyleSheet.create({
   torchButtonActive: {backgroundColor: palette.amber, borderColor: palette.amber},
   torchLabel: {fontSize: 12, fontWeight: '800', color: palette.white},
   torchLabelActive: {color: palette.navy},
-  manualEntry: {marginTop: 16, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
-  manualLabel: {marginBottom: 8, fontSize: 13, fontWeight: '800', color: palette.navy},
-  manualRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  manualEntry: {marginTop: 8},
+  manualFallbackToggle: {minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10},
+  manualFallbackText: {fontSize: 13, fontWeight: '700', color: palette.slate},
+  manualFallbackChevron: {fontSize: 18, lineHeight: 20, color: palette.slate},
+  manualForm: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4},
   manualInput: {flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 15, color: palette.navy},
   manualButton: {minWidth: 68, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
   manualButtonDisabled: {opacity: 0.5},
