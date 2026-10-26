@@ -77,6 +77,12 @@ export const offlineStockStore: OfflineStockStorage = {
     if (userId === null) globalThis.localStorage?.removeItem('spares-tracker.active-user.v1');
     else globalThis.localStorage?.setItem('spares-tracker.active-user.v1', String(userId));
   },
+  async getScanHapticsEnabled(userId) {
+    return globalThis.localStorage?.getItem(`spares-tracker.scan_haptics_enabled.${userId}`) !== 'false';
+  },
+  async setScanHapticsEnabled(userId, enabled) {
+    globalThis.localStorage?.setItem(`spares-tracker.scan_haptics_enabled.${userId}`, String(enabled));
+  },
   async enqueue(adjustment) {
     const entries = getWebEntries();
     entries.push(adjustment);

@@ -21,6 +21,8 @@ export type OfflineStockStorage = StockQueueStore & {
   loadProfile(userId: number): Promise<NativeUser | null>;
   getActiveUserId(): Promise<number | null>;
   setActiveUserId(userId: number | null): Promise<void>;
+  getScanHapticsEnabled(userId: number): Promise<boolean>;
+  setScanHapticsEnabled(userId: number, enabled: boolean): Promise<void>;
 };
 
 async function database() {
@@ -165,6 +167,24 @@ export const offlineStockStore: OfflineStockStorage = {
     const db = await database();
     if (userId === null) await db.runAsync("DELETE FROM offline_metadata WHERE key='active_user_id'");
     else await db.runAsync("INSERT OR REPLACE INTO offline_metadata(key,value) VALUES('active_user_id',?)", String(userId));
+  },
+  async getScanHapticsEnabled(userId) {
+    const key = `scan_haptics_enabled.${userId}`;
+    if (Platform.OS === 'web') return globalThis.localStorage?.getItem(`spares-tracker.${key}`) !== 'false';
+    const db = await database();
+    const row = await db.getFirstAsync<{value: string}>(
+      'SELECT value FROM offline_metadata WHERE key=?', key);
+    return row?.value !== 'false';
+  },
+  async setScanHapticsEnabled(userId, enabled) {
+    const key = `scan_haptics_enabled.${userId}`;
+    const value = String(enabled);
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, value);
+      return;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, value);
   },
   async enqueue(adjustment) {
     if (Platform.OS === 'web') {

@@ -1,6 +1,6 @@
 import Svg, {Circle, Path} from 'react-native-svg';
 
-export type AppIconName = 'inventory' | 'scan' | 'changes' | 'more' | 'filter' | 'search' | 'sort' | 'close' | 'signOut' | 'flashlight';
+export type AppIconName = 'inventory' | 'scan' | 'changes' | 'more' | 'filter' | 'search' | 'sort' | 'close' | 'signOut' | 'flashlight' | 'profile' | 'settings' | 'chevronRight';
 
 export function AppIcon({name, color, size = 22}: {name: AppIconName; color: string; size?: number}) {
   const shared = {stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const};
@@ -45,6 +45,15 @@ export function AppIcon({name, color, size = 22}: {name: AppIconName; color: str
         <Path d="M8 3h8l1.5 5-2.5 2v8.5L12 21l-3-2.5V10L6.5 8 8 3Z" {...shared} />
         <Path d="M8 6.5h8M9 9h6" {...shared} />
       </>}
+      {name === 'profile' && <>
+        <Circle cx="12" cy="8" r="3.5" {...shared} />
+        <Path d="M4.5 20a7.5 7.5 0 0 1 15 0" {...shared} />
+      </>}
+      {name === 'settings' && <>
+        <Circle cx="12" cy="12" r="3" {...shared} />
+        <Path d="m19.4 15 .1.1 1 1.7-1.7 2.9-2 .1-.2-.1a7.9 7.9 0 0 1-1.7 1l-.9 1.5h-3.4l-.9-1.5a7.9 7.9 0 0 1-1.7-1l-2 .1-1.7-2.9 1-1.7a8.3 8.3 0 0 1 0-2l-1-1.7 1.7-2.9 2 .1a7.9 7.9 0 0 1 1.7-1L10.8 6h3.4l.9 1.5a7.9 7.9 0 0 1 1.7 1l2-.1 1.7 2.9-1 1.7a8.3 8.3 0 0 1-.1 2Z" {...shared} />
+      </>}
+      {name === 'chevronRight' && <Path d="m9 5 7 7-7 7" {...shared} />}
     </Svg>
   );
 }

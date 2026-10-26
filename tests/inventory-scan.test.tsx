@@ -47,6 +47,7 @@ jest.mock('expo-haptics', () => ({
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     getActiveUserId: async () => 7,
+    getScanHapticsEnabled: async () => true,
     loadInventorySnapshot: async () => null,
     list: async () => [],
   },
