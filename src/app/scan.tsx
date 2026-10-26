@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions, type BarcodeType} from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import {ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
@@ -10,6 +10,7 @@ import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {findInventoryMatches} from '../features/inventory/scanLookup';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
+import {AppIcon} from '../features/navigation/AppIcon';
 
 const scannerBarcodeTypes: BarcodeType[] = [
   'qr', 'ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'code93', 'codabar', 'itf14',
@@ -29,6 +30,8 @@ export default function InventoryScanScreen() {
   const [matches, setMatches] = useState<InventoryItem[]>([]);
   const [permissionError, setPermissionError] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [manualPartNumber, setManualPartNumber] = useState('');
   const scanned = useRef(false);
 
   useEffect(() => {
@@ -107,6 +110,15 @@ export default function InventoryScanScreen() {
     setHasScanned(false);
     setScannedValue('');
     setMatches([]);
+    setTorchEnabled(false);
+  }
+
+  function findPartNumber() {
+    const partNumber = manualPartNumber.trim();
+    if (!partNumber) return;
+    Keyboard.dismiss();
+    setTorchEnabled(false);
+    onBarcodeScanned(partNumber);
   }
 
   async function allowCamera() {
@@ -144,7 +156,7 @@ export default function InventoryScanScreen() {
           </View>
         </View>
 
-        <Text style={styles.intro}>Scan a QR code or barcode to find matching part numbers in your inventory.</Text>
+        <Text style={styles.intro}>Scan a code or enter a part number to check stock saved on this device.</Text>
 
         {inventoryState === 'loading' && (
           <View style={styles.messageState}>
@@ -175,17 +187,31 @@ export default function InventoryScanScreen() {
 
         {inventoryState === 'ready' && (inventory?.length ?? 0) > 0 && (
           <>
+            <ScrollView style={styles.scanContent} contentContainerStyle={styles.scanContentInner} keyboardShouldPersistTaps="handled">
             {permission?.granted ? (
               <View style={styles.cameraFrame}>
                 {!hasScanned && (
                   <CameraView
                     style={StyleSheet.absoluteFill}
                     facing="back"
+                    enableTorch={torchEnabled}
                     barcodeScannerSettings={{barcodeTypes: scannerBarcodeTypes}}
                     onBarcodeScanned={({data}) => onBarcodeScanned(data)}
                   />
                 )}
                 <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
+                {!hasScanned && Platform.OS !== 'web' && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={torchEnabled ? 'Turn torch off' : 'Turn torch on'}
+                    accessibilityState={{checked: torchEnabled}}
+                    onPress={() => setTorchEnabled(value => !value)}
+                    style={[styles.torchButton, torchEnabled && styles.torchButtonActive]}
+                  >
+                    <AppIcon name="flashlight" color={torchEnabled ? palette.navy : palette.white} size={18} />
+                    <Text style={[styles.torchLabel, torchEnabled && styles.torchLabelActive]}>{torchEnabled ? 'Torch on' : 'Torch'}</Text>
+                  </Pressable>
+                )}
               </View>
             ) : (
               <View style={styles.permissionCard}>
@@ -201,6 +227,34 @@ export default function InventoryScanScreen() {
                     {requestingPermission ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.primaryButtonText}>Allow camera</Text>}
                   </Pressable>
                 )}
+              </View>
+            )}
+
+            {!hasScanned && (
+              <View style={styles.manualEntry}>
+                <Text style={styles.manualLabel}>Enter part number</Text>
+                <View style={styles.manualRow}>
+                  <TextInput
+                    accessibilityLabel="Part number"
+                    value={manualPartNumber}
+                    onChangeText={setManualPartNumber}
+                    onSubmitEditing={findPartNumber}
+                    placeholder="e.g. BRK-2048"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    style={styles.manualInput}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={!manualPartNumber.trim()}
+                    onPress={findPartNumber}
+                    style={[styles.manualButton, !manualPartNumber.trim() && styles.manualButtonDisabled]}
+                  >
+                    <Text style={styles.manualButtonText}>Find</Text>
+                  </Pressable>
+                </View>
               </View>
             )}
 
@@ -243,6 +297,7 @@ export default function InventoryScanScreen() {
                 </Pressable>
               </View>
             )}
+            </ScrollView>
           </>
         )}
       </View>
@@ -263,9 +318,22 @@ const styles = StyleSheet.create({
   wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
   pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
   intro: {marginTop: 18, fontSize: 14, lineHeight: 21, color: palette.muted},
-  cameraFrame: {height: 300, marginTop: 18, overflow: 'hidden', borderRadius: 18, backgroundColor: palette.navy},
+  scanContent: {flex: 1, marginTop: 16},
+  scanContentInner: {paddingBottom: 16},
+  cameraFrame: {height: 280, overflow: 'hidden', borderRadius: 18, backgroundColor: palette.navy},
   scanFrame: {position: 'absolute', top: '18%', right: '14%', bottom: '18%', left: '14%', borderWidth: 2, borderColor: palette.amber, borderRadius: 16},
   scanCorners: {flex: 1, margin: -3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 18},
+  torchButton: {position: 'absolute', right: 12, bottom: 12, minWidth: 78, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, borderRadius: 12, backgroundColor: 'rgba(21,38,59,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)'},
+  torchButtonActive: {backgroundColor: palette.amber, borderColor: palette.amber},
+  torchLabel: {fontSize: 12, fontWeight: '800', color: palette.white},
+  torchLabelActive: {color: palette.navy},
+  manualEntry: {marginTop: 16, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  manualLabel: {marginBottom: 8, fontSize: 13, fontWeight: '800', color: palette.navy},
+  manualRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  manualInput: {flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 15, color: palette.navy},
+  manualButton: {minWidth: 68, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
+  manualButtonDisabled: {opacity: 0.5},
+  manualButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   permissionCard: {marginTop: 18, padding: 18, alignItems: 'center', borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   permissionError: {marginTop: 10, fontSize: 13, lineHeight: 19, textAlign: 'center', color: '#A13A32'},
   messageState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24},
