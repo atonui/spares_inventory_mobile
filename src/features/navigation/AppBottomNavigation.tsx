@@ -119,13 +119,13 @@ function MenuAction({icon, title, subtitle, onPress}: {icon: AppIconName; title:
 }
 
 const styles = StyleSheet.create({
-  bar: {height: 76, flexDirection: 'row', marginHorizontal: -20, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: palette.white},
-  tab: {flex: 1, minHeight: 68, alignItems: 'center', justifyContent: 'center', gap: 4},
-  scanTab: {marginTop: -14},
+  bar: {height: 64, flexDirection: 'row', marginHorizontal: -16, paddingHorizontal: 3, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: palette.white},
+  tab: {flex: 1, minHeight: 60, alignItems: 'center', justifyContent: 'center', gap: 2},
+  scanTab: {marginTop: -10},
   activeIndicator: {position: 'absolute', top: 0, width: 28, height: 3, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, backgroundColor: palette.amber},
-  iconWrap: {position: 'relative', minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center'},
-  scanIconWrap: {width: 54, height: 54, borderRadius: 18, backgroundColor: palette.amber, borderWidth: 3, borderColor: palette.white},
-  tabLabel: {fontSize: 11, fontWeight: '600', color: palette.slate},
+  iconWrap: {position: 'relative', minWidth: 25, minHeight: 25, alignItems: 'center', justifyContent: 'center'},
+  scanIconWrap: {width: 42, height: 42, borderRadius: 21, backgroundColor: palette.amber, borderWidth: 2, borderColor: palette.white},
+  tabLabel: {fontSize: 10, fontWeight: '600', color: palette.slate},
   tabLabelActive: {fontWeight: '800', color: palette.navy},
   badge: {position: 'absolute', top: -4, right: -9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderRadius: 9},
   badgeWarning: {backgroundColor: palette.amber},

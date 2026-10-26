@@ -8,7 +8,7 @@ import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/in
 
 
 async function pairFromPreview(screen: ReturnType<typeof render>) {
-  await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+  await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
   await fireEvent.press(screen.getByRole('button', {name: 'Try preview pairing'}));
   await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy(), {timeout: 5000});
 }
@@ -64,9 +64,9 @@ describe('inventory device-pairing flow', () => {
   it('renders desktop pairing guidance on initial load', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
     expect(screen.getByText('Spares Tracker')).toBeTruthy();
-    expect(screen.getByText('Everything in its place.')).toBeTruthy();
+    expect(screen.getByText('STEP 1 OF 3')).toBeTruthy();
   });
 
   it('restores a saved session and loads inventory without showing sign-in', async () => {
@@ -81,7 +81,7 @@ describe('inventory device-pairing flow', () => {
     expect(screen.getByText('Good to see you, Preview')).toBeTruthy();
     expect(screen.getByText('Online · Updated just now')).toBeTruthy();
     expect(screen.getByText('4 items · Updated just now')).toBeTruthy();
-    expect(screen.queryByText('Sign in through your desktop account')).toBeNull();
+    expect(screen.queryByText('Pair with your desktop')).toBeNull();
     getMe.mockRestore();
   });
 
@@ -161,7 +161,7 @@ describe('inventory device-pairing flow', () => {
     jest.spyOn(api, 'claimMobilePairing').mockRejectedValue(new Error('This QR code is invalid or has expired.'));
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
     await fireEvent.press(screen.getByRole('button', {name: 'Try preview pairing'}));
 
     await waitFor(() => expect(screen.getByText('This QR code is invalid or has expired.')).toBeTruthy());
@@ -172,7 +172,7 @@ describe('inventory device-pairing flow', () => {
   it('opens the camera permission step from pairing instructions', async () => {
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
     await fireEvent.press(screen.getByRole('button', {name: 'Scan QR code'}));
     expect(screen.getByText('Camera access is needed to scan your QR code')).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Allow camera'})).toBeTruthy();
@@ -201,7 +201,7 @@ describe('inventory device-pairing flow', () => {
     expect(screen.queryByText('Adjust stock')).toBeNull();
 
     await openSignOut(screen);
-    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
     expect(getCachedInventoryItem(2)).toBeUndefined();
   });
 
@@ -228,7 +228,7 @@ describe('inventory device-pairing flow', () => {
     await openSignOut(screen);
     await waitFor(() => expect(screen.getByText('Keep your offline changes?')).toBeTruthy());
     await fireEvent.press(screen.getByRole('button', {name: 'Sign out and keep changes'}));
-    await waitFor(() => expect(screen.getByText('Sign in through your desktop account')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
     expect(logout).toHaveBeenCalledTimes(1);
     expect(remove).not.toHaveBeenCalled();
   });

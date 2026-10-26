@@ -94,6 +94,7 @@ export default function HomeScreen() {
   const inventory = overview.inventory;
   const outOfStockCount = inventory?.filter(item => item.quantity === 0).length ?? 0;
   const lowStockCount = inventory?.filter(item => item.quantity > 0 && item.quantity <= item.minThreshold).length ?? 0;
+  const attentionItems = inventory?.filter(item => item.quantity === 0 || (item.quantity > 0 && item.quantity <= item.minThreshold)) ?? [];
 
   function openInventory(filter: 'outOfStock' | 'lowStock' | 'all') {
     router.push({pathname: '/', params: {filter: filter === 'all' ? undefined : filter, query: undefined}});
@@ -106,14 +107,18 @@ export default function HomeScreen() {
           <Image source={require('../../assets/icon.png')} style={styles.brandIcon} accessible={false} />
           <View style={styles.brandCopy}>
             <Text style={styles.wordmark}>Spares Tracker</Text>
-            <Text accessibilityRole="header" style={styles.pageTitle}>Home</Text>
+            <Text accessibilityRole="header" style={styles.pageTitle}>Stock overview</Text>
+          </View>
+          <View style={[styles.connectionPill, offline && styles.connectionPillOffline]}>
+            <View style={[styles.connectionDot, offline && styles.connectionDotOffline]} />
+            <Text style={[styles.connectionText, offline && styles.connectionTextOffline]}>{offline ? 'Offline' : 'Online'}</Text>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.headingBlock}>
-            <Text style={styles.heading}>Stock at a glance</Text>
-            <Text style={styles.subheading}>Start with the items that need attention.</Text>
+            <Text style={styles.heading}>Good to see you</Text>
+            <Text style={styles.subheading}>Here’s what needs attention today.</Text>
           </View>
 
           <View style={styles.searchRow}>
@@ -169,6 +174,7 @@ export default function HomeScreen() {
             <View accessibilityLabel="Loading stock overview" style={styles.cardsRow}>
               <OverviewSkeleton />
               <OverviewSkeleton />
+              <OverviewSkeleton />
             </View>
           ) : inventory === null ? (
             <View style={styles.emptyCard}>
@@ -189,34 +195,46 @@ export default function HomeScreen() {
           ) : (
             <>
               <View style={styles.cardsRow}>
-                <StatusCard
-                  label="Out of stock"
-                  detail="No units available"
-                  count={outOfStockCount}
-                  tone="error"
-                  onPress={() => openInventory('outOfStock')}
-                />
-                <StatusCard
-                  label="Low stock"
-                  detail="At or below minimum"
-                  count={lowStockCount}
-                  tone="warning"
-                  onPress={() => openInventory('lowStock')}
-                />
+                <StatusCard label="Total SKUs" count={inventory.length} tone="neutral" onPress={() => openInventory('all')} />
+                <StatusCard label="Low stock" count={lowStockCount} tone="warning" onPress={() => openInventory('lowStock')} />
+                <StatusCard label="Out of stock" count={outOfStockCount} tone="error" onPress={() => openInventory('outOfStock')} />
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`View all ${inventory.length} inventory items`}
-                onPress={() => openInventory('all')}
-                style={styles.allStockLink}
-              >
-                <View style={styles.allStockCopy}>
-                  <Text style={styles.allStockLabel}>All stock</Text>
-                  <Text style={styles.allStockCount}>{inventory.length} items</Text>
+              <View style={styles.sectionHeading}>
+                <Text accessibilityRole="header" style={styles.sectionTitle}>Needs attention</Text>
+                <Pressable accessibilityRole="button" onPress={() => openInventory('all')}><Text style={styles.viewAll}>View inventory</Text></Pressable>
+              </View>
+              {attentionItems.length === 0 ? (
+                <View style={styles.allClearCard}>
+                  <View style={styles.allClearDot} />
+                  <Text style={styles.allClearText}>All stock is above its minimum level.</Text>
                 </View>
-                <Text style={styles.allStockHint}>Browse inventory</Text>
-                <AppIcon name="chevronRight" color={palette.slate} size={17} />
-              </Pressable>
+              ) : attentionItems.slice(0, 3).map(item => (
+                  <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Review ${item.partNumber}, ${item.quantity} in stock`}
+                    onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(item.id)}})} style={styles.attentionCard}>
+                    <View style={[styles.attentionMark, item.quantity === 0 && styles.attentionMarkOut]}>
+                      <AppIcon name="inventory" color={item.quantity === 0 ? palette.error : palette.warning} size={18} />
+                    </View>
+                    <View style={styles.attentionCopy}>
+                      <Text style={styles.attentionPart} numberOfLines={1}>{item.partNumber}</Text>
+                      <Text style={styles.attentionDetail} numberOfLines={1}>{item.quantity === 0 ? 'Out of stock' : 'Low stock'} · {item.storeName}</Text>
+                    </View>
+                    <View style={styles.attentionAction}>
+                      <Text style={styles.attentionQuantity}>{item.quantity}</Text>
+                      <Text style={styles.attentionActionText}>Review</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              <View style={styles.quickWorkCard}>
+                <Text style={styles.sectionTitle}>Quick work</Text>
+                <View style={styles.quickWorkRow}>
+                  <Pressable accessibilityRole="button" onPress={() => router.push('/scan')} style={styles.quickScanButton}>
+                    <AppIcon name="scan" color={palette.white} size={19} /><Text style={styles.quickScanText}>Scan stock</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => openInventory('all')} style={styles.quickCountButton}>
+                    <AppIcon name="inventory" color={palette.navy} size={18} /><Text style={styles.quickCountText}>Manual count</Text>
+                  </Pressable>
+                </View>
+              </View>
             </>
           )}
 
@@ -230,19 +248,18 @@ export default function HomeScreen() {
   );
 }
 
-function StatusCard({label, detail, count, tone, onPress}: {
+function StatusCard({label, count, tone, onPress}: {
   label: string;
-  detail: string;
   count: number;
-  tone: 'warning' | 'error';
+  tone: 'neutral' | 'warning' | 'error';
   onPress: () => void;
 }) {
-  const color = tone === 'error' ? palette.error : palette.warning;
-  const background = tone === 'error' ? palette.errorBackground : palette.warningBackground;
+  const color = tone === 'error' ? palette.error : tone === 'warning' ? palette.warning : palette.navy;
+  const background = tone === 'error' ? palette.errorBackground : tone === 'warning' ? palette.warningBackground : '#E8EDF2';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${count} ${label.toLowerCase()} items. ${detail}. Open filtered inventory.`}
+      accessibilityLabel={`${count} ${label.toLowerCase()} items. Open filtered inventory.`}
       accessibilityHint="Opens Inventory with this stock status selected"
       onPress={onPress}
       style={({pressed}) => [styles.statusCard, pressed && styles.statusCardPressed]}
@@ -252,7 +269,7 @@ function StatusCard({label, detail, count, tone, onPress}: {
         <Text numberOfLines={2} style={styles.statusLabel}>{label}</Text>
       </View>
       <Text style={[styles.statusCount, {color}]}>{count}</Text>
-      <Text style={styles.statusDetail}>{detail}</Text>
+      <Text style={styles.statusDetail}>{tone === 'neutral' ? 'In this inventory' : tone === 'warning' ? 'At or below minimum' : 'No units available'}</Text>
       <View style={[styles.cardAccent, {backgroundColor: background}]} />
     </Pressable>
   );
@@ -288,13 +305,19 @@ function formatPendingSummary(queued: number, conflicts: number): string {
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
   screen: {flex: 1, paddingHorizontal: 16},
-  topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: palette.border},
-  brandIcon: {width: 40, height: 40, borderRadius: 12},
+  topBar: {minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 11, marginHorizontal: -16, paddingHorizontal: 16, backgroundColor: palette.navy},
+  brandIcon: {width: 38, height: 38, borderRadius: 11},
   brandCopy: {flex: 1},
-  wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
-  pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
-  content: {flexGrow: 1, paddingTop: 18, paddingBottom: 18},
-  headingBlock: {marginBottom: 19},
+  wordmark: {fontSize: 17, fontWeight: '800', color: palette.white},
+  pageTitle: {fontSize: 12, fontWeight: '600', color: '#D5DEE8'},
+  connectionPill: {flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, backgroundColor: '#26394E'},
+  connectionPillOffline: {backgroundColor: '#3B3528'},
+  connectionDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#52B788'},
+  connectionDotOffline: {backgroundColor: palette.amber},
+  connectionText: {fontSize: 11, fontWeight: '700', color: palette.white},
+  connectionTextOffline: {color: '#FFE4A3'},
+  content: {flexGrow: 1, paddingTop: 17, paddingBottom: 18},
+  headingBlock: {marginBottom: 14},
   heading: {fontSize: 23, lineHeight: 29, fontWeight: '800', color: palette.navy},
   subheading: {marginTop: 4, fontSize: 14, lineHeight: 20, color: palette.muted},
   searchRow: {flexDirection: 'row', gap: 9, marginBottom: 14},
@@ -311,20 +334,36 @@ const styles = StyleSheet.create({
   pendingDotConflict: {backgroundColor: palette.error},
   pendingTitle: {fontSize: 13, fontWeight: '700', color: palette.navy},
   pendingText: {marginTop: 2, fontSize: 12, color: palette.muted},
-  cardsRow: {flexDirection: 'row', gap: 11},
-  statusCard: {flex: 1, minHeight: 132, overflow: 'hidden', paddingHorizontal: 13, paddingTop: 12, paddingBottom: 12, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  cardsRow: {flexDirection: 'row', gap: 8},
+  statusCard: {flex: 1, minHeight: 110, overflow: 'hidden', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 9, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   statusCardPressed: {opacity: 0.76},
-  statusHeader: {minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 7},
+  statusHeader: {minHeight: 25, flexDirection: 'row', alignItems: 'center', gap: 7},
   statusDot: {width: 8, height: 8, borderRadius: 4},
-  statusLabel: {flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '700', color: palette.navy},
-  statusCount: {marginTop: 5, fontSize: 34, lineHeight: 40, fontWeight: '800'},
-  statusDetail: {marginTop: 1, fontSize: 11, lineHeight: 16, color: palette.muted},
+  statusLabel: {flex: 1, fontSize: 11, lineHeight: 14, fontWeight: '700', color: palette.navy},
+  statusCount: {marginTop: 3, fontSize: 28, lineHeight: 34, fontWeight: '800'},
+  statusDetail: {marginTop: 1, fontSize: 9, lineHeight: 13, color: palette.muted},
   cardAccent: {position: 'absolute', left: 0, top: 0, bottom: 0, width: 4},
-  allStockLink: {minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13, paddingHorizontal: 13, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
-  allStockCopy: {flex: 1},
-  allStockLabel: {fontSize: 14, fontWeight: '700', color: palette.navy},
-  allStockCount: {marginTop: 2, fontSize: 12, color: palette.muted},
-  allStockHint: {fontSize: 11, fontWeight: '600', color: palette.slate},
+  sectionHeading: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 8},
+  sectionTitle: {fontSize: 15, fontWeight: '800', color: palette.navy},
+  viewAll: {fontSize: 12, fontWeight: '700', color: palette.slate},
+  allClearCard: {minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: '#D6E8DC', backgroundColor: '#F1F8F3'},
+  allClearDot: {width: 8, height: 8, borderRadius: 4, backgroundColor: '#287441'},
+  allClearText: {fontSize: 12, fontWeight: '600', color: '#21653A'},
+  attentionCard: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8, paddingHorizontal: 11, borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  attentionMark: {width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.warningBackground},
+  attentionMarkOut: {backgroundColor: palette.errorBackground},
+  attentionCopy: {flex: 1},
+  attentionPart: {fontSize: 12, fontWeight: '800', color: palette.navy},
+  attentionDetail: {marginTop: 3, fontSize: 10, color: palette.muted},
+  attentionAction: {alignItems: 'flex-end', minWidth: 48},
+  attentionQuantity: {fontSize: 16, fontWeight: '800', color: palette.navy},
+  attentionActionText: {fontSize: 9, fontWeight: '700', color: palette.slate},
+  quickWorkCard: {marginTop: 8, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  quickWorkRow: {flexDirection: 'row', gap: 8, marginTop: 9},
+  quickScanButton: {flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 11, backgroundColor: palette.navy},
+  quickScanText: {fontSize: 12, fontWeight: '800', color: palette.white},
+  quickCountButton: {flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 11, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  quickCountText: {fontSize: 12, fontWeight: '700', color: palette.navy},
   updatedAt: {marginTop: 15, fontSize: 12, textAlign: 'center', color: palette.slate},
   emptyCard: {alignItems: 'center', padding: 20, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   emptyTitle: {fontSize: 16, fontWeight: '800', textAlign: 'center', color: palette.navy},

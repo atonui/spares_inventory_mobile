@@ -104,6 +104,13 @@ export default function OfflineChangesScreen() {
 
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.intro}>Stock counts saved on this device appear here until they sync.</Text>
+          <View style={styles.safeToWork}>
+            <View style={styles.safeToWorkIcon}><Text style={styles.safeToWorkCheck}>✓</Text></View>
+            <View style={styles.safeToWorkCopy}>
+              <Text style={styles.safeToWorkTitle}>You’re safe to keep working</Text>
+              <Text style={styles.safeToWorkText}>Queued counts are saved on this phone and will sync when a connection returns.</Text>
+            </View>
+          </View>
           <View style={styles.summaryRow}>
             <SummaryCard count={queued.length} label="Waiting to sync" tone="amber" />
             <SummaryCard count={conflicts.length} label="Need review" tone="red" />
@@ -227,16 +234,16 @@ const palette = {
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
   screen: {flex: 1, paddingHorizontal: 16},
-  header: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: palette.border},
+  header: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: -16, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#34475C', backgroundColor: palette.navy},
   backButton: {width: 44, height: 44, justifyContent: 'center'},
-  backGlyph: {fontSize: 34, lineHeight: 38, color: palette.navy},
+  backGlyph: {fontSize: 34, lineHeight: 38, color: palette.white},
   headerCopy: {flex: 1},
-  brand: {fontSize: 13, fontWeight: '700', color: palette.slate},
-  title: {fontSize: 19, fontWeight: '800', color: palette.navy},
-  content: {paddingTop: 18, paddingBottom: 32, gap: 12},
-  intro: {fontSize: 14, lineHeight: 21, color: palette.muted},
+  brand: {fontSize: 12, fontWeight: '700', color: '#C4D0DC'},
+  title: {fontSize: 18, fontWeight: '800', color: palette.white},
+  content: {paddingTop: 14, paddingBottom: 26, gap: 10},
+  intro: {fontSize: 13, lineHeight: 19, color: palette.muted},
   summaryRow: {flexDirection: 'row', gap: 10},
-  summaryCard: {flex: 1, borderRadius: 13, padding: 13, backgroundColor: palette.amberTint},
+  summaryCard: {flex: 1, minHeight: 62, justifyContent: 'center', borderRadius: 13, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: palette.amberTint},
   conflictSummary: {backgroundColor: palette.redTint},
   summaryCount: {fontSize: 22, fontWeight: '800', color: palette.navy},
   summaryLabel: {marginTop: 3, fontSize: 12, fontWeight: '700', color: palette.muted},
@@ -244,6 +251,12 @@ const styles = StyleSheet.create({
   body: {fontSize: 13, lineHeight: 19, color: palette.muted},
   sectionHeader: {marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
   sectionTitle: {fontSize: 16, fontWeight: '800', color: palette.navy},
+  safeToWork: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2, padding: 12, borderRadius: 13, backgroundColor: palette.navy},
+  safeToWorkIcon: {width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#31465D'},
+  safeToWorkCopy: {flex: 1},
+  safeToWorkCheck: {fontSize: 19, fontWeight: '800', color: palette.amber},
+  safeToWorkTitle: {fontSize: 12, fontWeight: '800', color: palette.white},
+  safeToWorkText: {marginTop: 2, fontSize: 10, lineHeight: 15, color: '#D4DDE6'},
   syncButton: {minHeight: 44, minWidth: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 12, backgroundColor: palette.navy},
   disabledButton: {opacity: 0.6},
   syncButtonText: {fontSize: 13, fontWeight: '800', color: palette.white},

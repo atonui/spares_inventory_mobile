@@ -83,6 +83,7 @@ const inventorySortOptions: {value: InventorySort; label: string}[] = [
 
 export default function InventoryScreen() {
   const router = useRouter();
+  const [pairingPhase, setPairingPhase] = useState<'welcome' | 'scan' | 'pending'>('welcome');
   const routeParams = useLocalSearchParams<{filter?: string | string[]; query?: string | string[]}>();
   const routeFilterValue = Array.isArray(routeParams.filter) ? routeParams.filter[0] : routeParams.filter;
   const routeQueryValue = Array.isArray(routeParams.query) ? routeParams.query[0] : routeParams.query;
@@ -439,82 +440,67 @@ export default function InventoryScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.screen}>
-          <View style={styles.topBar}>
-            <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandIcon} /></View>
-            <View style={styles.brandCopy}>
-              <Text style={styles.wordmark}>Spares Tracker</Text>
-              <Text style={styles.pageTitle}>Inventory</Text>
+          <View style={styles.inventoryHeader}>
+            <View style={styles.topBar}>
+              <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandIcon} /></View>
+              <View style={styles.brandCopy}>
+                <Text style={styles.wordmark}>Spares Tracker</Text>
+                <Text accessibilityRole="header" style={styles.pageTitle}>Inventory</Text>
+              </View>
+              <View style={[styles.connectionPill, isOffline && styles.connectionPillOffline]}>
+                <View style={[styles.connectionDot, isOffline && styles.connectionDotOffline]} />
+                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline]}>{isOffline ? 'Offline snapshot' : 'Online'}</Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.welcomeRow}>
-            <View>
-              <Text style={styles.welcome}>Good to see you, {user.name.split(' ')[0]}</Text>
-              <Text style={styles.muted}>{user.role.replaceAll('_', ' ')} · {isMockMode ? 'preview data' : 'live inventory'}</Text>
+            <View style={styles.welcomeRow}>
+              <View>
+                <Text style={styles.welcome}>Stock on hand</Text>
+                <Text style={styles.headerSubline}>{user.role.replaceAll('_', ' ')} · {isMockMode ? 'preview data' : 'live inventory'}</Text>
+              </View>
+              <View style={styles.totalBadge}>
+                <Text style={styles.totalNumber}>{inventory.length}</Text>
+                <Text style={styles.totalLabel}>ITEMS</Text>
+              </View>
             </View>
-            <View style={styles.totalBadge}>
-              <Text style={styles.totalNumber}>{inventory.length}</Text>
-              <Text style={styles.totalLabel}>ITEMS</Text>
+
+            <View accessibilityRole="summary" style={styles.connectionStatus}>
+              <View style={[styles.connectionDot, isOffline ? styles.connectionDotOffline : styles.connectionDotOnline]} />
+              <View style={styles.connectionStatusCopy}>
+                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline]}>{connectionStatusTitle}</Text>
+                {!!connectionStatusDetail && <Text style={styles.connectionStatusDetail}>{connectionStatusDetail}</Text>}
+              </View>
+              {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
+                <Pressable accessibilityRole="button" accessibilityLabel="Review offline changes"
+                  onPress={() => router.push('/offline-changes')} style={styles.syncPendingButton}>
+                  <Text style={styles.syncPending}>{snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting`}</Text>
+                </Pressable>
+              )}
             </View>
-          </View>
 
-          <View accessibilityRole="summary" style={styles.connectionStatus}>
-            <View style={[styles.connectionDot, isOffline ? styles.connectionDotOffline : styles.connectionDotOnline]} />
-            <View style={styles.connectionStatusCopy}>
-              <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline]}>{connectionStatusTitle}</Text>
-              {!!connectionStatusDetail && <Text style={styles.connectionStatusDetail}>{connectionStatusDetail}</Text>}
+            <View style={styles.searchBox}>
+              <AppIcon name="search" color={palette.muted} size={19} />
+              <TextInput accessibilityLabel="Search inventory" value={search}
+                onChangeText={value => router.setParams({query: value || undefined})}
+                placeholder="Search part or description" placeholderTextColor={palette.placeholder}
+                style={styles.searchInput} returnKeyType="search"
+                onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
+              {search.length > 0 && (
+                <Pressable accessibilityRole="button" accessibilityLabel="Clear search" accessibilityHint="Clears the inventory search"
+                  onPress={() => router.setParams({query: undefined})} style={styles.clearSearchButton} hitSlop={4}>
+                  <Text style={styles.clearSearchText}>×</Text>
+                </Pressable>
+              )}
             </View>
-            {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Review offline changes"
-                onPress={() => router.push('/offline-changes')}
-                style={styles.syncPendingButton}
-              >
-                <Text style={styles.syncPending}>
-                  {snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting`}
-                </Text>
-              </Pressable>
-            )}
-          </View>
 
-          <View style={styles.searchBox}>
-            <AppIcon name="search" color={palette.muted} size={20} />
-            <TextInput
-              accessibilityLabel="Search inventory"
-              value={search}
-              onChangeText={value => router.setParams({query: value || undefined})}
-              placeholder="Search part, store, or work order"
-              placeholderTextColor={palette.placeholder}
-              style={styles.searchInput}
-              returnKeyType="search"
-              onSubmitEditing={() => {
-                Keyboard.dismiss();
-                announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);
-              }}
-            />
-            {search.length > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-                accessibilityHint="Clears the inventory search"
-                onPress={() => router.setParams({query: undefined})}
-                style={styles.clearSearchButton}
-                hitSlop={4}
-              >
-                <Text style={styles.clearSearchText}>×</Text>
-              </Pressable>
-            )}
-          </View>
-
-          <View style={styles.controlsRow}>
+            <View style={styles.controlsRow}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Filter and sort inventory${activeFilterSortLabels.length ? `, active: ${activeFilterSortLabels.join(', ')}` : ''}`}
               onPress={openFilterSort}
               style={[styles.filterSortButton, activeFilterSortLabels.length > 0 && styles.filterSortButtonActive]}
             >
-              <AppIcon name="filter" color={palette.navy} size={18} />
+              <AppIcon name="filter" color={palette.white} size={18} />
               <Text numberOfLines={1} style={styles.filterSortButtonText}>{filterSortButtonLabel}</Text>
             </Pressable>
             {activeFilterSortLabels.length > 0 && (
@@ -527,6 +513,7 @@ export default function InventoryScreen() {
                 <Text style={styles.resetControlsText}>Reset</Text>
               </Pressable>
             )}
+            </View>
           </View>
 
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
@@ -579,21 +566,25 @@ export default function InventoryScreen() {
                   }}
                   style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
                 >
-                  <View style={styles.cardTop}>
-                    <Text style={styles.partNumber}>{row.partNumber}</Text>
-                    <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge, outOfStock && styles.outQuantityBadge]}>
-                      <View style={[styles.statusDot, lowStock && styles.lowStatusDot, outOfStock && styles.outStatusDot]} />
-                      <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{row.quantity}</Text>
-                      <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{outOfStock ? 'OUT OF STOCK' : lowStock ? 'LOW STOCK' : 'IN STOCK'}</Text>
+                  <View style={styles.itemMark}><AppIcon name="inventory" color={palette.navy} size={19} /></View>
+                  <View style={styles.itemCopy}>
+                    <View style={styles.itemTitleRow}>
+                      <Text style={styles.partNumber} numberOfLines={1}>{row.partNumber}</Text>
+                      <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge, outOfStock && styles.outQuantityBadge]}>
+                        <View style={[styles.statusDot, lowStock && styles.lowStatusDot, outOfStock && styles.outStatusDot]} />
+                        <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{row.quantity}</Text>
+                        <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{outOfStock ? 'Out' : lowStock ? 'Low' : 'Healthy'}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.description} numberOfLines={1}>{row.description}</Text>
+                    <View style={styles.statusRow}>
+                      <Text style={[styles.locationText, row.isAllocated && styles.allocatedStatus]} numberOfLines={1}>
+                        {row.storeName}{row.isAllocated ? ` · Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : ''}
+                      </Text>
+                      <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
                     </View>
                   </View>
-                  <Text style={styles.description}>{row.description}</Text>
-                  <View style={styles.statusRow}>
-                    <Text style={[styles.locationText, row.isAllocated && styles.allocatedStatus]} numberOfLines={1}>
-                      {row.storeName}{row.isAllocated ? ` · Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : ''}
-                    </Text>
-                    <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
-                  </View>
+                  <AppIcon name="chevronRight" color={palette.slate} size={17} />
                 </Pressable>
               );
             }}
@@ -726,14 +717,19 @@ export default function InventoryScreen() {
           <View style={styles.hero}>
             <View style={styles.heroBrandRow}>
               <View style={styles.heroMark}><Image source={require('../../assets/icon.png')} style={styles.heroBrandIcon} /></View>
-              <Text style={styles.heroWordmark}>Spares Tracker</Text>
+              <View style={styles.heroBrandCopy}>
+                <Text style={styles.heroWordmark}>Spares Tracker</Text>
+                <Text style={styles.heroTagline}>Warehouse inventory, made thumb-fast</Text>
+              </View>
             </View>
-            <Text style={styles.heroLabel}>INVENTORY MANAGEMENT</Text>
-            <Text style={styles.heroTitle}>Everything in its place.</Text>
-            <Text style={styles.heroSubtitle}>Keep track of your stock, wherever the work takes you.</Text>
+            <View style={styles.pairingProgressLabel}>
+              <Text style={styles.heroLabel}>{pairingPhase === 'welcome' ? 'STEP 1 OF 3' : pairingPhase === 'scan' ? 'STEP 2 OF 3' : 'STEP 3 OF 3'}</Text>
+              <Text style={styles.heroStep}>{pairingPhase === 'welcome' ? 'Pair this device' : pairingPhase === 'scan' ? 'Scan desktop QR' : 'Approve this device'}</Text>
+            </View>
+            <View style={styles.progressTrack}><View style={[styles.progressFill, pairingPhase === 'scan' && styles.progressFillScan, pairingPhase === 'pending' && styles.progressFillPending]} /></View>
           </View>
           {!!error && <ErrorNotice message={error} onRetry={hasSession ? restoreSession : undefined} />}
-          <DesktopPairing mockMode={isMockMode} onPair={pairWithDesktop} onCancel={cancelPairing} />
+          <DesktopPairing mockMode={isMockMode} onPair={pairWithDesktop} onCancel={cancelPairing} onPhaseChange={setPairingPhase} />
           <Text style={styles.onboardingFootnote}>Mobile access is managed by your organisation. Your desktop profile is used to approve this device.</Text>
       </ScrollView>
     </SafeAreaView>
@@ -792,12 +788,16 @@ const palette = {
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
   screen: {flex: 1, paddingHorizontal: 16},
-  topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: palette.border},
+  inventoryHeader: {marginHorizontal: -16, paddingHorizontal: 16, paddingBottom: 12, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, backgroundColor: palette.navy},
+  topBar: {minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#34475C'},
   brandMark: {width: 42, height: 42, borderRadius: 13, overflow: 'hidden'},
   brandIcon: {width: 42, height: 42},
   brandCopy: {flex: 1},
-  wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
-  pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
+  wordmark: {fontSize: 16, fontWeight: '800', color: palette.white},
+  pageTitle: {fontSize: 11, fontWeight: '600', color: '#C4D0DC'},
+  connectionPill: {flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 11, backgroundColor: '#26394E'},
+  connectionPillOffline: {backgroundColor: '#423722'},
+  headerSubline: {marginTop: 3, color: '#C4D0DC', fontSize: 10},
   signOutBackdrop: {flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(21, 38, 59, 0.48)'},
   signOutCard: {padding: 20, borderRadius: 16, backgroundColor: palette.white},
   signOutTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
@@ -808,32 +808,32 @@ const styles = StyleSheet.create({
   signOutKeepText: {fontSize: 13, fontWeight: '700', color: palette.navy},
   signOutConfirmButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: palette.navy},
   signOutConfirmText: {fontSize: 13, fontWeight: '800', color: palette.white},
-  welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 10},
-  connectionStatus: {minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 7},
+  welcomeRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 9, paddingBottom: 8},
+  connectionStatus: {minHeight: 33, flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 7, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#22364B'},
   connectionDot: {width: 7, height: 7, borderRadius: 4},
-  connectionDotOnline: {backgroundColor: '#287441'},
-  connectionDotOffline: {backgroundColor: '#A16207'},
+  connectionDotOnline: {backgroundColor: '#52B788'},
+  connectionDotOffline: {backgroundColor: palette.amber},
   connectionStatusCopy: {flex: 1},
-  connectionStatusText: {fontSize: 11, lineHeight: 15, color: palette.muted},
-  connectionStatusTextOffline: {fontWeight: '700', color: '#8A5A00'},
-  connectionStatusDetail: {fontSize: 10, lineHeight: 14, color: palette.muted},
-  syncPending: {fontSize: 10, fontWeight: '700', color: palette.navy, textAlign: 'right'},
+  connectionStatusText: {fontSize: 11, lineHeight: 15, color: '#E7EDF3'},
+  connectionStatusTextOffline: {fontWeight: '700', color: '#FFE4A3'},
+  connectionStatusDetail: {fontSize: 10, lineHeight: 14, color: '#C4D0DC'},
+  syncPending: {fontSize: 10, fontWeight: '700', color: palette.white, textAlign: 'right'},
   syncPendingButton: {minHeight: 32, justifyContent: 'center', paddingLeft: 6},
-  welcome: {fontSize: 15, fontWeight: '700', color: palette.text},
+  welcome: {fontSize: 17, fontWeight: '800', color: palette.white},
   muted: {marginTop: 3, color: palette.muted, fontSize: 11},
-  totalBadge: {minWidth: 62, alignItems: 'center', borderRadius: 10, backgroundColor: '#FEF3DF', paddingVertical: 5, paddingHorizontal: 8},
-  totalNumber: {fontSize: 17, fontWeight: '800', color: palette.navy},
-  totalLabel: {fontSize: 8, fontWeight: '800', letterSpacing: 0.9, color: palette.navy},
-  searchBox: {height: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 13, backgroundColor: palette.white, borderRadius: 13, borderWidth: 1, borderColor: palette.border},
+  totalBadge: {minWidth: 62, alignItems: 'center', borderRadius: 10, backgroundColor: '#26394E', paddingVertical: 5, paddingHorizontal: 8},
+  totalNumber: {fontSize: 17, fontWeight: '800', color: palette.white},
+  totalLabel: {fontSize: 8, fontWeight: '800', letterSpacing: 0.9, color: '#C4D0DC'},
+  searchBox: {height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3, paddingHorizontal: 12, backgroundColor: palette.white, borderRadius: 12, borderWidth: 1, borderColor: '#D7E0E9'},
   searchInput: {flex: 1, paddingVertical: 10, fontSize: 14, color: palette.text},
   clearSearchButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center'},
   clearSearchText: {fontSize: 25, lineHeight: 29, color: palette.muted},
-  controlsRow: {flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8},
-  filterSortButton: {flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: palette.border, borderRadius: 11, backgroundColor: palette.white},
-  filterSortButtonActive: {borderColor: palette.amber, backgroundColor: '#FFF8EA'},
-  filterSortButtonText: {flex: 1, fontSize: 13, fontWeight: '700', color: palette.navy},
+  controlsRow: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7},
+  filterSortButton: {flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderWidth: 1, borderColor: '#44586E', borderRadius: 10, backgroundColor: '#22364B'},
+  filterSortButtonActive: {borderColor: palette.amber, backgroundColor: '#3D3528'},
+  filterSortButtonText: {flex: 1, fontSize: 12, fontWeight: '700', color: palette.white},
   resetControlsButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 8},
-  resetControlsText: {fontSize: 12, fontWeight: '700', color: palette.muted},
+  resetControlsText: {fontSize: 12, fontWeight: '700', color: '#E7EDF3'},
   filterSortBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(21, 38, 59, 0.38)'},
   filterSortSheet: {maxHeight: '90%', paddingHorizontal: 20, paddingTop: 9, paddingBottom: 24, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
   sheetHandle: {alignSelf: 'center', width: 42, height: 4, marginBottom: 8, borderRadius: 2, backgroundColor: palette.border},
@@ -855,16 +855,18 @@ const styles = StyleSheet.create({
   filterSortResetText: {fontSize: 13, fontWeight: '700', color: palette.navy},
   filterSortApplyButton: {flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: palette.amber},
   filterSortApplyText: {fontSize: 13, fontWeight: '800', color: palette.navy},
-  listContent: {paddingTop: 8, paddingBottom: 10},
+  listContent: {paddingTop: 9, paddingBottom: 10},
   resultsSummary: {paddingHorizontal: 2, paddingBottom: 2, fontSize: 12, fontWeight: '600', color: palette.muted},
-  stockCard: {backgroundColor: 'transparent', borderBottomColor: '#E2E8F0', borderBottomWidth: 1, paddingHorizontal: 4, paddingVertical: 12},
+  stockCard: {minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 7, paddingHorizontal: 9, paddingVertical: 9, borderRadius: 13, borderWidth: 1, borderColor: '#E3E9EF', backgroundColor: palette.white},
   stockCardPressed: {opacity: 0.72},
-  cardTop: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10},
-  partNumber: {flex: 1, marginTop: 2, fontSize: 15, fontWeight: '800', letterSpacing: 0.2, color: palette.navy},
-  description: {marginTop: 3, fontSize: 13, lineHeight: 18, fontWeight: '500', color: palette.text},
-  quantityBadge: {minWidth: 88, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 5, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 10, backgroundColor: '#E3F3E8'},
-  quantityValue: {fontSize: 15, fontWeight: '800', color: '#21653A'},
-  quantityCaption: {width: '100%', marginTop: 2, fontSize: 8, textAlign: 'center', fontWeight: '800', letterSpacing: 0.35, color: '#21653A'},
+  itemMark: {width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#F0F3F6'},
+  itemCopy: {flex: 1, minWidth: 0},
+  itemTitleRow: {flexDirection: 'row', alignItems: 'center', gap: 5},
+  partNumber: {flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', letterSpacing: 0.1, color: palette.navy},
+  description: {marginTop: 3, fontSize: 11, lineHeight: 15, fontWeight: '500', color: palette.text},
+  quantityBadge: {minWidth: 52, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 4, paddingVertical: 4, paddingHorizontal: 6, borderRadius: 9, backgroundColor: '#E3F3E8'},
+  quantityValue: {fontSize: 12, fontWeight: '800', color: '#21653A'},
+  quantityCaption: {width: '100%', marginTop: 1, fontSize: 7, textAlign: 'center', fontWeight: '800', letterSpacing: 0.2, color: '#21653A'},
   statusDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#287441'},
   lowStatusDot: {backgroundColor: '#E9A23B'},
   outStatusDot: {backgroundColor: '#D92D20'},
@@ -872,8 +874,8 @@ const styles = StyleSheet.create({
   lowQuantityText: {color: '#8A4B08'},
   outQuantityBadge: {backgroundColor: '#FCE8E6'},
   outQuantityText: {color: palette.red},
-  statusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8},
-  locationText: {flex: 1, fontSize: 12, fontWeight: '700', color: palette.muted},
+  statusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 3},
+  locationText: {flex: 1, fontSize: 10, fontWeight: '600', color: palette.muted},
   allocatedStatus: {color: palette.slate},
   threshold: {fontSize: 11, color: palette.muted},
   skeletonList: {gap: 8},
@@ -891,12 +893,18 @@ const styles = StyleSheet.create({
   onboardingContent: {flexGrow: 1, padding: 18, justifyContent: 'center'},
   hero: {paddingHorizontal: 22, paddingTop: 26, paddingBottom: 30, backgroundColor: palette.navy, borderTopLeftRadius: 24, borderTopRightRadius: 24},
   heroBrandRow: {flexDirection: 'row', alignItems: 'center', gap: 12},
-  heroMark: {width: 48, height: 48, borderRadius: 14, overflow: 'hidden'},
-  heroBrandIcon: {width: 48, height: 48},
-  heroWordmark: {fontSize: 23, fontWeight: '800', color: palette.white},
-  heroLabel: {marginTop: 16, fontSize: 10, fontWeight: '800', letterSpacing: 1.6, color: palette.amber},
-  heroTitle: {marginTop: 9, fontSize: 30, lineHeight: 36, fontWeight: '800', color: palette.white},
-  heroSubtitle: {marginTop: 8, fontSize: 15, lineHeight: 23, color: '#C1D0DF'},
+  heroMark: {width: 40, height: 40, borderRadius: 12, overflow: 'hidden'},
+  heroBrandIcon: {width: 40, height: 40},
+  heroBrandCopy: {flex: 1},
+  heroWordmark: {fontSize: 18, fontWeight: '800', color: palette.white},
+  heroTagline: {marginTop: 2, fontSize: 10, color: '#C1D0DF'},
+  pairingProgressLabel: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24},
+  heroLabel: {fontSize: 10, fontWeight: '800', letterSpacing: 1, color: palette.amber},
+  heroStep: {fontSize: 12, fontWeight: '700', color: palette.white},
+  progressTrack: {height: 4, marginTop: 9, borderRadius: 2, backgroundColor: '#3D5065'},
+  progressFill: {width: '34%', height: 4, borderRadius: 2, backgroundColor: palette.amber},
+  progressFillScan: {width: '67%'},
+  progressFillPending: {width: '100%'},
   onboardingFootnote: {marginTop: 14, marginHorizontal: 14, textAlign: 'center', fontSize: 11, lineHeight: 17, color: palette.muted},
   errorNotice: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12, padding: 11, borderRadius: 10, backgroundColor: palette.redTint},
   errorText: {flex: 1, fontSize: 12, lineHeight: 18, color: palette.red},

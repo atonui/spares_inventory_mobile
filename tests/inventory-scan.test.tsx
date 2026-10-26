@@ -106,6 +106,8 @@ describe('inventory scanner screen', () => {
     expect(mockPush).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByRole('button', {name: 'View PN-0042 at Field van, 8 units'}));
+    expect(mockPush).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole('button', {name: 'Open item details'}));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/inventory/[itemId]',
       params: {itemId: '43', userId: '7'},
