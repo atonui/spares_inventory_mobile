@@ -216,16 +216,16 @@ export default function InventoryScanScreen() {
               </View>
             ) : (
               <View style={styles.permissionCard}>
-                <Text accessibilityRole="header" style={styles.messageTitle}>Camera access is needed to scan a code</Text>
-                <Text style={styles.messageText}>Spares Tracker uses the camera to read QR codes and barcodes.</Text>
+                <Text accessibilityRole="header" style={styles.permissionTitle}>Use your camera to scan stock</Text>
+                <Text style={styles.permissionDescription}>Spares Tracker uses the camera to read barcodes and QR codes.</Text>
                 {permissionError ? <Text accessibilityRole="alert" style={styles.permissionError}>{permissionError}</Text> : null}
                 {!permission?.canAskAgain && permission?.granted === false ? (
-                  <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} style={styles.primaryButton}>
-                    <Text style={styles.primaryButtonText}>Open device settings</Text>
+                  <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} style={styles.permissionButton}>
+                    <Text style={styles.permissionButtonText}>Open device settings</Text>
                   </Pressable>
                 ) : (
-                  <Pressable accessibilityRole="button" disabled={requestingPermission} onPress={() => void allowCamera()} style={styles.primaryButton}>
-                    {requestingPermission ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.primaryButtonText}>Allow camera</Text>}
+                  <Pressable accessibilityRole="button" disabled={requestingPermission} onPress={() => void allowCamera()} style={styles.permissionButton}>
+                    {requestingPermission ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.permissionButtonText}>Allow camera</Text>}
                   </Pressable>
                 )}
               </View>
@@ -242,7 +242,6 @@ export default function InventoryScanScreen() {
                   <Text style={styles.manualFallbackText}>
                     {manualEntryVisible ? 'Hide part-number entry' : 'Can’t scan? Enter part number'}
                   </Text>
-                  <Text style={styles.manualFallbackChevron}>{manualEntryVisible ? '⌃' : '⌄'}</Text>
                 </Pressable>
                 {manualEntryVisible && (
                   <View style={styles.manualForm}>
@@ -341,15 +340,18 @@ const styles = StyleSheet.create({
   torchLabel: {fontSize: 12, fontWeight: '800', color: palette.white},
   torchLabelActive: {color: palette.navy},
   manualEntry: {marginTop: 8},
-  manualFallbackToggle: {minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10},
-  manualFallbackText: {fontSize: 13, fontWeight: '700', color: palette.slate},
-  manualFallbackChevron: {fontSize: 18, lineHeight: 20, color: palette.slate},
+  manualFallbackToggle: {minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10},
+  manualFallbackText: {fontSize: 13, fontWeight: '700', color: palette.slate, textDecorationLine: 'underline'},
   manualForm: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4},
   manualInput: {flex: 1, height: 48, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 15, color: palette.navy},
   manualButton: {minWidth: 68, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
   manualButtonDisabled: {opacity: 0.5},
   manualButtonText: {fontSize: 14, fontWeight: '800', color: palette.navy},
   permissionCard: {marginTop: 18, padding: 18, alignItems: 'center', borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  permissionTitle: {fontSize: 16, fontWeight: '700', textAlign: 'center', color: palette.navy},
+  permissionDescription: {marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', color: palette.muted},
+  permissionButton: {minHeight: 48, minWidth: 144, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white, paddingHorizontal: 14},
+  permissionButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
   permissionError: {marginTop: 10, fontSize: 13, lineHeight: 19, textAlign: 'center', color: '#A13A32'},
   messageState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24},
   messageTitle: {fontSize: 17, fontWeight: '800', textAlign: 'center', color: palette.navy},
