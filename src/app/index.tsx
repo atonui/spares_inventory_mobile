@@ -582,6 +582,7 @@ export default function InventoryScreen() {
                   <View style={styles.cardTop}>
                     <Text style={styles.partNumber}>{row.partNumber}</Text>
                     <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge, outOfStock && styles.outQuantityBadge]}>
+                      <View style={[styles.statusDot, lowStock && styles.lowStatusDot, outOfStock && styles.outStatusDot]} />
                       <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{row.quantity}</Text>
                       <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{outOfStock ? 'OUT OF STOCK' : lowStock ? 'LOW STOCK' : 'IN STOCK'}</Text>
                     </View>
@@ -790,7 +791,7 @@ const palette = {
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
-  screen: {flex: 1, paddingHorizontal: 20},
+  screen: {flex: 1, paddingHorizontal: 16},
   topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: palette.border},
   brandMark: {width: 42, height: 42, borderRadius: 13, overflow: 'hidden'},
   brandIcon: {width: 42, height: 42},
@@ -861,12 +862,15 @@ const styles = StyleSheet.create({
   cardTop: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10},
   partNumber: {flex: 1, marginTop: 2, fontSize: 15, fontWeight: '800', letterSpacing: 0.2, color: palette.navy},
   description: {marginTop: 3, fontSize: 13, lineHeight: 18, fontWeight: '500', color: palette.text},
-  quantityBadge: {minWidth: 67, alignItems: 'flex-end', paddingVertical: 2, paddingHorizontal: 2},
-  quantityValue: {fontSize: 17, fontWeight: '800', color: '#287441'},
-  quantityCaption: {fontSize: 9, fontWeight: '800', letterSpacing: 0.4, color: '#287441'},
-  lowQuantityBadge: {backgroundColor: 'transparent'},
-  lowQuantityText: {color: '#A54E1E'},
-  outQuantityBadge: {backgroundColor: 'transparent'},
+  quantityBadge: {minWidth: 88, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 5, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 10, backgroundColor: '#E3F3E8'},
+  quantityValue: {fontSize: 15, fontWeight: '800', color: '#21653A'},
+  quantityCaption: {width: '100%', marginTop: 2, fontSize: 8, textAlign: 'center', fontWeight: '800', letterSpacing: 0.35, color: '#21653A'},
+  statusDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#287441'},
+  lowStatusDot: {backgroundColor: '#E9A23B'},
+  outStatusDot: {backgroundColor: '#D92D20'},
+  lowQuantityBadge: {backgroundColor: '#FFF2D0'},
+  lowQuantityText: {color: '#8A4B08'},
+  outQuantityBadge: {backgroundColor: '#FCE8E6'},
   outQuantityText: {color: palette.red},
   statusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8},
   locationText: {flex: 1, fontSize: 12, fontWeight: '700', color: palette.muted},

@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {CameraView, useCameraPermissions} from 'expo-camera';
-import {ActivityIndicator, Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 
 const palette = {
   navy: '#15263B',
@@ -54,7 +54,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel}: Props) {
   }
 
   return (
-    <View style={styles.page}>
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <View style={styles.brandMark} accessibilityElementsHidden>
         <Image source={require('../../../assets/icon.png')} style={styles.brandIcon} />
       </View>
@@ -135,7 +135,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel}: Props) {
           </Pressable>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -149,10 +149,10 @@ function Step({number, text}: {number: string; text: string}) {
 }
 
 const styles = StyleSheet.create({
-  page: {flexGrow: 1, justifyContent: 'center', padding: 24, backgroundColor: palette.white, borderRadius: 22, borderWidth: 1, borderColor: palette.border},
-  brandMark: {width: 54, height: 54, marginBottom: 22, borderRadius: 16, overflow: 'hidden'},
-  brandIcon: {width: 54, height: 54},
-  title: {fontSize: 27, lineHeight: 34, fontWeight: '800', letterSpacing: -0.5, color: palette.navy},
+  page: {flexGrow: 1, justifyContent: 'center', padding: 20, backgroundColor: palette.white, borderRadius: 22, borderWidth: 1, borderColor: palette.border},
+  brandMark: {width: 50, height: 50, marginBottom: 16, borderRadius: 15, overflow: 'hidden'},
+  brandIcon: {width: 50, height: 50},
+  title: {fontSize: 24, lineHeight: 30, fontWeight: '800', letterSpacing: -0.4, color: palette.navy},
   body: {marginTop: 9, fontSize: 15, lineHeight: 23, color: palette.muted},
   steps: {gap: 14, marginTop: 24, marginBottom: 25},
   step: {flexDirection: 'row', alignItems: 'center', gap: 12},

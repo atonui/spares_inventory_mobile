@@ -9,6 +9,7 @@ const palette = {
   border: '#CBD5E1',
   white: '#FFFFFF',
   text: '#15263B',
+  background: '#F5F7FA',
 };
 
 export function InventoryItemDetails({item, user, userId, onQuantityChange, onRefresh}: {
@@ -25,15 +26,28 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text accessibilityRole="header" style={styles.partNumber}>{item.partNumber}</Text>
-        <Text style={styles.description}>{item.description}</Text>
-        <View style={[styles.stockBadge, lowStock && styles.lowStockBadge, outOfStock && styles.outOfStockBadge]}>
-          <Text style={[styles.stockValue, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>
-            {item.quantity} {item.quantity === 1 ? 'unit' : 'units'}
-          </Text>
-          <Text style={[styles.stockLabel, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>
-            {outOfStock ? 'OUT OF STOCK' : lowStock ? 'LOW STOCK' : 'IN STOCK'}
-          </Text>
+        <View style={styles.heroHeading}>
+          <View style={styles.itemMark}><Text style={styles.itemMarkText}>{item.partNumber.slice(0, 1).toUpperCase()}</Text></View>
+          <View style={styles.heroCopy}>
+            <Text accessibilityRole="header" style={styles.partNumber}>{item.partNumber}</Text>
+            <Text style={styles.description}>{item.description}</Text>
+            <Text style={styles.location}>{item.storeName}</Text>
+          </View>
+        </View>
+        <View style={styles.metricsRow}>
+          <View accessibilityLabel={`${item.quantity} ${item.quantity === 1 ? 'unit' : 'units'} on hand`} style={styles.metric}>
+            <Text style={styles.stockValue}>{item.quantity}</Text>
+            <Text style={styles.stockLabel}>On hand</Text>
+          </View>
+          <View style={styles.metric}>
+            <Text style={[styles.metricValue, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>{item.minThreshold}</Text>
+            <Text style={styles.stockLabel}>Reorder at</Text>
+          </View>
+          <View style={[styles.stockBadge, lowStock && styles.lowStockBadge, outOfStock && styles.outOfStockBadge]}>
+            <Text style={[styles.statusText, lowStock && styles.lowStockText, outOfStock && styles.outOfStockText]}>
+              {outOfStock ? 'Out of stock' : lowStock ? 'Low stock' : 'In stock'}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -55,7 +69,6 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
 
       <View style={styles.card}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>Storage location</Text>
-        <DetailField label="Store" value={item.storeName} />
         <DetailField label="Store type" value={storeTypeLabel(item.storeType)} />
       </View>
     </ScrollView>
@@ -81,14 +94,23 @@ function storeTypeLabel(value: string): string {
 }
 
 const styles = StyleSheet.create({
-  content: {paddingTop: 16, paddingBottom: 28, gap: 12},
-  hero: {padding: 18, borderRadius: 16, backgroundColor: palette.navy},
-  partNumber: {fontSize: 19, fontWeight: '800', color: palette.white},
-  description: {marginTop: 6, fontSize: 15, lineHeight: 22, color: '#E2EAF1'},
-  stockBadge: {alignSelf: 'flex-start', alignItems: 'center', marginTop: 18, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 11, backgroundColor: '#DCEFE1'},
-  stockValue: {fontSize: 17, fontWeight: '800', color: '#21653A'},
-  stockLabel: {marginTop: 2, fontSize: 9, fontWeight: '800', letterSpacing: 0.8, color: '#21653A'},
-  lowStockBadge: {backgroundColor: '#FCE8D9'},
+  content: {paddingTop: 14, paddingBottom: 24, gap: 12},
+  hero: {padding: 16, borderRadius: 18, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  heroHeading: {flexDirection: 'row', alignItems: 'flex-start', gap: 12},
+  itemMark: {width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: palette.background},
+  itemMarkText: {fontSize: 20, fontWeight: '800', color: palette.navy},
+  heroCopy: {flex: 1},
+  partNumber: {fontSize: 17, fontWeight: '800', color: palette.navy},
+  description: {marginTop: 3, fontSize: 13, lineHeight: 19, color: palette.muted},
+  location: {marginTop: 7, fontSize: 12, fontWeight: '700', color: palette.muted},
+  metricsRow: {flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 16},
+  metric: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12, backgroundColor: palette.background},
+  metricValue: {fontSize: 17, fontWeight: '800', color: palette.navy},
+  stockBadge: {flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRadius: 12, backgroundColor: '#E3F3E8'},
+  stockValue: {fontSize: 19, fontWeight: '800', color: palette.navy},
+  stockLabel: {marginTop: 3, fontSize: 11, fontWeight: '600', color: palette.muted},
+  statusText: {fontSize: 12, fontWeight: '800', color: '#21653A'},
+  lowStockBadge: {backgroundColor: '#FFF2D0'},
   lowStockText: {color: '#8A3E18'},
   outOfStockBadge: {backgroundColor: '#FFF0EE'},
   outOfStockText: {color: '#A13A32'},

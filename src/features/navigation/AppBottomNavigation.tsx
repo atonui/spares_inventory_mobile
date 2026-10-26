@@ -60,18 +60,18 @@ export function AppBottomNavigation({
                 else if (tab.key === 'scan') navigateTo('/scan');
                 else if (tab.key === 'changes') navigateTo('/offline-changes');
               }}
-              style={styles.tab}
+              style={[styles.tab, tab.key === 'scan' && styles.scanTab]}
             >
-              {selected && <View style={styles.activeIndicator} />}
-              <View style={styles.iconWrap}>
-                <AppIcon name={tab.icon} color={selected ? palette.navy : palette.slate} size={22} />
+              {selected && tab.key !== 'scan' && <View style={styles.activeIndicator} />}
+              <View style={[styles.iconWrap, tab.key === 'scan' && styles.scanIconWrap]}>
+                <AppIcon name={tab.icon} color={tab.key === 'scan' ? palette.navy : selected ? palette.navy : palette.slate} size={tab.key === 'scan' ? 25 : 22} />
                 {tab.key === 'changes' && pendingCount > 0 && (
                   <View accessible={false} style={[styles.badge, conflictCount > 0 ? styles.badgeError : styles.badgeWarning]}>
                     <Text style={[styles.badgeText, conflictCount > 0 && styles.badgeErrorText]}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
                   </View>
                 )}
               </View>
-              <Text style={[styles.tabLabel, selected && styles.tabLabelActive]}>{tab.label}</Text>
+              <Text style={[styles.tabLabel, (selected || tab.key === 'scan') && styles.tabLabelActive]}>{tab.label}</Text>
             </Pressable>
           );
         })}
@@ -119,13 +119,15 @@ function MenuAction({icon, title, subtitle, onPress}: {icon: AppIconName; title:
 }
 
 const styles = StyleSheet.create({
-  bar: {height: 70, flexDirection: 'row', marginHorizontal: -20, borderTopWidth: 1, borderTopColor: palette.border, backgroundColor: palette.white},
-  tab: {flex: 1, minHeight: 70, alignItems: 'center', justifyContent: 'center', gap: 3},
+  bar: {height: 76, flexDirection: 'row', marginHorizontal: -20, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: palette.white},
+  tab: {flex: 1, minHeight: 68, alignItems: 'center', justifyContent: 'center', gap: 4},
+  scanTab: {marginTop: -14},
   activeIndicator: {position: 'absolute', top: 0, width: 28, height: 3, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, backgroundColor: palette.amber},
-  iconWrap: {position: 'relative', minWidth: 26, minHeight: 25, alignItems: 'center', justifyContent: 'center'},
-  tabLabel: {fontSize: 10, fontWeight: '600', color: palette.slate},
+  iconWrap: {position: 'relative', minWidth: 28, minHeight: 28, alignItems: 'center', justifyContent: 'center'},
+  scanIconWrap: {width: 54, height: 54, borderRadius: 18, backgroundColor: palette.amber, borderWidth: 3, borderColor: palette.white},
+  tabLabel: {fontSize: 11, fontWeight: '600', color: palette.slate},
   tabLabelActive: {fontWeight: '800', color: palette.navy},
-  badge: {position: 'absolute', top: -4, right: -9, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8},
+  badge: {position: 'absolute', top: -4, right: -9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderRadius: 9},
   badgeWarning: {backgroundColor: palette.amber},
   badgeError: {backgroundColor: palette.red},
   badgeText: {fontSize: 9, lineHeight: 12, fontWeight: '800', color: palette.navy},

@@ -1,5 +1,5 @@
 import {useCallback, useState} from 'react';
-import {Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useRouter} from 'expo-router';
 import {useNetworkState} from 'expo-network';
@@ -31,6 +31,7 @@ export default function HomeScreen() {
   const network = useNetworkState();
   const [overview, setOverview] = useState<OverviewData>(emptyOverview);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const pendingCount = overview.queued + overview.conflicts;
   const offline = network.isConnected === false || network.isInternetReachable === false;
 
@@ -113,6 +114,25 @@ export default function HomeScreen() {
           <View style={styles.headingBlock}>
             <Text style={styles.heading}>Stock at a glance</Text>
             <Text style={styles.subheading}>Start with the items that need attention.</Text>
+          </View>
+
+          <View style={styles.searchRow}>
+            <View style={styles.searchBox}>
+              <AppIcon name="search" color={palette.slate} size={19} />
+              <TextInput
+                accessibilityLabel="Search inventory from home"
+                value={search}
+                onChangeText={setSearch}
+                onSubmitEditing={() => router.push({pathname: '/', params: {query: search.trim() || undefined}})}
+                placeholder="Search part or description"
+                placeholderTextColor={palette.slate}
+                returnKeyType="search"
+                style={styles.searchInput}
+              />
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Scan stock" onPress={() => router.push('/scan')} style={styles.scanButton}>
+              <AppIcon name="scan" color={palette.white} size={21} />
+            </Pressable>
           </View>
 
           {offline && (
@@ -267,16 +287,20 @@ function formatPendingSummary(queued: number, conflicts: number): string {
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
-  screen: {flex: 1, paddingHorizontal: 20},
+  screen: {flex: 1, paddingHorizontal: 16},
   topBar: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: palette.border},
   brandIcon: {width: 40, height: 40, borderRadius: 12},
   brandCopy: {flex: 1},
   wordmark: {fontSize: 17, fontWeight: '800', color: palette.navy},
   pageTitle: {fontSize: 13, fontWeight: '600', color: palette.muted},
-  content: {flexGrow: 1, paddingTop: 22, paddingBottom: 22},
+  content: {flexGrow: 1, paddingTop: 18, paddingBottom: 18},
   headingBlock: {marginBottom: 19},
   heading: {fontSize: 23, lineHeight: 29, fontWeight: '800', color: palette.navy},
   subheading: {marginTop: 4, fontSize: 14, lineHeight: 20, color: palette.muted},
+  searchRow: {flexDirection: 'row', gap: 9, marginBottom: 14},
+  searchBox: {flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  searchInput: {flex: 1, paddingVertical: 8, fontSize: 14, color: palette.navy},
+  scanButton: {width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: palette.navy},
   offlineBanner: {flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12, padding: 13, borderRadius: 12, backgroundColor: palette.warningBackground},
   offlineDot: {width: 9, height: 9, marginTop: 4, borderRadius: 5, backgroundColor: palette.amber},
   bannerCopy: {flex: 1},
@@ -288,7 +312,7 @@ const styles = StyleSheet.create({
   pendingTitle: {fontSize: 13, fontWeight: '700', color: palette.navy},
   pendingText: {marginTop: 2, fontSize: 12, color: palette.muted},
   cardsRow: {flexDirection: 'row', gap: 11},
-  statusCard: {flex: 1, minHeight: 148, overflow: 'hidden', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 13, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  statusCard: {flex: 1, minHeight: 132, overflow: 'hidden', paddingHorizontal: 13, paddingTop: 12, paddingBottom: 12, borderRadius: 16, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   statusCardPressed: {opacity: 0.76},
   statusHeader: {minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 7},
   statusDot: {width: 8, height: 8, borderRadius: 4},

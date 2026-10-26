@@ -226,7 +226,7 @@ const palette = {
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: palette.background},
-  screen: {flex: 1, paddingHorizontal: 20},
+  screen: {flex: 1, paddingHorizontal: 16},
   header: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: palette.border},
   backButton: {width: 44, height: 44, justifyContent: 'center'},
   backGlyph: {fontSize: 34, lineHeight: 38, color: palette.navy},
