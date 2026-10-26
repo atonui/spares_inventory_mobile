@@ -9,7 +9,7 @@ This document turns the mobile UX principles into a screen-by-screen design. It 
 
 ## Visual wireframes
 
-The vector screen board below shows all seven primary screens and the end-to-end find-to-recovery storyboard. Open the SVG directly for a scalable view.
+The vector screen board below shows the core screens and end-to-end find-to-recovery storyboard. Open the SVG directly for a scalable view.
 
 ![Spares Tracker mobile screen wireframes](mobile-screen-wireframes.svg)
 
@@ -25,8 +25,9 @@ The vector screen board below shows all seven primary screens and the end-to-end
 
 ```mermaid
 flowchart TD
-  Pair["Pair device"] --> Home["Home overview"]
-  Home --> Inventory["Inventory"]
+  Pair["Pair device"] --> Inventory["Inventory"]
+  Inventory --> Home["Home overview"]
+  Home --> Inventory
   Home --> Changes["Offline changes"]
   Inventory --> Scanner["Scan part"]
   Scanner --> Inventory
@@ -39,7 +40,7 @@ flowchart TD
   Offline --> Inventory
 ```
 
-The inventory screen is the home hub. Scanner, details, count editing, and offline review are task screens or overlays; they should preserve context and return workers to the same inventory search/filter state.
+Inventory remains the initial landing screen and the main stock work area. Home is a separate, compact triage overview available from the bottom navigation. Scanner, details, count editing, and offline review are task screens or overlays; they should preserve context and return workers to the same inventory search/filter state.
 
 ## Shared layout and interaction rules
 
@@ -76,12 +77,16 @@ The inventory screen is the home hub. Scanner, details, count editing, and offli
 
 **Purpose:** Give a compact view of stock health and a direct route into inventory work.
 
-- Show a small three-metric summary: total items, low stock, and out of stock.
-- List only the most urgent items under “Needs attention”; avoid charts or repeated summary cards.
-- Keep shortcuts to Inventory and Scan visible.
-- Use the persistent bottom navigation for Home, Stock, Scan, Changes, and More.
+- Keep Inventory as the initial screen; make Home a separate bottom-navigation destination for stock triage.
+- Show two large, easy-to-scan status cards: Out of stock and Low stock. Low stock excludes zero quantity and uses the same threshold rule as Inventory.
+- Make each status card a large tap target that opens Inventory with its matching filter already applied. Keep a small All stock route for users who want the full list.
+- Use red for out-of-stock and amber for low-stock, with text labels and quantities so status never depends on color alone.
+- Show the device’s last stock refresh time. When offline, state that the overview uses the latest stock saved on the device and that queued changes sync when connected.
+- Show a compact offline-changes notice only when changes are waiting or need review; let it open the review screen directly.
+- Do not repeat a long urgent-item list, charts, search, sort, or filter controls on Home. Keep scanning one tap away in the bottom navigation.
+- Use five bottom destinations: Home, Inventory, Scan, Changes, and More. Keep Profile and Settings in More; show the pending-change badge on Changes.
 
-## Screen 2 — Inventory home
+## Screen 2 — Inventory
 
 **Purpose:** Search, triage, and open a stock item quickly.
 
@@ -93,7 +98,7 @@ The inventory screen is the home hub. Scanner, details, count editing, and offli
 4. Keep quick filters to a small set such as All and Needs attention; open the full filter sheet for stock status and allocation. This keeps the list uncluttered while common triage stays one tap away.
 5. Result summary with visible count; sort control for Default, Part number, and Lowest stock.
 6. Dense but readable inventory rows.
-7. Persistent bottom navigation for Home, Stock, Scan, Changes, and More, with Scan kept in the thumb zone. The More destination opens account and settings actions.
+7. Persistent bottom navigation for Home, Inventory, Scan, Changes, and More, with Scan kept in the thumb zone. The More destination opens account and settings actions.
 
 Each inventory row presents:
 - Part number and short description as the strongest text.
@@ -248,10 +253,10 @@ These are shared screen states, not separate destinations.
 
 | Step | Screen slice | Acceptance focus |
 | --- | --- | --- |
-| 1 | Inventory home and its loading/empty/error states | Search/filter context, scannable rows, skeleton geometry, scanner reach |
-| 2 | Stock details and count editor | Item identity, numeric entry, zero confirmation, undo/saved feedback |
-| 3 | Offline changes and conflict review | Fresh server quantity, safe discard, sign-out protection |
-| 4 | Scanner task flow | Permissions, repeat scan ergonomics, feedback, preserved inventory context |
-| 5 | End-to-end storyboard review | Complete find/count/offline/recovery flows with mock data and on-device validation when available |
+| 1 | Home overview and its saved/offline states | Two status anchors, clear drilldowns, timestamp, offline and queue visibility |
+| 2 | Inventory search and triage | Filtered entry, search context, scannable rows, skeleton geometry, scanner reach |
+| 3 | Stock details and count editor | Item identity, numeric entry, zero confirmation, undo/saved feedback |
+| 4 | Offline changes and conflict review | Fresh server quantity, safe discard, sign-out protection |
+| 5 | Scanner task flow and storyboard review | Permissions, repeat scan ergonomics, feedback, preserved inventory context |
 
 Backend-dependent features (barcode fields, supplier/serial/location search, bulk location edits, export, and paginated server search) stay out of these screens until the API supports them. Use mock data for visual and interaction review where live SaaS/PostgreSQL is unavailable.

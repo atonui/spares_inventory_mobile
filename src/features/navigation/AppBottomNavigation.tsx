@@ -3,7 +3,7 @@ import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native
 import {useRouter} from 'expo-router';
 import {AppIcon, type AppIconName} from './AppIcon';
 
-type ActiveTab = 'inventory' | 'scan' | 'changes' | 'more';
+type ActiveTab = 'home' | 'inventory' | 'scan' | 'changes' | 'more';
 
 const palette = {
   navy: '#15263B', amber: '#E9A23B', slate: '#64748B', white: '#FFFFFF',
@@ -25,13 +25,14 @@ export function AppBottomNavigation({
   const [menuVisible, setMenuVisible] = useState(false);
   const pendingCount = queuedCount + conflictCount;
   const tabs: {key: ActiveTab; label: string; icon: AppIconName}[] = [
+    {key: 'home', label: 'Home', icon: 'home'},
     {key: 'inventory', label: 'Inventory', icon: 'inventory'},
     {key: 'scan', label: 'Scan', icon: 'scan'},
     {key: 'changes', label: 'Changes', icon: 'changes'},
     {key: 'more', label: 'More', icon: 'more'},
   ];
 
-  function navigateTo(path: '/' | '/scan' | '/offline-changes' | '/profile' | '/settings') {
+  function navigateTo(path: '/' | '/home' | '/scan' | '/offline-changes' | '/profile' | '/settings') {
     setMenuVisible(false);
     router.push(path);
   }
@@ -54,9 +55,10 @@ export function AppBottomNavigation({
               onPress={() => {
                 if (tab.key === 'more') setMenuVisible(true);
                 else if (selected) return;
-                else if (tab.key === 'inventory') navigateTo('/');
+                else if (tab.key === 'home') navigateTo('/home');
+                else if (tab.key === 'inventory') router.push({pathname: '/', params: {filter: undefined, query: undefined}});
                 else if (tab.key === 'scan') navigateTo('/scan');
-                else navigateTo('/offline-changes');
+                else if (tab.key === 'changes') navigateTo('/offline-changes');
               }}
               style={styles.tab}
             >
@@ -64,8 +66,8 @@ export function AppBottomNavigation({
               <View style={styles.iconWrap}>
                 <AppIcon name={tab.icon} color={selected ? palette.navy : palette.slate} size={22} />
                 {tab.key === 'changes' && pendingCount > 0 && (
-                  <View accessible={false} style={styles.badge}>
-                    <Text style={styles.badgeText}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
+                  <View accessible={false} style={[styles.badge, conflictCount > 0 ? styles.badgeError : styles.badgeWarning]}>
+                    <Text style={[styles.badgeText, conflictCount > 0 && styles.badgeErrorText]}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
                   </View>
                 )}
               </View>
@@ -87,16 +89,7 @@ export function AppBottomNavigation({
               </Pressable>
             </View>
             <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuContent} showsVerticalScrollIndicator={false}>
-              <Text style={styles.groupLabel}>WORK</Text>
-              <MenuAction icon="inventory" title="Inventory" subtitle="Search and browse stock" onPress={() => navigateTo('/')} />
-              <MenuAction icon="scan" title="Scan a part" subtitle="Find stock by barcode or QR code" onPress={() => navigateTo('/scan')} />
-              <MenuAction
-                icon="changes"
-                title="Offline changes"
-                subtitle={pendingCount ? `${queuedCount} waiting · ${conflictCount} need review` : 'No changes waiting to sync'}
-                onPress={() => navigateTo('/offline-changes')}
-              />
-              <Text style={[styles.groupLabel, styles.accountGroupLabel]}>ACCOUNT & APP</Text>
+              <Text style={styles.groupLabel}>ACCOUNT & APP</Text>
               <MenuAction icon="profile" title="Profile" subtitle="View your account details" onPress={() => navigateTo('/profile')} />
               <MenuAction icon="settings" title="Settings" subtitle="Scanner feedback and offline data" onPress={() => navigateTo('/settings')} />
             </ScrollView>
@@ -132,8 +125,11 @@ const styles = StyleSheet.create({
   iconWrap: {position: 'relative', minWidth: 26, minHeight: 25, alignItems: 'center', justifyContent: 'center'},
   tabLabel: {fontSize: 10, fontWeight: '600', color: palette.slate},
   tabLabelActive: {fontWeight: '800', color: palette.navy},
-  badge: {position: 'absolute', top: -4, right: -9, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8, backgroundColor: palette.red},
-  badgeText: {fontSize: 9, lineHeight: 12, fontWeight: '800', color: palette.white},
+  badge: {position: 'absolute', top: -4, right: -9, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8},
+  badgeWarning: {backgroundColor: palette.amber},
+  badgeError: {backgroundColor: palette.red},
+  badgeText: {fontSize: 9, lineHeight: 12, fontWeight: '800', color: palette.navy},
+  badgeErrorText: {color: palette.white},
   backdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(21, 38, 59, 0.38)'},
   sheet: {maxHeight: '88%', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white},
   handle: {alignSelf: 'center', width: 42, height: 4, marginBottom: 10, borderRadius: 2, backgroundColor: palette.border},
@@ -143,7 +139,6 @@ const styles = StyleSheet.create({
   menuScroll: {flexShrink: 1},
   menuContent: {paddingBottom: 8},
   groupLabel: {marginTop: 4, marginBottom: 2, fontSize: 10, fontWeight: '800', letterSpacing: 1, color: palette.slate},
-  accountGroupLabel: {marginTop: 16},
   signOutSection: {marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: palette.border},
   menuAction: {minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: '#E8EDF2'},
   menuActionPressed: {opacity: 0.72},

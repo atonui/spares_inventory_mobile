@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRouter} from 'expo-router';
+import {useLocalSearchParams, useRouter} from 'expo-router';
 import * as Network from 'expo-network';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
@@ -69,6 +69,12 @@ const inventoryFilterOptions: {value: InventoryFilter; label: string}[] = [
   {value: 'allocated', label: 'Allocated'},
 ];
 
+function parseInventoryFilter(value: string | undefined): InventoryFilter {
+  return inventoryFilterOptions.some(option => option.value === value)
+    ? value as InventoryFilter
+    : 'all';
+}
+
 const inventorySortOptions: {value: InventorySort; label: string}[] = [
   {value: 'default', label: 'Default'},
   {value: 'partNumber', label: 'Part number'},
@@ -77,6 +83,10 @@ const inventorySortOptions: {value: InventorySort; label: string}[] = [
 
 export default function InventoryScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{filter?: string | string[]; query?: string | string[]}>();
+  const routeFilterValue = Array.isArray(routeParams.filter) ? routeParams.filter[0] : routeParams.filter;
+  const routeQueryValue = Array.isArray(routeParams.query) ? routeParams.query[0] : routeParams.query;
+  const search = routeQueryValue ?? '';
   const [hasSession, setHasSession] = useState(false);
   const [user, setUser] = useState<NativeUser | null>(null);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
@@ -92,8 +102,7 @@ export default function InventoryScreen() {
   const [signOutError, setSignOutError] = useState('');
   const pairingCancelledRef = useRef(false);
   const syncInFlightRef = useRef<Promise<unknown> | null>(null);
-  const [search, setSearch] = useState('');
-  const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
+  const inventoryFilter = parseInventoryFilter(routeFilterValue);
   const [inventorySort, setInventorySort] = useState<InventorySort>('default');
   const [filterSortVisible, setFilterSortVisible] = useState(false);
   const [draftInventoryFilter, setDraftInventoryFilter] = useState<InventoryFilter>('all');
@@ -280,7 +289,7 @@ export default function InventoryScreen() {
       setHasSession(false);
       setUser(null);
       setInventory([]);
-      setSearch('');
+      router.setParams({filter: undefined, query: undefined});
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession();
@@ -290,7 +299,7 @@ export default function InventoryScreen() {
         setHasSession(false);
         setUser(null);
         setInventory([]);
-        setSearch('');
+        router.setParams({filter: undefined, query: undefined});
       }
       const message = `Sign out failed: ${responseMessage(reason)}`;
       setSignOutError(message);
@@ -394,8 +403,7 @@ export default function InventoryScreen() {
 
   function clearInventoryCriteria() {
     Keyboard.dismiss();
-    setSearch('');
-    setInventoryFilter('all');
+    router.setParams({filter: undefined, query: undefined});
     setInventorySort('default');
   }
 
@@ -410,7 +418,7 @@ export default function InventoryScreen() {
       const nextVisibleInventory = getVisibleInventory(draftInventoryFilter);
       announceInventoryResultCount(nextVisibleInventory.length, inventory.length, search, draftInventoryFilter);
     }
-    setInventoryFilter(draftInventoryFilter);
+    router.setParams({filter: draftInventoryFilter === 'all' ? undefined : draftInventoryFilter});
     setInventorySort(draftInventorySort);
     setFilterSortVisible(false);
   }
@@ -475,7 +483,7 @@ export default function InventoryScreen() {
             <TextInput
               accessibilityLabel="Search inventory"
               value={search}
-              onChangeText={setSearch}
+              onChangeText={value => router.setParams({query: value || undefined})}
               placeholder="Search part, store, or work order"
               placeholderTextColor={palette.placeholder}
               style={styles.searchInput}
@@ -490,7 +498,7 @@ export default function InventoryScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Clear search"
                 accessibilityHint="Clears the inventory search"
-                onPress={() => setSearch('')}
+                onPress={() => router.setParams({query: undefined})}
                 style={styles.clearSearchButton}
                 hitSlop={4}
               >
@@ -513,7 +521,7 @@ export default function InventoryScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Reset filters and sorting"
-                onPress={() => {setInventoryFilter('all'); setInventorySort('default');}}
+                onPress={() => {router.setParams({filter: undefined}); setInventorySort('default');}}
                 style={styles.resetControlsButton}
               >
                 <Text style={styles.resetControlsText}>Reset</Text>
