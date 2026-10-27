@@ -31,6 +31,9 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
   const [phase, setPhase] = useState<Phase>('welcome');
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [error, setError] = useState('');
+  const [cameraMountError, setCameraMountError] = useState(false);
+  const [cameraAttempt, setCameraAttempt] = useState(0);
+  const [retryingCamera, setRetryingCamera] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
   const scanned = useRef(false);
 
@@ -79,6 +82,21 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
     }
   }
 
+  async function retryCamera() {
+    setError('');
+    setCameraMountError(false);
+    setRetryingCamera(true);
+    try {
+      const currentPermission = await getPermission();
+      if (currentPermission.granted) setCameraAttempt(attempt => attempt + 1);
+    } catch {
+      setCameraMountError(true);
+      setError('Camera access could not be checked. Try again.');
+    } finally {
+      setRetryingCamera(false);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <Text accessibilityRole="header" style={styles.title}>
@@ -118,15 +136,28 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
         <>
           <Text style={styles.body}>Hold your camera over the QR code shown in your desktop profile.</Text>
           {permission?.granted ? (
-            <View style={styles.cameraFrame}>
-              <CameraView
-                style={StyleSheet.absoluteFill}
-                facing="back"
-                barcodeScannerSettings={{barcodeTypes: ['qr']}}
-                onBarcodeScanned={({data}) => void beginPairing(data)}
-              />
-              <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
-            </View>
+            cameraMountError ? (
+              <View style={styles.cameraFailureCard}>
+                <AppIcon name="scan" color={palette.slate} size={24} />
+                <Text style={styles.cameraFailureTitle}>Camera couldn’t start</Text>
+                <Text style={styles.cameraFailureBody}>Check that no other app is using the camera, then try again.</Text>
+                <Pressable accessibilityRole="button" disabled={retryingCamera} onPress={() => void retryCamera()} style={styles.cameraRetryButton}>
+                  {retryingCamera ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.cameraRetryText}>Try camera again</Text>}
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.cameraFrame}>
+                <CameraView
+                  key={cameraAttempt}
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  barcodeScannerSettings={{barcodeTypes: ['qr']}}
+                  onBarcodeScanned={({data}) => void beginPairing(data)}
+                  onMountError={() => setCameraMountError(true)}
+                />
+                <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
+              </View>
+            )
           ) : (
             <View style={styles.permissionCard}>
               <Text style={styles.permissionTitle}>Camera access is needed to scan your QR code</Text>
@@ -207,6 +238,11 @@ const styles = StyleSheet.create({
   previewButton: {minHeight: 46, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background},
   previewButtonText: {fontSize: 13, fontWeight: '700', color: palette.navy},
   cameraFrame: {height: 300, marginTop: 22, overflow: 'hidden', borderRadius: 18, backgroundColor: '#0B1726'},
+  cameraFailureCard: {height: 300, alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 22, padding: 20, borderRadius: 18, backgroundColor: palette.background},
+  cameraFailureTitle: {fontSize: 16, fontWeight: '800', textAlign: 'center', color: palette.navy},
+  cameraFailureBody: {maxWidth: 260, fontSize: 13, lineHeight: 19, textAlign: 'center', color: palette.muted},
+  cameraRetryButton: {minHeight: 44, marginTop: 5, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FEF3DF'},
+  cameraRetryText: {fontSize: 13, fontWeight: '800', color: palette.navy},
   scanFrame: {position: 'absolute', top: '20%', right: '16%', bottom: '20%', left: '16%', borderWidth: 2, borderColor: palette.amber, borderRadius: 14},
   scanCorners: {flex: 1, margin: -3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 16},
   permissionCard: {marginTop: 22, padding: 18, borderRadius: 14, backgroundColor: palette.background},
