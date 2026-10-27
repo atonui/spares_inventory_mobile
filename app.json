@@ -33,7 +33,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Spares Tracker uses the camera only to scan a one-time mobile pairing code.",
+          "cameraPermission": "Spares Tracker uses the camera to scan a one-time QR code to pair this phone or to look up stock by barcode or QR code.",
           "microphonePermission": false,
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true

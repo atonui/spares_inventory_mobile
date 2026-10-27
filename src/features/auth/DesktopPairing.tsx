@@ -76,7 +76,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
             <View style={styles.qrMark}><AppIcon name="scan" color={palette.white} size={20} /></View>
             <View style={styles.qrCopy}>
               <Text style={styles.qrTitle}>Ready to connect</Text>
-              <Text style={styles.qrDescription}>Point your camera at the one-time QR code on your desktop.</Text>
+              <Text style={styles.qrDescription}>Point your camera at the one-time QR code on your desktop. The Scan screen also reads stock barcodes and QR codes.</Text>
             </View>
           </View>
           <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('scan');}} style={styles.primaryButton}>
@@ -108,7 +108,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
           ) : (
             <View style={styles.permissionCard}>
               <Text style={styles.permissionTitle}>Camera access is needed to scan your QR code</Text>
-              <Text style={styles.permissionBody}>Spares Tracker uses the camera for QR scanning only.</Text>
+              <Text style={styles.permissionBody}>The camera scans a one-time QR code to pair this phone. The Scan screen uses it to look up stock by barcode or QR code.</Text>
               {!!permission && !permission.canAskAgain ? (
                 <Text style={styles.permissionBody}>Enable camera access in your device settings, then return here.</Text>
               ) : (
