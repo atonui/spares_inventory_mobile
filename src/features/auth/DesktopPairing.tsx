@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions} from 'expo-camera';
+import * as Linking from 'expo-linking';
 import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {AppIcon} from '../navigation/AppIcon';
 
@@ -28,7 +29,7 @@ export const PREVIEW_PAIRING_QR = 'sparesflow://pair?token=preview-pairing-token
 
 export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChange}: Props) {
   const [phase, setPhase] = useState<Phase>('welcome');
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [error, setError] = useState('');
   const [approvalRequired, setApprovalRequired] = useState(false);
   const scanned = useRef(false);
@@ -55,6 +56,27 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
     onCancel?.();
     setError('');
     setPhase('welcome');
+  }
+
+  async function openCameraSettings() {
+    setError('');
+    try {
+      await Linking.openSettings();
+    } catch {
+      setError('Could not open device settings. Open Settings and enable camera access for Spares Tracker.');
+    }
+  }
+
+  async function checkCameraPermission() {
+    setError('');
+    try {
+      const currentPermission = await getPermission();
+      if (!currentPermission.granted) {
+        setError('Camera access is still off. Enable it in device settings, then check again.');
+      }
+    } catch {
+      setError('Camera access could not be checked. Try again.');
+    }
   }
 
   return (
@@ -110,7 +132,15 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
               <Text style={styles.permissionTitle}>Camera access is needed to scan your QR code</Text>
               <Text style={styles.permissionBody}>The camera scans a one-time QR code to pair this phone. The Scan screen uses it to look up stock by barcode or QR code.</Text>
               {!!permission && !permission.canAskAgain ? (
-                <Text style={styles.permissionBody}>Enable camera access in your device settings, then return here.</Text>
+                <>
+                  <Text style={styles.permissionBody}>Camera access is turned off. Open device settings to allow camera access for Spares Tracker, then return and check again.</Text>
+                  <Pressable accessibilityRole="button" onPress={() => void openCameraSettings()} style={styles.secondaryButton}>
+                    <Text style={styles.secondaryButtonText}>Open device settings</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => void checkCameraPermission()} style={styles.settingsCheckButton}>
+                    <Text style={styles.settingsCheckButtonText}>Check camera access</Text>
+                  </Pressable>
+                </>
               ) : (
                 <Pressable accessibilityRole="button" onPress={() => void requestPermission()} style={styles.secondaryButton}>
                   <Text style={styles.secondaryButtonText}>Allow camera</Text>
@@ -184,6 +214,8 @@ const styles = StyleSheet.create({
   permissionBody: {marginTop: 8, fontSize: 13, lineHeight: 19, color: palette.muted},
   secondaryButton: {minHeight: 44, marginTop: 15, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.navy},
   secondaryButtonText: {fontSize: 14, fontWeight: '700', color: palette.white},
+  settingsCheckButton: {minHeight: 44, marginTop: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  settingsCheckButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
   textButton: {alignSelf: 'center', minHeight: 44, marginTop: 15, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center'},
   textButtonLabel: {fontSize: 14, fontWeight: '700', color: palette.slate},
   pendingCard: {alignItems: 'center', marginTop: 20, padding: 22, borderRadius: 16, backgroundColor: palette.background},
