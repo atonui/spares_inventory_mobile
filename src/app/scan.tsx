@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions, type BarcodeType} from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import type {AudioPlayer} from 'expo-audio';
@@ -6,7 +6,7 @@ import * as ExpoLinking from 'expo-linking';
 import {StatusBar} from 'expo-status-bar';
 import {ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useLocalSearchParams, useRouter} from 'expo-router';
+import {useFocusEffect, useLocalSearchParams, useRouter} from 'expo-router';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import {getInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
@@ -37,6 +37,7 @@ export default function InventoryScanScreen() {
   const [checkingPermission, setCheckingPermission] = useState(false);
   const [cameraMountError, setCameraMountError] = useState(false);
   const [cameraAttempt, setCameraAttempt] = useState(0);
+  const [screenFocused, setScreenFocused] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [scanSoundsEnabled, setScanSoundsEnabled] = useState(false);
@@ -74,8 +75,17 @@ export default function InventoryScanScreen() {
     };
   }, [scanSoundsEnabled]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
+    setScreenFocused(true);
+    if (scanned.current) {
+      scanned.current = false;
+      setHasScanned(false);
+      setScannedValue('');
+      setMatches([]);
+      setSelectedMatchId(null);
+    }
+    setInventoryState('loading');
     const loadInventory = async () => {
       const requestedUserId = /^\d+$/.test(userIdParam ?? '') ? Number(userIdParam) : null;
       let activeUserId: number | null;
@@ -123,8 +133,12 @@ export default function InventoryScanScreen() {
       }
     };
     void loadInventory();
-    return () => { active = false; };
-  }, [userIdParam]);
+    return () => {
+      active = false;
+      setScreenFocused(false);
+      setTorchEnabled(false);
+    };
+  }, [userIdParam]));
 
   useEffect(() => {
     if (!hasScanned || !hapticsEnabled) return;
@@ -316,17 +330,15 @@ export default function InventoryScanScreen() {
                   </Pressable>
                 </View>
               ) : !hasScanned && <View style={styles.cameraFrame}>
-                {!hasScanned && (
-                  <CameraView
-                    key={cameraAttempt}
-                    style={StyleSheet.absoluteFill}
-                    facing="back"
-                    enableTorch={torchEnabled}
-                    barcodeScannerSettings={{barcodeTypes: scannerBarcodeTypes}}
-                    onBarcodeScanned={({data}) => onBarcodeScanned(data)}
-                    onMountError={() => {setCameraMountError(true); setTorchEnabled(false);}}
-                  />
-                )}
+                {screenFocused && <CameraView
+                  key={cameraAttempt}
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  enableTorch={torchEnabled}
+                  barcodeScannerSettings={{barcodeTypes: scannerBarcodeTypes}}
+                  onBarcodeScanned={({data}) => onBarcodeScanned(data)}
+                  onMountError={() => {setCameraMountError(true); setTorchEnabled(false);}}
+                />}
                 <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
                 {!hasScanned && <View pointerEvents="none" style={styles.scanPrompt}><Text style={styles.scanPromptText}>Align code inside frame</Text></View>}
                 {!hasScanned && Platform.OS !== 'web' && (
