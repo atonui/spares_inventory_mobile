@@ -102,23 +102,20 @@ export default function InventoryScanScreen() {
         // Sound feedback stays off if the local preference cannot be read.
       }
       const snapshot = getInventorySnapshot();
-      if (snapshot !== null) {
-        if (active) {
-          setInventory(snapshot);
-          setInventoryState('ready');
-        }
-        return;
-      }
-
       try {
+        const queued = await offlineStockStore.list(activeUserId);
+        if (!active) return;
+        if (snapshot !== null) {
+          setInventory(applyQueuedStockCounts(snapshot, queued));
+          setInventoryState('ready');
+          return;
+        }
         const cachedRows = await offlineStockStore.loadInventorySnapshot(activeUserId);
         if (!active) return;
         if (cachedRows === null) {
           setInventoryState('unavailable');
           return;
         }
-        const queued = await offlineStockStore.list(activeUserId);
-        if (!active) return;
         setInventory(applyQueuedStockCounts(cachedRows, queued));
         setInventoryState('ready');
       } catch {
