@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions, type BarcodeType} from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import type {AudioPlayer} from 'expo-audio';
 import * as ExpoLinking from 'expo-linking';
 import {StatusBar} from 'expo-status-bar';
 import {ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
@@ -36,8 +37,40 @@ export default function InventoryScanScreen() {
   const [checkingPermission, setCheckingPermission] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [scanSoundsEnabled, setScanSoundsEnabled] = useState(false);
   const [manualPartNumber, setManualPartNumber] = useState('');
   const scanned = useRef(false);
+  const soundPlayers = useRef<{success: AudioPlayer | null; notFound: AudioPlayer | null}>({success: null, notFound: null});
+
+  useEffect(() => {
+    if (!scanSoundsEnabled) return;
+    let mounted = true;
+    let successPlayer: AudioPlayer | null = null;
+    let notFoundPlayer: AudioPlayer | null = null;
+    const loadPlayers = async () => {
+      try {
+        const {createAudioPlayer} = await import('expo-audio');
+        successPlayer = createAudioPlayer(require('../../assets/audio/scan-success.wav'));
+        notFoundPlayer = createAudioPlayer(require('../../assets/audio/scan-not-found.wav'));
+        if (mounted) soundPlayers.current = {success: successPlayer, notFound: notFoundPlayer};
+        else {
+          successPlayer.release();
+          notFoundPlayer.release();
+        }
+      } catch {
+        // Scanning and haptics still work if audio players are unavailable.
+        successPlayer?.release();
+        notFoundPlayer?.release();
+      }
+    };
+    void loadPlayers();
+    return () => {
+      mounted = false;
+      soundPlayers.current.success?.release();
+      soundPlayers.current.notFound?.release();
+      soundPlayers.current = {success: null, notFound: null};
+    };
+  }, [scanSoundsEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -59,6 +92,12 @@ export default function InventoryScanScreen() {
         if (active) setHapticsEnabled(enabled);
       } catch {
         // Keep scan feedback enabled if the local preference cannot be read.
+      }
+      try {
+        const enabled = await offlineStockStore.getScanSoundsEnabled(activeUserId);
+        if (active) setScanSoundsEnabled(enabled);
+      } catch {
+        // Sound feedback stays off if the local preference cannot be read.
       }
       const snapshot = getInventorySnapshot();
       if (snapshot !== null) {
@@ -108,7 +147,19 @@ export default function InventoryScanScreen() {
     void sendScanFeedback();
   }, [hasScanned, hapticsEnabled, matches.length]);
 
-  function onBarcodeScanned(value: string) {
+  async function playScanSound(foundMatch: boolean) {
+    if (!scanSoundsEnabled) return;
+    const player = foundMatch ? soundPlayers.current.success : soundPlayers.current.notFound;
+    if (!player) return;
+    try {
+      if (player.isLoaded) await player.seekTo(0);
+      player.play();
+    } catch {
+      // Visual and haptic scan feedback remain available if sound playback fails.
+    }
+  }
+
+  function onBarcodeScanned(value: string, source: 'camera' | 'manual' = 'camera') {
     if (scanned.current || inventory === null) return;
     scanned.current = true;
     setHasScanned(true);
@@ -116,6 +167,7 @@ export default function InventoryScanScreen() {
     const found = findInventoryMatches(inventory, value);
     setMatches(found);
     setSelectedMatchId(found.length === 1 ? found[0].id : null);
+    if (source === 'camera') void playScanSound(found.length > 0);
   }
 
   function scanAgain() {
@@ -136,7 +188,7 @@ export default function InventoryScanScreen() {
     setHasScanned(false);
     setScannedValue('');
     setMatches([]);
-    onBarcodeScanned(partNumber);
+    onBarcodeScanned(partNumber, 'manual');
   }
 
   async function allowCamera() {

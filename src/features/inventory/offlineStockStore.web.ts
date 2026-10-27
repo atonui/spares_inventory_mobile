@@ -83,6 +83,12 @@ export const offlineStockStore: OfflineStockStorage = {
   async setScanHapticsEnabled(userId, enabled) {
     globalThis.localStorage?.setItem(`spares-tracker.scan_haptics_enabled.${userId}`, String(enabled));
   },
+  async getScanSoundsEnabled(userId) {
+    return globalThis.localStorage?.getItem(`spares-tracker.scan_sounds_enabled.${userId}`) === 'true';
+  },
+  async setScanSoundsEnabled(userId, enabled) {
+    globalThis.localStorage?.setItem(`spares-tracker.scan_sounds_enabled.${userId}`, String(enabled));
+  },
   async enqueue(adjustment) {
     const entries = getWebEntries();
     entries.push(adjustment);

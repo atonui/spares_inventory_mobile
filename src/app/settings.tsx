@@ -13,6 +13,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState<number | null>(null);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [scanSoundsEnabled, setScanSoundsEnabled] = useState(false);
   const [queue, setQueue] = useState<QueuedStockAdjustment[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingPreference, setSavingPreference] = useState(false);
@@ -29,13 +30,15 @@ export default function SettingsScreen() {
           setQueue([]);
           return;
         }
-        const [pending, enabled] = await Promise.all([
+        const [pending, enabled, soundsEnabled] = await Promise.all([
           offlineStockStore.list(activeUserId),
           offlineStockStore.getScanHapticsEnabled(activeUserId),
+          offlineStockStore.getScanSoundsEnabled(activeUserId),
         ]);
         if (active) {
           setQueue(pending);
           setHapticsEnabled(enabled);
+          setScanSoundsEnabled(soundsEnabled);
         }
       } catch {
         if (active) setError('Could not load settings saved on this device.');
@@ -57,6 +60,22 @@ export default function SettingsScreen() {
       await offlineStockStore.setScanHapticsEnabled(userId, enabled);
     } catch {
       setHapticsEnabled(previous);
+      setError('Could not save this setting. Try again.');
+    } finally {
+      setSavingPreference(false);
+    }
+  }
+
+  async function updateScanSounds(enabled: boolean) {
+    if (userId === null || savingPreference) return;
+    const previous = scanSoundsEnabled;
+    setScanSoundsEnabled(enabled);
+    setSavingPreference(true);
+    setError('');
+    try {
+      await offlineStockStore.setScanSoundsEnabled(userId, enabled);
+    } catch {
+      setScanSoundsEnabled(previous);
       setError('Could not save this setting. Try again.');
     } finally {
       setSavingPreference(false);
@@ -95,6 +114,21 @@ export default function SettingsScreen() {
                 accessibilityLabel="Haptic scan feedback"
                 value={hapticsEnabled}
                 onValueChange={value => void updateHaptics(value)}
+                disabled={loading || savingPreference || userId === null}
+                trackColor={{false: palette.border, true: palette.amber}}
+                thumbColor={palette.white}
+              />
+            </View>
+            <View style={styles.settingDivider} />
+            <View style={styles.settingRow}>
+              <View style={styles.settingCopy}>
+                <Text style={styles.settingTitle}>Sound scan feedback</Text>
+                <Text style={styles.settingDescription}>Play a high tone for a match and a low tone when no part is found. Off by default.</Text>
+              </View>
+              <Switch
+                accessibilityLabel="Sound scan feedback"
+                value={scanSoundsEnabled}
+                onValueChange={value => void updateScanSounds(value)}
                 disabled={loading || savingPreference || userId === null}
                 trackColor={{false: palette.border, true: palette.amber}}
                 thumbColor={palette.white}
@@ -152,6 +186,7 @@ const styles = StyleSheet.create({
   sectionTitle: {marginBottom: 9, fontSize: 15, fontWeight: '800', color: palette.navy},
   settingCard: {marginBottom: 22, padding: 15, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   settingRow: {minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 14},
+  settingDivider: {height: 1, marginVertical: 12, backgroundColor: palette.border},
   settingCopy: {flex: 1},
   settingTitle: {fontSize: 14, fontWeight: '700', color: palette.navy},
   settingDescription: {marginTop: 5, fontSize: 13, lineHeight: 19, color: palette.muted},

@@ -12,7 +12,16 @@ export default ({config}) => {
 
   return {
     ...config,
-    plugins: [...(config.plugins ?? []), 'expo-sqlite'],
+    plugins: [
+      ...(config.plugins ?? []),
+      'expo-sqlite',
+      ['expo-audio', {
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        enableBackgroundPlayback: false,
+        enableBackgroundRecording: false,
+      }],
+    ],
     name: `${config.name}${label}`,
     ios: {
       ...config.ios,

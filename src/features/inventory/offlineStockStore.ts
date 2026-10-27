@@ -23,6 +23,8 @@ export type OfflineStockStorage = StockQueueStore & {
   setActiveUserId(userId: number | null): Promise<void>;
   getScanHapticsEnabled(userId: number): Promise<boolean>;
   setScanHapticsEnabled(userId: number, enabled: boolean): Promise<void>;
+  getScanSoundsEnabled(userId: number): Promise<boolean>;
+  setScanSoundsEnabled(userId: number, enabled: boolean): Promise<void>;
 };
 
 async function database() {
@@ -178,6 +180,24 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async setScanHapticsEnabled(userId, enabled) {
     const key = `scan_haptics_enabled.${userId}`;
+    const value = String(enabled);
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, value);
+      return;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, value);
+  },
+  async getScanSoundsEnabled(userId) {
+    const key = `scan_sounds_enabled.${userId}`;
+    if (Platform.OS === 'web') return globalThis.localStorage?.getItem(`spares-tracker.${key}`) === 'true';
+    const db = await database();
+    const row = await db.getFirstAsync<{value: string}>(
+      'SELECT value FROM offline_metadata WHERE key=?', key);
+    return row?.value === 'true';
+  },
+  async setScanSoundsEnabled(userId, enabled) {
+    const key = `scan_sounds_enabled.${userId}`;
     const value = String(enabled);
     if (Platform.OS === 'web') {
       globalThis.localStorage?.setItem(`spares-tracker.${key}`, value);
