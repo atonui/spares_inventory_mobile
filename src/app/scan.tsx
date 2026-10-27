@@ -35,6 +35,8 @@ export default function InventoryScanScreen() {
   const [permissionError, setPermissionError] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
   const [checkingPermission, setCheckingPermission] = useState(false);
+  const [cameraMountError, setCameraMountError] = useState(false);
+  const [cameraAttempt, setCameraAttempt] = useState(0);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [scanSoundsEnabled, setScanSoundsEnabled] = useState(false);
@@ -173,6 +175,7 @@ export default function InventoryScanScreen() {
   function scanAgain() {
     scanned.current = false;
     setHasScanned(false);
+    setCameraMountError(false);
     setScannedValue('');
     setMatches([]);
     setSelectedMatchId(null);
@@ -227,6 +230,25 @@ export default function InventoryScanScreen() {
       }
     } catch {
       setPermissionError('Camera access could not be checked. Try again.');
+    } finally {
+      setCheckingPermission(false);
+    }
+  }
+
+  async function retryCamera() {
+    setPermissionError('');
+    setCameraMountError(false);
+    setCheckingPermission(true);
+    try {
+      const currentPermission = await getPermission();
+      if (!currentPermission.granted) {
+        setPermissionError('Camera access is still off. Allow it in device settings, then check again.');
+        return;
+      }
+      setTorchEnabled(false);
+      setCameraAttempt(attempt => attempt + 1);
+    } catch {
+      setCameraMountError(true);
     } finally {
       setCheckingPermission(false);
     }
@@ -287,14 +309,25 @@ export default function InventoryScanScreen() {
           <>
             <ScrollView style={styles.scanContent} contentContainerStyle={styles.scanContentInner} keyboardShouldPersistTaps="handled">
             {permission?.granted ? (
-              !hasScanned && <View style={styles.cameraFrame}>
+              cameraMountError ? (
+                <View style={[styles.cameraFrame, styles.cameraErrorCard]}>
+                  <AppIcon name="scan" color="#C4D0DC" size={24} />
+                  <Text style={styles.cameraErrorTitle}>Camera couldn’t start</Text>
+                  <Text style={styles.cameraErrorDescription}>Try again, or enter a part number below to look up stock.</Text>
+                  <Pressable accessibilityRole="button" disabled={checkingPermission} onPress={() => void retryCamera()} style={styles.cameraRetryButton}>
+                    {checkingPermission ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.cameraRetryText}>Try camera again</Text>}
+                  </Pressable>
+                </View>
+              ) : !hasScanned && <View style={styles.cameraFrame}>
                 {!hasScanned && (
                   <CameraView
+                    key={cameraAttempt}
                     style={StyleSheet.absoluteFill}
                     facing="back"
                     enableTorch={torchEnabled}
                     barcodeScannerSettings={{barcodeTypes: scannerBarcodeTypes}}
                     onBarcodeScanned={({data}) => onBarcodeScanned(data)}
+                    onMountError={() => {setCameraMountError(true); setTorchEnabled(false);}}
                   />
                 )}
                 <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
@@ -428,6 +461,11 @@ const styles = StyleSheet.create({
   scanContent: {flex: 1, marginTop: 11},
   scanContentInner: {paddingBottom: 14},
   cameraFrame: {height: 320, overflow: 'hidden', borderRadius: 17, borderWidth: 1, borderColor: '#43576D', backgroundColor: '#0D1B2B'},
+  cameraErrorCard: {alignItems: 'center', justifyContent: 'center', gap: 8, padding: 20},
+  cameraErrorTitle: {fontSize: 16, fontWeight: '800', textAlign: 'center', color: palette.white},
+  cameraErrorDescription: {maxWidth: 260, fontSize: 13, lineHeight: 19, textAlign: 'center', color: '#C4D0DC'},
+  cameraRetryButton: {minHeight: 44, marginTop: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: palette.amber},
+  cameraRetryText: {fontSize: 13, fontWeight: '800', color: palette.navy},
   scanFrame: {position: 'absolute', top: '18%', right: '14%', bottom: '18%', left: '14%', borderWidth: 2, borderColor: palette.amber, borderRadius: 16},
   scanCorners: {flex: 1, margin: -3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 18},
   scanPrompt: {position: 'absolute', top: 10, left: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(21,38,59,0.84)'},
