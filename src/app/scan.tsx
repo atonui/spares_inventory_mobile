@@ -1,8 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions, type BarcodeType} from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import * as ExpoLinking from 'expo-linking';
 import {StatusBar} from 'expo-status-bar';
-import {ActivityIndicator, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
@@ -22,7 +23,7 @@ type InventoryState = 'loading' | 'ready' | 'unavailable';
 export default function InventoryScanScreen() {
   const router = useRouter();
   const {userId: userIdParam} = useLocalSearchParams<{userId?: string}>();
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [inventory, setInventory] = useState<InventoryItem[] | null>(null);
   const [inventoryState, setInventoryState] = useState<InventoryState>('loading');
   const [signedInUserId, setSignedInUserId] = useState<number | null>(null);
@@ -32,6 +33,7 @@ export default function InventoryScanScreen() {
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [permissionError, setPermissionError] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
+  const [checkingPermission, setCheckingPermission] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [manualPartNumber, setManualPartNumber] = useState('');
@@ -154,6 +156,30 @@ export default function InventoryScanScreen() {
     }
   }
 
+  async function openCameraSettings() {
+    setPermissionError('');
+    try {
+      await ExpoLinking.openSettings();
+    } catch {
+      setPermissionError('Could not open device settings. Open Settings and allow camera access for Spares Tracker.');
+    }
+  }
+
+  async function checkCameraPermission() {
+    setPermissionError('');
+    setCheckingPermission(true);
+    try {
+      const currentPermission = await getPermission();
+      if (!currentPermission.granted) {
+        setPermissionError('Camera access is still off. Allow it in device settings, then check again.');
+      }
+    } catch {
+      setPermissionError('Camera access could not be checked. Try again.');
+    } finally {
+      setCheckingPermission(false);
+    }
+  }
+
   function openItem(item: InventoryItem) {
     router.push({pathname: '/inventory/[itemId]', params: {itemId: String(item.id), userId: String(signedInUserId ?? '')}});
   }
@@ -241,9 +267,14 @@ export default function InventoryScanScreen() {
                 <Text style={styles.permissionNote}>You can also enter a part number below.</Text>
                 {permissionError ? <Text accessibilityRole="alert" style={styles.permissionError}>{permissionError}</Text> : null}
                 {!permission?.canAskAgain && permission?.granted === false ? (
-                  <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} style={styles.permissionButton}>
-                    <Text style={styles.permissionButtonText}>Open device settings</Text>
-                  </Pressable>
+                  <>
+                    <Pressable accessibilityRole="button" onPress={() => void openCameraSettings()} style={styles.permissionButton}>
+                      <Text style={styles.permissionButtonText}>Open device settings</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" disabled={checkingPermission} onPress={() => void checkCameraPermission()} style={[styles.permissionButton, styles.permissionCheckButton]}>
+                      {checkingPermission ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.permissionButtonText}>Check camera access</Text>}
+                    </Pressable>
+                  </>
                 ) : (
                   <Pressable accessibilityRole="button" disabled={requestingPermission} onPress={() => void allowCamera()} style={styles.permissionButton}>
                     {requestingPermission ? <ActivityIndicator color={palette.navy} /> : <Text style={styles.permissionButtonText}>Allow camera</Text>}
@@ -365,6 +396,7 @@ const styles = StyleSheet.create({
   permissionTitle: {fontSize: 16, fontWeight: '700', textAlign: 'center', color: palette.navy},
   permissionDescription: {marginTop: 8, fontSize: 14, lineHeight: 20, textAlign: 'center', color: palette.muted},
   permissionButton: {minHeight: 48, minWidth: 144, marginTop: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.navy, backgroundColor: palette.white, paddingHorizontal: 14},
+  permissionCheckButton: {marginTop: 8, borderColor: palette.border, backgroundColor: palette.background},
   permissionNote: {marginTop: 9, fontSize: 12, color: palette.slate},
   permissionButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
   permissionError: {marginTop: 10, fontSize: 13, lineHeight: 19, textAlign: 'center', color: '#A13A32'},
