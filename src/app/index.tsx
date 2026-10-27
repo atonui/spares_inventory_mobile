@@ -16,11 +16,11 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useLocalSearchParams, useRouter} from 'expo-router';
+import {useFocusEffect, useLocalSearchParams, useRouter} from 'expo-router';
 import * as Network from 'expo-network';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type NativeUser} from '../api/client';
-import {clearInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
+import {clearInventorySnapshot, getInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
 import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAccessibility';
 import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
@@ -190,6 +190,12 @@ export default function InventoryScreen() {
     });
     return () => { active = false; };
   }, [restoreSession]);
+
+  useFocusEffect(useCallback(() => {
+    if (!hasSession || user === null) return;
+    const latestSnapshot = getInventorySnapshot();
+    if (latestSnapshot !== null) setInventory(latestSnapshot);
+  }, [hasSession, user]));
 
   useEffect(() => {
     if (!hasSession || !user) return;
