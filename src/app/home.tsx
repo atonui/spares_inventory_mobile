@@ -5,7 +5,7 @@ import {useFocusEffect, useRouter} from 'expo-router';
 import {useNetworkState} from 'expo-network';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
-import {setInventorySnapshot} from '../features/inventory/inventorySnapshot';
+import {getInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
@@ -69,7 +69,7 @@ export default function HomeScreen() {
           offlineStockStore.list(userId),
           offlineStockStore.getInventorySnapshotSavedAt(userId),
         ]);
-        const baseInventory = savedInventory;
+        const baseInventory = getInventorySnapshot() ?? savedInventory;
         const inventory = baseInventory === null ? null : applyQueuedStockCounts(baseInventory, queue);
         if (active) {
           if (inventory !== null) setInventorySnapshot(inventory);
