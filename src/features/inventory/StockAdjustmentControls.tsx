@@ -29,6 +29,8 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
   const [quantityRefreshed, setQuantityRefreshed] = useState(false);
   const [undoableCount, setUndoableCount] = useState<UndoableCount | null>(null);
   const [undoing, setUndoing] = useState(false);
+  const saveInFlight = useRef(false);
+  const undoInFlight = useRef(false);
   const syncInFlight = useRef(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -82,6 +84,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
   }, [userId, item.id, onQuantityChange]);
 
   async function save(confirmZeroCount = false) {
+    if (saveInFlight.current || undoInFlight.current) return;
     const amount = Number(value);
     if (!Number.isSafeInteger(amount) || amount < 0 || (mode === 'add' && amount < 1)) {
       setNotice(mode === 'add' ? 'Enter a whole number greater than zero.' : 'Enter a whole number of zero or more.');
@@ -102,6 +105,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       return;
     }
 
+    saveInFlight.current = true;
     setSaving(true);
     setNotice('');
     try {
@@ -139,13 +143,15 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not save this stock change.');
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   }
 
   async function undoSavedCount() {
     const undo = undoableCount;
-    if (!undo || undoing) return;
+    if (!undo || undoInFlight.current || saveInFlight.current) return;
+    undoInFlight.current = true;
     setUndoing(true);
     setNotice('');
     try {
@@ -190,6 +196,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     } catch (error) {
       setNotice(error instanceof Error ? `Could not undo this stock change: ${error.message}` : 'Could not undo this stock change.');
     } finally {
+      undoInFlight.current = false;
       setUndoing(false);
     }
   }
@@ -234,10 +241,10 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     <View>
       {!item.isAllocated && (
         <View style={styles.actions}>
-          <Pressable accessibilityRole="button" disabled={hasConflict} onPress={() => {setMode('add'); setValue(''); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.primaryButton}>
+          <Pressable accessibilityRole="button" disabled={hasConflict || saving || undoing} onPress={() => {setMode('add'); setValue(''); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Add stock</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" disabled={hasConflict} onPress={() => {setMode('count'); setValue(String(item.quantity)); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.secondaryButton}>
+          <Pressable accessibilityRole="button" disabled={hasConflict || saving || undoing} onPress={() => {setMode('count'); setValue(String(item.quantity)); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Edit count</Text>
           </Pressable>
         </View>
@@ -246,7 +253,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       {undoableCount && !hasConflict && (
         <View accessibilityRole="summary" style={styles.undoNotice}>
           <Text accessibilityRole="status" style={styles.undoText}>Stock quantity changed.</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Undo stock change" disabled={undoing}
+          <Pressable accessibilityRole="button" accessibilityLabel="Undo stock change" disabled={undoing || saving}
             onPress={() => void undoSavedCount()} style={styles.undoButton}>
             <Text style={styles.undoButtonText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
           </Pressable>
