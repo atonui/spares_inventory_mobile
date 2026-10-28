@@ -218,7 +218,7 @@ export default function HomeScreen() {
           ) : (
             <>
               <View style={styles.cardsRow}>
-                <StatusCard label="Total SKUs" count={inventory.length} tone="neutral" onPress={() => openInventory('all')} />
+                <StatusCard label="Stock records" count={inventory.length} tone="neutral" onPress={() => openInventory('all')} />
                 <StatusCard label="Low stock" count={lowStockCount} tone="warning" onPress={() => openInventory('lowStock')} />
                 <StatusCard label="Out of stock" count={outOfStockCount} tone="error" onPress={() => openInventory('outOfStock')} />
               </View>
@@ -279,10 +279,11 @@ function StatusCard({label, count, tone, onPress}: {
 }) {
   const color = tone === 'error' ? palette.error : tone === 'warning' ? palette.warning : palette.navy;
   const background = tone === 'error' ? palette.errorBackground : tone === 'warning' ? palette.warningBackground : '#E8EDF2';
+  const countDescription = tone === 'neutral' ? `${count} stock records` : `${count} ${label.toLowerCase()} records`;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${count} ${label.toLowerCase()} items. Open filtered inventory.`}
+      accessibilityLabel={`${countDescription}. Open filtered inventory.`}
       accessibilityHint="Opens Inventory with this stock status selected"
       onPress={onPress}
       style={({pressed}) => [styles.statusCard, pressed && styles.statusCardPressed]}
