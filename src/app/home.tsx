@@ -253,7 +253,8 @@ export default function HomeScreen() {
                   <Text style={styles.allClearText}>All stock is above its minimum level.</Text>
                 </View>
               ) : attentionItems.slice(0, 3).map(item => (
-                  <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Review ${item.partNumber}, ${item.quantity} in stock`}
+                  <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={alertAccessibilityLabel(item)}
+                    accessibilityHint="Opens stock details"
                     onPress={() => router.push({pathname: '/inventory/[itemId]', params: {itemId: String(item.id)}})} style={styles.attentionCard}>
                     <View style={[styles.attentionMark, item.quantity === 0 && styles.attentionMarkOut]}>
                       <AppIcon name="inventory" color={item.quantity === 0 ? palette.error : palette.warning} size={18} />
@@ -345,6 +346,12 @@ function formatPendingSummary(queued: number, conflicts: number): string {
     queued > 0 ? `${queued} waiting to sync` : '',
     conflicts > 0 ? `${conflicts} to review` : '',
   ].filter(Boolean).join(' · ');
+}
+
+function alertAccessibilityLabel(item: InventoryItem): string {
+  const status = item.quantity === 0 ? 'out of stock' : 'low stock';
+  const units = item.quantity === 1 ? 'unit' : 'units';
+  return `Review ${item.partNumber}, ${item.description}. ${item.quantity} ${units}, ${status}, at ${item.storeName}.`;
 }
 
 const styles = StyleSheet.create({
