@@ -10,9 +10,11 @@ The scanner accepts part numbers directly or from QR URLs using `part_number`, `
 
 ## Backend environments
 
-The EAS `production` build profile connects to the migrated SaaS/PostgreSQL API. The `preview` profile remains a demo build backed by mock data. Local development uses mock data unless `EXPO_PUBLIC_API_BASE_URL` is set in an ignored `.env.local` file. Do not put credentials in the API URL or commit credentials.
+The EAS `production` and `live-preview` build profiles connect to the migrated SaaS/PostgreSQL API. Use `live-preview` to pair an internal build with the desktop account; the `preview` profile remains a demo build backed by mock data. Live preview uses production accounts and inventory, so count changes are real. Local development uses mock data unless `EXPO_PUBLIC_API_BASE_URL` is set in an ignored `.env.local` file. Do not put credentials in the API URL or commit credentials.
 
-The `staging` profile requires `EXPO_PUBLIC_API_BASE_URL` to be configured in the EAS `preview` environment and should point to a separate non-production SaaS/PostgreSQL deployment. Do not use the production URL for staging or live smoke tests. Before validating sign-in or stock changes, use an authorized test account against a non-production deployment.
+The `staging` profile requires `EXPO_PUBLIC_API_BASE_URL` to be configured in the EAS `preview` environment and should point to a separate non-production SaaS/PostgreSQL deployment. Do not use the production URL for staging tests. Before validating sign-in or stock changes on staging, use an authorized test account against that non-production deployment.
+
+Build the live internal app with `eas build --profile live-preview --platform all`.
 
 ## Checks
 
