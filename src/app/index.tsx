@@ -40,7 +40,7 @@ function normalizeInventorySearchText(value: string): string {
   return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
-type InventoryFilter = 'all' | 'outOfStock' | 'lowStock' | 'available' | 'allocated';
+type InventoryFilter = 'all' | 'needsAttention' | 'outOfStock' | 'lowStock' | 'available' | 'allocated';
 type SnapshotStatus = {savedAt: number | null; queued: number; conflicts: number};
 
 function announceInventoryResultCount(count: number, total: number, query: string, filter: InventoryFilter) {
@@ -64,6 +64,7 @@ function formatSnapshotTime(savedAt: number | null): string {
 
 const inventoryFilterOptions: {value: InventoryFilter; label: string}[] = [
   {value: 'all', label: 'All'},
+  {value: 'needsAttention', label: 'Needs attention'},
   {value: 'outOfStock', label: 'Out of stock'},
   {value: 'lowStock', label: 'Low stock'},
   {value: 'available', label: 'Available'},
@@ -377,6 +378,7 @@ export default function InventoryScreen() {
       .filter(({row, searchableText}) => {
         const matchesSearch = !query || (queryTerms.length > 0 && queryTerms.every(term => searchableText.includes(term)));
         const matchesFilter = filter === 'all' ||
+          (filter === 'needsAttention' && (row.quantity === 0 || row.quantity <= row.minThreshold)) ||
           (filter === 'outOfStock' && row.quantity === 0) ||
           (filter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
           (filter === 'available' && !row.isAllocated) ||
@@ -407,12 +409,13 @@ export default function InventoryScreen() {
 
   const inventoryFilterCounts = useMemo(() => inventory.reduce((counts, row) => {
     counts.all += 1;
+    if (row.quantity === 0 || row.quantity <= row.minThreshold) counts.needsAttention += 1;
     if (row.quantity === 0) counts.outOfStock += 1;
     else if (row.quantity <= row.minThreshold) counts.lowStock += 1;
     if (row.isAllocated) counts.allocated += 1;
     else counts.available += 1;
     return counts;
-  }, {all: 0, outOfStock: 0, lowStock: 0, available: 0, allocated: 0}), [inventory]);
+  }, {all: 0, needsAttention: 0, outOfStock: 0, lowStock: 0, available: 0, allocated: 0}), [inventory]);
 
   function clearInventoryCriteria() {
     Keyboard.dismiss();
