@@ -30,6 +30,7 @@ export default function InventoryScanScreen() {
   const [signedInUserId, setSignedInUserId] = useState<number | null>(null);
   const [scannedValue, setScannedValue] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
+  const [feedbackSource, setFeedbackSource] = useState<'camera' | 'manual'>('camera');
   const [matches, setMatches] = useState<InventoryItem[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [permissionError, setPermissionError] = useState('');
@@ -141,7 +142,7 @@ export default function InventoryScanScreen() {
   }, [userIdParam]));
 
   useEffect(() => {
-    if (!hasScanned || !hapticsEnabled) return;
+    if (!hasScanned || !hapticsEnabled || feedbackSource !== 'camera') return;
     const sendScanFeedback = async () => {
       try {
         if (Platform.OS === 'android') {
@@ -158,7 +159,7 @@ export default function InventoryScanScreen() {
       }
     };
     void sendScanFeedback();
-  }, [hasScanned, hapticsEnabled, matches.length]);
+  }, [hasScanned, hapticsEnabled, feedbackSource, matches.length]);
 
   async function playScanSound(foundMatch: boolean) {
     if (!scanSoundsEnabled) return;
@@ -175,6 +176,7 @@ export default function InventoryScanScreen() {
   function onBarcodeScanned(value: string, source: 'camera' | 'manual' = 'camera') {
     if (scanned.current || inventory === null) return;
     scanned.current = true;
+    setFeedbackSource(source);
     setHasScanned(true);
     setScannedValue(value);
     const found = findInventoryMatches(inventory, value);
