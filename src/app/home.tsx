@@ -98,7 +98,7 @@ export default function HomeScreen() {
   const lowStockCount = inventory?.filter(item => item.quantity > 0 && item.quantity <= item.minThreshold).length ?? 0;
   const attentionItems = inventory?.filter(item => item.quantity === 0 || (item.quantity > 0 && item.quantity <= item.minThreshold)) ?? [];
 
-  function openInventory(filter: 'outOfStock' | 'lowStock' | 'all') {
+  function openInventory(filter: 'needsAttention' | 'outOfStock' | 'lowStock' | 'all') {
     router.push({pathname: '/', params: {filter: filter === 'all' ? undefined : filter, query: undefined}});
   }
 
@@ -224,7 +224,11 @@ export default function HomeScreen() {
               </View>
               <View style={styles.sectionHeading}>
                 <Text accessibilityRole="header" style={styles.sectionTitle}>Needs attention</Text>
-                <Pressable accessibilityRole="button" onPress={() => openInventory('all')}><Text style={styles.viewAll}>View inventory</Text></Pressable>
+                <Pressable accessibilityRole="button"
+                  accessibilityLabel={attentionItems.length > 0 ? 'View all stock alerts' : 'View inventory'}
+                  onPress={() => openInventory(attentionItems.length > 0 ? 'needsAttention' : 'all')}>
+                  <Text style={styles.viewAll}>{attentionItems.length > 0 ? 'View all alerts' : 'View inventory'}</Text>
+                </Pressable>
               </View>
               {attentionItems.length === 0 ? (
                 <View style={styles.allClearCard}>
