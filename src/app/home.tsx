@@ -138,8 +138,9 @@ export default function HomeScreen() {
                   Keyboard.dismiss();
                   router.push({pathname: '/', params: {query: search.trim() || undefined}});
                 }}
-                placeholder="Search part or description"
+                placeholder="Part, store, or work order"
                 placeholderTextColor={palette.slate}
+                accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
                 returnKeyType="search"
                 style={styles.searchInput}
               />
