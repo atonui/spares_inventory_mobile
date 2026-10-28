@@ -329,6 +329,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
                   accessibilityLabel={mode === 'add' ? 'Quantity to add' : 'New stock quantity'}
                   value={value}
                   onChangeText={setValue}
+                  autoFocus={mode !== null && !zeroCountConfirmationVisible}
                   keyboardType="number-pad"
                   inputMode="numeric"
                   selectTextOnFocus
