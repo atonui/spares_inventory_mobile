@@ -1,5 +1,5 @@
 import {useCallback, useState} from 'react';
-import {Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useRouter} from 'expo-router';
 import {useNetworkState} from 'expo-network';
@@ -134,12 +134,26 @@ export default function HomeScreen() {
                 accessibilityLabel="Search inventory from home"
                 value={search}
                 onChangeText={setSearch}
-                onSubmitEditing={() => router.push({pathname: '/', params: {query: search.trim() || undefined}})}
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  router.push({pathname: '/', params: {query: search.trim() || undefined}});
+                }}
                 placeholder="Search part or description"
                 placeholderTextColor={palette.slate}
                 returnKeyType="search"
                 style={styles.searchInput}
               />
+              {search.length > 0 && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear home search"
+                  accessibilityHint="Clears the search text"
+                  onPress={() => setSearch('')}
+                  style={styles.clearSearchButton}
+                >
+                  <AppIcon name="close" color={palette.slate} size={17} />
+                </Pressable>
+              )}
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Scan stock" onPress={() => router.push('/scan')} style={styles.scanButton}>
               <AppIcon name="scan" color={palette.white} size={21} />
@@ -331,6 +345,7 @@ const styles = StyleSheet.create({
   searchRow: {flexDirection: 'row', gap: 9, marginBottom: 14},
   searchBox: {flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   searchInput: {flex: 1, paddingVertical: 8, fontSize: 14, color: palette.navy},
+  clearSearchButton: {width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10},
   scanButton: {width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: palette.navy},
   offlineBanner: {flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12, padding: 13, borderRadius: 12, backgroundColor: palette.warningBackground},
   offlineDot: {width: 9, height: 9, marginTop: 4, borderRadius: 5, backgroundColor: palette.amber},
