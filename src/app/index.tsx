@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12395)
-Total output lines: 938
-
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
@@ -476,7 +473,178 @@ export default function InventoryScreen() {
             <View style={styles.welcomeRow}>
               <View>
                 <Text style={styles.welcome}>Stock on hand</Text>
-                <Text style={styles.headerSubline}>{user.role.replaceAll('_', ' ')} · {isMo…2395 tokens truncated…View style={styles.filterSortOptions} showsVerticalScrollIndicator={false}>
+                <Text style={styles.headerSubline}>{user.role.replaceAll('_', ' ')} · {isMockMode ? 'preview data' : 'live inventory'}</Text>
+              </View>
+              <View style={styles.totalBadge}>
+                <Text style={styles.totalNumber}>{inventory.length}</Text>
+                <Text style={styles.totalLabel}>ITEMS</Text>
+              </View>
+            </View>
+
+            <View accessibilityRole="summary" style={styles.connectionStatus}>
+              <View style={[styles.connectionDot, isOffline ? styles.connectionDotOffline
+                : connectionUnknown ? styles.connectionDotChecking : styles.connectionDotOnline]} />
+              <View style={styles.connectionStatusCopy}>
+                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline,
+                  connectionUnknown && styles.connectionStatusTextChecking]}>{connectionStatusTitle}</Text>
+                {!!connectionStatusDetail && <Text style={styles.connectionStatusDetail}>{connectionStatusDetail}</Text>}
+              </View>
+              {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
+                <Pressable accessibilityRole="button" accessibilityLabel="Review offline changes"
+                  onPress={() => router.push('/offline-changes')} style={styles.syncPendingButton}>
+                  <Text style={styles.syncPending}>{snapshotStatus.conflicts > 0 ? `${snapshotStatus.conflicts} need review` : `${snapshotStatus.queued} waiting`}</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <View style={styles.searchBox}>
+              <AppIcon name="search" color={palette.muted} size={19} />
+              <TextInput accessibilityLabel="Search inventory" value={search}
+                onChangeText={value => router.setParams({query: value || undefined})}
+                placeholder="Search part or description" placeholderTextColor={palette.placeholder}
+                style={styles.searchInput} returnKeyType="search"
+                onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
+              {search.length > 0 && (
+                <Pressable accessibilityRole="button" accessibilityLabel="Clear search" accessibilityHint="Clears the inventory search"
+                  onPress={() => router.setParams({query: undefined})} style={styles.clearSearchButton} hitSlop={4}>
+                  <Text style={styles.clearSearchText}>×</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <View style={styles.controlsRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Filter and sort inventory${activeFilterSortLabels.length ? `, active: ${activeFilterSortLabels.join(', ')}` : ''}`}
+              onPress={openFilterSort}
+              style={[styles.filterSortButton, activeFilterSortLabels.length > 0 && styles.filterSortButtonActive]}
+            >
+              <AppIcon name="filter" color={palette.white} size={18} />
+              <Text numberOfLines={1} style={styles.filterSortButtonText}>{filterSortButtonLabel}</Text>
+            </Pressable>
+            {activeFilterSortLabels.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Reset filters and sorting"
+                onPress={() => {router.setParams({filter: undefined}); setInventorySort('default');}}
+                style={styles.resetControlsButton}
+              >
+                <Text style={styles.resetControlsText}>Reset</Text>
+              </Pressable>
+            )}
+            </View>
+          </View>
+
+          {!!error && <ErrorNotice message={error} onRetry={refresh} />}
+
+          <FlatList
+            data={visibleInventory}
+            keyExtractor={row => String(row.id)}
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.navy} />}
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={visibleInventory.length > 0 ? (
+              <Text accessibilityRole="text" style={styles.resultsSummary}>
+                {hasInventoryCriteria
+                  ? `Showing ${visibleInventory.length} of ${inventory.length} ${inventory.length === 1 ? 'item' : 'items'}`
+                  : `${inventory.length} ${inventory.length === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
+              </Text>
+            ) : undefined}
+            ListEmptyComponent={loading && !error ? <InventorySkeleton /> : error ? <></> : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
+                <Text style={styles.muted}>
+                  {hasInventoryCriteria
+                    ? 'Try changing your search or filter.'
+                    : 'Pull down to refresh your inventory.'}
+                </Text>
+                {hasInventoryCriteria && inventory.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear search and filters"
+                    accessibilityHint="Clears the search, shows all stock, and restores the default sort"
+                    onPress={clearInventoryCriteria}
+                    style={styles.emptyResetButton}
+                  >
+                    <Text style={styles.emptyResetText}>Clear search and filters</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+            renderItem={({item: row}) => {
+              const outOfStock = row.quantity === 0;
+              const lowStock = row.quantity <= row.minThreshold;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={inventoryRowAccessibilityLabel(row)}
+                  accessibilityHint="Opens stock details"
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id), userId: String(user?.id ?? '')}});
+                  }}
+                  style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
+                >
+                  <View style={styles.itemMark}><AppIcon name="inventory" color={palette.navy} size={19} /></View>
+                  <View style={styles.itemCopy}>
+                    <View style={styles.itemTitleRow}>
+                      <Text style={styles.partNumber} numberOfLines={1}>{row.partNumber}</Text>
+                      <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge, outOfStock && styles.outQuantityBadge]}>
+                        <View style={[styles.statusDot, lowStock && styles.lowStatusDot, outOfStock && styles.outStatusDot]} />
+                        <Text style={[styles.quantityValue, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{row.quantity}</Text>
+                        <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{outOfStock ? 'Out' : lowStock ? 'Low' : 'Healthy'}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.description} numberOfLines={1}>{row.description}</Text>
+                    <View style={styles.statusRow}>
+                      <Text style={styles.locationText} numberOfLines={1}>{row.storeName}</Text>
+                      <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
+                    </View>
+                    {row.isAllocated && (
+                      <Text style={styles.allocatedStatus} numberOfLines={1}>
+                        Allocated{row.workOrder ? ` · Work order ${row.workOrder}` : ''}
+                      </Text>
+                    )}
+                  </View>
+                  <AppIcon name="chevronRight" color={palette.slate} size={17} />
+                </Pressable>
+              );
+            }}
+          />
+          <AppBottomNavigation
+            active="inventory"
+            queuedCount={snapshotStatus.queued}
+            conflictCount={snapshotStatus.conflicts}
+            onSignOut={() => void requestSignOut()}
+          />
+        </View>
+        <Modal
+          transparent
+          visible={filterSortVisible}
+          animationType="slide"
+          onRequestClose={() => setFilterSortVisible(false)}
+        >
+          <View style={styles.filterSortBackdrop}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close filter and sort options"
+              onPress={() => setFilterSortVisible(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.filterSortSheet}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.filterSortHeader}>
+                <Text accessibilityRole="header" style={styles.filterSortTitle}>Filter & sort</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close filter and sort options"
+                  onPress={() => setFilterSortVisible(false)}
+                  style={styles.sheetCloseButton}
+                >
+                  <AppIcon name="close" color={palette.muted} size={20} />
+                </Pressable>
+              </View>
+              <ScrollView style={styles.filterSortOptions} showsVerticalScrollIndicator={false}>
                 <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Stock status</Text>
                 <View accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
                   {inventoryFilterOptions.map(option => {
