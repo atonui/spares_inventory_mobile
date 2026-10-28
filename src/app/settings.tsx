@@ -16,18 +16,23 @@ export default function SettingsScreen() {
   const [scanSoundsEnabled, setScanSoundsEnabled] = useState(false);
   const [queue, setQueue] = useState<QueuedStockAdjustment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [savingPreference, setSavingPreference] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
     const loadSettings = async () => {
+      setLoading(true);
+      setError('');
       try {
         const activeUserId = await offlineStockStore.getActiveUserId();
         if (!active) return;
         setUserId(activeUserId);
         if (activeUserId === null) {
           setQueue([]);
+          setSettingsLoadFailed(false);
           return;
         }
         const [pending, enabled, soundsEnabled] = await Promise.all([
@@ -39,16 +44,20 @@ export default function SettingsScreen() {
           setQueue(pending);
           setHapticsEnabled(enabled);
           setScanSoundsEnabled(soundsEnabled);
+          setSettingsLoadFailed(false);
         }
       } catch {
-        if (active) setError('Could not load settings saved on this device.');
+        if (active) {
+          setSettingsLoadFailed(true);
+          setError('Could not load settings saved on this device.');
+        }
       } finally {
         if (active) setLoading(false);
       }
     };
     void loadSettings();
     return () => { active = false; };
-  }, []);
+  }, [loadAttempt]);
 
   async function updateHaptics(enabled: boolean) {
     if (userId === null || savingPreference) return;
@@ -105,36 +114,54 @@ export default function SettingsScreen() {
 
           <Text style={styles.sectionTitle}>Scanning</Text>
           <View style={styles.settingCard}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingCopy}>
-                <Text style={styles.settingTitle}>Haptic scan feedback</Text>
-                <Text style={styles.settingDescription}>Vibrate to confirm a match or flag an unrecognized code.</Text>
+            {loading ? (
+              <View accessibilityRole="progressbar" accessibilityLabel="Loading scanner preferences" style={styles.preferencesLoading}>
+                <ActivityIndicator color={palette.slate} />
+                <Text style={styles.preferencesLoadingText}>Loading saved scanner preferences…</Text>
               </View>
-              <Switch
-                accessibilityLabel="Haptic scan feedback"
-                value={hapticsEnabled}
-                onValueChange={value => void updateHaptics(value)}
-                disabled={loading || savingPreference || userId === null}
-                trackColor={{false: palette.border, true: palette.amber}}
-                thumbColor={palette.white}
-              />
-            </View>
-            <View style={styles.settingDivider} />
-            <View style={styles.settingRow}>
-              <View style={styles.settingCopy}>
-                <Text style={styles.settingTitle}>Sound scan feedback</Text>
-                <Text style={styles.settingDescription}>Play a high tone for a match and a low tone when no part is found. Off by default.</Text>
+            ) : settingsLoadFailed ? (
+              <View style={styles.preferencesUnavailable}>
+                <Text style={styles.settingDescription}>Saved scanner preferences are unavailable.</Text>
+                <Pressable accessibilityRole="button" onPress={() => setLoadAttempt(attempt => attempt + 1)} style={styles.retryButton}>
+                  <Text style={styles.retryButtonText}>Try again</Text>
+                </Pressable>
               </View>
-              <Switch
-                accessibilityLabel="Sound scan feedback"
-                value={scanSoundsEnabled}
-                onValueChange={value => void updateScanSounds(value)}
-                disabled={loading || savingPreference || userId === null}
-                trackColor={{false: palette.border, true: palette.amber}}
-                thumbColor={palette.white}
-              />
-            </View>
-            {savingPreference && <ActivityIndicator size="small" color={palette.slate} style={styles.preferenceProgress} />}
+            ) : userId === null ? (
+              <Text style={styles.preferencesUnavailableText}>Pair this device to manage scanner preferences.</Text>
+            ) : (
+              <>
+                <View style={styles.settingRow}>
+                  <View style={styles.settingCopy}>
+                    <Text style={styles.settingTitle}>Haptic scan feedback</Text>
+                    <Text style={styles.settingDescription}>Vibrate to confirm a match or flag an unrecognized code.</Text>
+                  </View>
+                  <Switch
+                    accessibilityLabel="Haptic scan feedback"
+                    value={hapticsEnabled}
+                    onValueChange={value => void updateHaptics(value)}
+                    disabled={savingPreference}
+                    trackColor={{false: palette.border, true: palette.amber}}
+                    thumbColor={palette.white}
+                  />
+                </View>
+                <View style={styles.settingDivider} />
+                <View style={styles.settingRow}>
+                  <View style={styles.settingCopy}>
+                    <Text style={styles.settingTitle}>Sound scan feedback</Text>
+                    <Text style={styles.settingDescription}>Play a high tone for a match and a low tone when no part is found. Off by default.</Text>
+                  </View>
+                  <Switch
+                    accessibilityLabel="Sound scan feedback"
+                    value={scanSoundsEnabled}
+                    onValueChange={value => void updateScanSounds(value)}
+                    disabled={savingPreference}
+                    trackColor={{false: palette.border, true: palette.amber}}
+                    thumbColor={palette.white}
+                  />
+                </View>
+                {savingPreference && <ActivityIndicator size="small" color={palette.slate} style={styles.preferenceProgress} />}
+              </>
+            )}
           </View>
 
           <Text style={styles.sectionTitle}>Offline work</Text>
@@ -187,6 +214,12 @@ const styles = StyleSheet.create({
   settingCard: {marginBottom: 22, padding: 15, borderRadius: 14, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   settingRow: {minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 14},
   settingDivider: {height: 1, marginVertical: 12, backgroundColor: palette.border},
+  preferencesLoading: {minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 11},
+  preferencesLoadingText: {flex: 1, fontSize: 13, color: palette.muted},
+  preferencesUnavailable: {minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 12},
+  preferencesUnavailableText: {minHeight: 76, textAlignVertical: 'center', fontSize: 13, lineHeight: 19, color: palette.muted},
+  retryButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.navy},
+  retryButtonText: {fontSize: 12, fontWeight: '800', color: palette.white},
   settingCopy: {flex: 1},
   settingTitle: {fontSize: 14, fontWeight: '700', color: palette.navy},
   settingDescription: {marginTop: 5, fontSize: 13, lineHeight: 19, color: palette.muted},
