@@ -501,7 +501,8 @@ export default function InventoryScreen() {
               <AppIcon name="search" color={palette.muted} size={19} />
               <TextInput accessibilityLabel="Search inventory" value={search}
                 onChangeText={value => router.setParams({query: value || undefined})}
-                placeholder="Search part or description" placeholderTextColor={palette.placeholder}
+                placeholder="Part, store, or work order" placeholderTextColor={palette.placeholder}
+                accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
                 style={styles.searchInput} returnKeyType="search"
                 onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
               {search.length > 0 && (
