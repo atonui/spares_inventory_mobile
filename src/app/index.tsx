@@ -597,11 +597,14 @@ export default function InventoryScreen() {
                     </View>
                     <Text style={styles.description} numberOfLines={1}>{row.description}</Text>
                     <View style={styles.statusRow}>
-                      <Text style={[styles.locationText, row.isAllocated && styles.allocatedStatus]} numberOfLines={1}>
-                        {row.storeName}{row.isAllocated ? ` · Allocated${row.workOrder ? ` · ${row.workOrder}` : ''}` : ''}
-                      </Text>
+                      <Text style={styles.locationText} numberOfLines={1}>{row.storeName}</Text>
                       <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
                     </View>
+                    {row.isAllocated && (
+                      <Text style={styles.allocatedStatus} numberOfLines={1}>
+                        Allocated{row.workOrder ? ` · Work order ${row.workOrder}` : ''}
+                      </Text>
+                    )}
                   </View>
                   <AppIcon name="chevronRight" color={palette.slate} size={17} />
                 </Pressable>
@@ -898,7 +901,7 @@ const styles = StyleSheet.create({
   outQuantityText: {color: palette.red},
   statusRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 3},
   locationText: {flex: 1, fontSize: 10, fontWeight: '600', color: palette.muted},
-  allocatedStatus: {color: palette.slate},
+  allocatedStatus: {marginTop: 3, fontSize: 10, fontWeight: '700', color: palette.slate},
   threshold: {fontSize: 11, color: palette.muted},
   skeletonList: {gap: 8},
   skeletonCard: {paddingHorizontal: 13, paddingVertical: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 13, backgroundColor: palette.white},
