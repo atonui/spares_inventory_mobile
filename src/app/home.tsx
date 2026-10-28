@@ -7,6 +7,7 @@ import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
 import {getInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
+import {getConnectivityStatus} from '../features/network/connectivity';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
 
@@ -33,7 +34,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const pendingCount = overview.queued + overview.conflicts;
-  const offline = network.isConnected === false || network.isInternetReachable === false;
+  const connectivity = getConnectivityStatus(network.isConnected, network.isInternetReachable);
+  const offline = connectivity === 'offline';
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -110,8 +112,12 @@ export default function HomeScreen() {
             <Text accessibilityRole="header" style={styles.pageTitle}>Stock overview</Text>
           </View>
           <View style={[styles.connectionPill, offline && styles.connectionPillOffline]}>
-            <View style={[styles.connectionDot, offline && styles.connectionDotOffline]} />
-            <Text style={[styles.connectionText, offline && styles.connectionTextOffline]}>{offline ? 'Offline' : 'Online'}</Text>
+            <View style={[styles.connectionDot, offline && styles.connectionDotOffline,
+              connectivity === 'checking' && styles.connectionDotChecking]} />
+            <Text style={[styles.connectionText, offline && styles.connectionTextOffline,
+              connectivity === 'checking' && styles.connectionTextChecking]}>
+              {connectivity === 'checking' ? 'Checking' : offline ? 'Offline' : 'Online'}
+            </Text>
           </View>
         </View>
 
@@ -314,8 +320,10 @@ const styles = StyleSheet.create({
   connectionPillOffline: {backgroundColor: '#3B3528'},
   connectionDot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#52B788'},
   connectionDotOffline: {backgroundColor: palette.amber},
+  connectionDotChecking: {backgroundColor: '#CBD5E1'},
   connectionText: {fontSize: 11, fontWeight: '700', color: palette.white},
   connectionTextOffline: {color: '#FFE4A3'},
+  connectionTextChecking: {color: '#D5DEE8'},
   content: {flexGrow: 1, paddingTop: 17, paddingBottom: 18},
   headingBlock: {marginBottom: 14},
   heading: {fontSize: 23, lineHeight: 29, fontWeight: '800', color: palette.navy},
