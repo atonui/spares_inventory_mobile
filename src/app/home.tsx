@@ -141,6 +141,8 @@ export default function HomeScreen() {
                 placeholder="Part, store, or work order"
                 placeholderTextColor={palette.slate}
                 accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
+                autoCapitalize="none"
+                autoCorrect={false}
                 returnKeyType="search"
                 style={styles.searchInput}
               />
