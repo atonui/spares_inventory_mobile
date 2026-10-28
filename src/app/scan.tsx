@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import type {AudioPlayer} from 'expo-audio';
 import * as ExpoLinking from 'expo-linking';
 import {StatusBar} from 'expo-status-bar';
-import {ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {AccessibilityInfo, ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useLocalSearchParams, useRouter} from 'expo-router';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
@@ -160,6 +160,16 @@ export default function InventoryScanScreen() {
     };
     void sendScanFeedback();
   }, [hasScanned, hapticsEnabled, feedbackSource, matches.length]);
+
+  useEffect(() => {
+    if (!hasScanned) return;
+    const announcement = matches.length === 0
+      ? `No matching stock item found for ${scannedValue}.`
+      : matches.length === 1
+        ? `${matches[0].partNumber}, ${matches[0].quantity} ${matches[0].quantity === 1 ? 'unit' : 'units'} at ${matches[0].storeName}.`
+        : `${matches.length} stock locations found for ${matches[0].partNumber}. Select the location you are checking.`;
+    AccessibilityInfo.announceForAccessibility(announcement);
+  }, [hasScanned, matches, scannedValue]);
 
   async function playScanSound(foundMatch: boolean) {
     if (!scanSoundsEnabled) return;
