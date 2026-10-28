@@ -32,6 +32,17 @@
         "buildType": "apk"
       }
     },
+    "live-preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "staging",
+        "EXPO_PUBLIC_API_BASE_URL": "https://sparesinventory-production.up.railway.app"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "distribution": "store",
       "environment": "production",
