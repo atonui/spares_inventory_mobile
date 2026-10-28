@@ -383,9 +383,18 @@ export default function InventoryScanScreen() {
               <Text style={styles.manualTitle}>Can’t scan?</Text>
               <Text style={styles.manualHint}>Enter a part number to look it up.</Text>
               <View style={styles.manualForm}>
-                <TextInput accessibilityLabel="Part number" value={manualPartNumber} onChangeText={setManualPartNumber}
-                  onSubmitEditing={findPartNumber} placeholder="e.g. BRK-2048" placeholderTextColor="#94A3B8"
-                  autoCapitalize="characters" autoCorrect={false} returnKeyType="search" style={styles.manualInput} />
+                <View style={styles.manualInputBox}>
+                  <TextInput accessibilityLabel="Part number" value={manualPartNumber} onChangeText={setManualPartNumber}
+                    onSubmitEditing={findPartNumber} placeholder="e.g. BRK-2048" placeholderTextColor="#94A3B8"
+                    autoCapitalize="characters" autoCorrect={false} returnKeyType="search" style={styles.manualInput} />
+                  {manualPartNumber.length > 0 && (
+                    <Pressable accessibilityRole="button" accessibilityLabel="Clear part number"
+                      accessibilityHint="Clears the manual lookup field" onPress={() => setManualPartNumber('')}
+                      style={styles.clearManualSearchButton}>
+                      <AppIcon name="close" color={palette.slate} size={17} />
+                    </Pressable>
+                  )}
+                </View>
                 <Pressable accessibilityRole="button" disabled={!manualPartNumber.trim()} onPress={findPartNumber}
                   style={[styles.manualButton, !manualPartNumber.trim() && styles.manualButtonDisabled]}>
                   <Text style={styles.manualButtonText}>Look up part</Text>
@@ -489,7 +498,9 @@ const styles = StyleSheet.create({
   manualTitle: {fontSize: 14, fontWeight: '800', color: palette.navy},
   manualHint: {marginTop: 2, fontSize: 11, color: palette.slate},
   manualForm: {flexDirection: 'column', gap: 8, marginTop: 9},
-  manualInput: {height: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, fontSize: 14, color: palette.navy},
+  manualInputBox: {height: 48, flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingRight: 3, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background},
+  manualInput: {flex: 1, height: 46, paddingVertical: 10, fontSize: 14, color: palette.navy},
+  clearManualSearchButton: {width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10},
   manualButton: {height: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.amber},
   manualButtonDisabled: {opacity: 0.5},
   manualButtonText: {fontSize: 13, fontWeight: '800', color: palette.navy},
