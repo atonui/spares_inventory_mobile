@@ -20,6 +20,8 @@ export default function OfflineChangesScreen() {
   const [error, setError] = useState('');
   const [syncNotice, setSyncNotice] = useState('');
   const [pendingDiscard, setPendingDiscard] = useState<QueuedStockAdjustment | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -75,17 +77,22 @@ export default function OfflineChangesScreen() {
   }
 
   function discardConflict(change: QueuedStockAdjustment) {
+    setDiscardError('');
     setPendingDiscard(change);
   }
 
   async function confirmDiscard() {
-    if (!pendingDiscard) return;
+    if (!pendingDiscard || discarding) return;
+    setDiscarding(true);
+    setDiscardError('');
     try {
       await offlineStockStore.remove(pendingDiscard.operationId);
       setPendingDiscard(null);
       await load();
     } catch {
-      setError('Could not discard this change. Try again.');
+      setDiscardError('Could not discard this change. It is still saved on this device. Try again.');
+    } finally {
+      setDiscarding(false);
     }
   }
 
@@ -155,19 +162,22 @@ export default function OfflineChangesScreen() {
         </ScrollView>
       </View>
       <AppBottomNavigation active="changes" queuedCount={queued.length} conflictCount={conflicts.length} />
-      <Modal transparent visible={pendingDiscard !== null} animationType="fade" onRequestClose={() => setPendingDiscard(null)}>
+      <Modal transparent visible={pendingDiscard !== null} animationType="fade" onRequestClose={() => {if (!discarding) setPendingDiscard(null);}}>
         <View style={styles.modalBackdrop}>
           <View accessibilityRole="alert" style={styles.confirmCard}>
             <Text style={styles.confirmTitle}>Discard this stock change?</Text>
             <Text style={styles.body}>
               The offline count for {items.get(pendingDiscard?.inventoryId ?? -1)?.partNumber ?? 'this item'} will be removed from this device.
             </Text>
+            {!!discardError && <Text accessibilityRole="alert" style={styles.discardError}>{discardError}</Text>}
             <View style={styles.actionRow}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Keep change" onPress={() => setPendingDiscard(null)} style={styles.discardButton}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Keep change" disabled={discarding}
+                onPress={() => setPendingDiscard(null)} style={[styles.discardButton, discarding && styles.disabledButton]}>
                 <Text style={styles.discardButtonText}>Keep change</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Confirm discard" onPress={() => void confirmDiscard()} style={styles.dangerButton}>
-                <Text style={styles.dangerButtonText}>Discard</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Confirm discard" disabled={discarding}
+                onPress={() => void confirmDiscard()} style={[styles.dangerButton, discarding && styles.disabledButton]}>
+                {discarding ? <ActivityIndicator size="small" color={palette.white} /> : <Text style={styles.dangerButtonText}>Discard</Text>}
               </Pressable>
             </View>
           </View>
@@ -289,4 +299,5 @@ const styles = StyleSheet.create({
   confirmTitle: {marginBottom: 8, fontSize: 18, fontWeight: '800', color: palette.navy},
   dangerButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 11, backgroundColor: palette.red},
   dangerButtonText: {fontSize: 12, fontWeight: '800', color: palette.white},
+  discardError: {marginTop: 10, fontSize: 13, lineHeight: 19, color: palette.red},
 });
