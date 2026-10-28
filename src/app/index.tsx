@@ -503,6 +503,7 @@ export default function InventoryScreen() {
                 onChangeText={value => router.setParams({query: value || undefined})}
                 placeholder="Part, store, or work order" placeholderTextColor={palette.placeholder}
                 accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
+                autoCapitalize="none" autoCorrect={false}
                 style={styles.searchInput} returnKeyType="search"
                 onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
               {search.length > 0 && (
