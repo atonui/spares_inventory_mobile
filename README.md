@@ -8,6 +8,12 @@ Company role behavior follows the backend: owners and admins may adjust unalloca
 
 The scanner accepts part numbers directly or from QR URLs using `part_number`, `partNumber`, `sku`, or `code` query parameters. The current generated v1 API has no barcode field, so other desktop workflows (parts, stores, equipment, transfers, reports, and company administration) still need versioned mobile endpoints before they can be added safely.
 
+## Backend environments
+
+The EAS `production` build profile connects to the migrated SaaS/PostgreSQL API. The `preview` profile remains a demo build backed by mock data. Local development uses mock data unless `EXPO_PUBLIC_API_BASE_URL` is set in an ignored `.env.local` file. Do not put credentials in the API URL or commit credentials.
+
+The `staging` profile requires `EXPO_PUBLIC_API_BASE_URL` to be configured in the EAS `preview` environment and should point to a separate non-production SaaS/PostgreSQL deployment. Do not use the production URL for staging or live smoke tests. Before validating sign-in or stock changes, use an authorized test account against a non-production deployment.
+
 ## Checks
 
 ```sh
