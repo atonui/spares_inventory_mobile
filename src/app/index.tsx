@@ -25,6 +25,7 @@ import {sortInventory, type InventorySort} from '../features/inventory/inventory
 import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAccessibility';
 import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
+import {getConnectivityStatus} from '../features/network/connectivity';
 import DesktopPairing from '../features/auth/DesktopPairing';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
@@ -203,14 +204,16 @@ export default function InventoryScreen() {
     let listenerReportedState = false;
     void Network.getNetworkStateAsync().then(state => {
       if (active && !listenerReportedState) {
-        setNetworkConnected(state.isConnected === true && state.isInternetReachable !== false);
+        const status = getConnectivityStatus(state.isConnected, state.isInternetReachable);
+        setNetworkConnected(status === 'checking' ? null : status === 'online');
       }
     }).catch(() => undefined);
     const subscription = Network.addNetworkStateListener(state => {
       listenerReportedState = true;
-      const connected = state.isConnected === true && state.isInternetReachable !== false;
+      const status = getConnectivityStatus(state.isConnected, state.isInternetReachable);
+      const connected = status === 'checking' ? null : status === 'online';
       setNetworkConnected(connected);
-      if (connected) {
+      if (status === 'online') {
         void loadInventory(user.id).catch(reason => {
           if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
             void restoreSession();
@@ -388,13 +391,16 @@ export default function InventoryScreen() {
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
   const isOffline = usingCachedInventory || networkConnected === false;
+  const connectionUnknown = !usingCachedInventory && networkConnected === null;
   const connectionStatusTitle = isOffline
     ? snapshotStatus.savedAt === null
       ? 'Offline · No stock saved on this device'
       : 'Offline · Showing the last saved stock'
-    : snapshotStatus.savedAt === null
+    : connectionUnknown
       ? 'Checking connection…'
-      : `Online · ${formatSnapshotTime(snapshotStatus.savedAt)}`;
+      : snapshotStatus.savedAt === null
+        ? 'Online · Stock refresh time unavailable'
+        : `Online · ${formatSnapshotTime(snapshotStatus.savedAt)}`;
   const connectionStatusDetail = isOffline && snapshotStatus.savedAt !== null
     ? 'Changes sync when you’re back online.'
     : '';
@@ -453,9 +459,14 @@ export default function InventoryScreen() {
                 <Text style={styles.wordmark}>Spares Tracker</Text>
                 <Text accessibilityRole="header" style={styles.pageTitle}>Inventory</Text>
               </View>
-              <View style={[styles.connectionPill, isOffline && styles.connectionPillOffline]}>
-                <View style={[styles.connectionDot, isOffline && styles.connectionDotOffline]} />
-                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline]}>{isOffline ? 'Offline snapshot' : 'Online'}</Text>
+              <View style={[styles.connectionPill, isOffline && styles.connectionPillOffline,
+                connectionUnknown && styles.connectionPillChecking]}>
+                <View style={[styles.connectionDot, isOffline && styles.connectionDotOffline,
+                  connectionUnknown && styles.connectionDotChecking]} />
+                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline,
+                  connectionUnknown && styles.connectionStatusTextChecking]}>
+                  {isOffline ? 'Offline snapshot' : connectionUnknown ? 'Checking' : 'Online'}
+                </Text>
               </View>
             </View>
 
@@ -471,9 +482,11 @@ export default function InventoryScreen() {
             </View>
 
             <View accessibilityRole="summary" style={styles.connectionStatus}>
-              <View style={[styles.connectionDot, isOffline ? styles.connectionDotOffline : styles.connectionDotOnline]} />
+              <View style={[styles.connectionDot, isOffline ? styles.connectionDotOffline
+                : connectionUnknown ? styles.connectionDotChecking : styles.connectionDotOnline]} />
               <View style={styles.connectionStatusCopy}>
-                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline]}>{connectionStatusTitle}</Text>
+                <Text style={[styles.connectionStatusText, isOffline && styles.connectionStatusTextOffline,
+                  connectionUnknown && styles.connectionStatusTextChecking]}>{connectionStatusTitle}</Text>
                 {!!connectionStatusDetail && <Text style={styles.connectionStatusDetail}>{connectionStatusDetail}</Text>}
               </View>
               {(snapshotStatus.queued > 0 || snapshotStatus.conflicts > 0) && (
@@ -803,6 +816,7 @@ const styles = StyleSheet.create({
   pageTitle: {fontSize: 11, fontWeight: '600', color: '#C4D0DC'},
   connectionPill: {flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 11, backgroundColor: '#26394E'},
   connectionPillOffline: {backgroundColor: '#423722'},
+  connectionPillChecking: {backgroundColor: '#304357'},
   headerSubline: {marginTop: 3, color: '#C4D0DC', fontSize: 10},
   signOutBackdrop: {flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(21, 38, 59, 0.48)'},
   signOutCard: {padding: 20, borderRadius: 16, backgroundColor: palette.white},
@@ -819,9 +833,11 @@ const styles = StyleSheet.create({
   connectionDot: {width: 7, height: 7, borderRadius: 4},
   connectionDotOnline: {backgroundColor: '#52B788'},
   connectionDotOffline: {backgroundColor: palette.amber},
+  connectionDotChecking: {backgroundColor: '#CBD5E1'},
   connectionStatusCopy: {flex: 1},
   connectionStatusText: {fontSize: 11, lineHeight: 15, color: '#E7EDF3'},
   connectionStatusTextOffline: {fontWeight: '700', color: '#FFE4A3'},
+  connectionStatusTextChecking: {color: '#D5DEE8'},
   connectionStatusDetail: {fontSize: 10, lineHeight: 14, color: '#C4D0DC'},
   syncPending: {fontSize: 10, fontWeight: '700', color: palette.white, textAlign: 'right'},
   syncPendingButton: {minHeight: 32, justifyContent: 'center', paddingLeft: 6},
