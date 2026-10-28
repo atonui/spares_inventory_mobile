@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useMemo, useState} from 'react';
 import {Image, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useRouter} from 'expo-router';
@@ -94,9 +94,26 @@ export default function HomeScreen() {
   }, []));
 
   const inventory = overview.inventory;
-  const outOfStockCount = inventory?.filter(item => item.quantity === 0).length ?? 0;
-  const lowStockCount = inventory?.filter(item => item.quantity > 0 && item.quantity <= item.minThreshold).length ?? 0;
-  const attentionItems = inventory?.filter(item => item.quantity === 0 || (item.quantity > 0 && item.quantity <= item.minThreshold)) ?? [];
+  const {outOfStockCount, lowStockCount, attentionItems} = useMemo(() => {
+    const alerts: InventoryItem[] = [];
+    let outOfStock = 0;
+    let lowStock = 0;
+    for (const item of inventory ?? []) {
+      if (item.quantity === 0) {
+        outOfStock += 1;
+        alerts.push(item);
+      } else if (item.quantity <= item.minThreshold) {
+        lowStock += 1;
+        alerts.push(item);
+      }
+    }
+    alerts.sort((left, right) => {
+      if (left.quantity === 0) return right.quantity === 0 ? 0 : -1;
+      if (right.quantity === 0) return 1;
+      return left.quantity / left.minThreshold - right.quantity / right.minThreshold;
+    });
+    return {outOfStockCount: outOfStock, lowStockCount: lowStock, attentionItems: alerts};
+  }, [inventory]);
 
   function openInventory(filter: 'needsAttention' | 'outOfStock' | 'lowStock' | 'all') {
     router.push({pathname: '/', params: {filter: filter === 'all' ? undefined : filter, query: undefined}});
