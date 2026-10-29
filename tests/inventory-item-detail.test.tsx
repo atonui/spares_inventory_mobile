@@ -103,7 +103,7 @@ describe('inventory item detail screen', () => {
     setInventorySnapshot([row]);
     const screen = await render(<InventoryItemDetailScreen />);
 
-    await waitFor(() => expect(screen.getByRole('button', {name: 'Add stock'})).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Receive stock'})).toBeTruthy());
     expect(screen.getByRole('button', {name: 'Edit count'})).toBeTruthy();
   });
 
@@ -119,7 +119,7 @@ describe('inventory item detail screen', () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
     await waitFor(() => expect(screen.getByText('PART-89')).toBeTruthy());
-    expect(screen.queryByRole('button', {name: 'Add stock'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'Receive stock'})).toBeNull();
     expect(screen.getByText('Stock adjustments are limited to central and assigned stores.')).toBeTruthy();
   });
 
@@ -134,7 +134,7 @@ describe('inventory item detail screen', () => {
     setInventorySnapshot([row]);
     const screen = await render(<InventoryItemDetailScreen />);
 
-    await waitFor(() => expect(screen.getByRole('button', {name: 'Add stock'})).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Receive stock'})).toBeTruthy());
   });
 
   it('fetches and displays the current server count when resolving an offline conflict', async () => {
