@@ -2,6 +2,7 @@ import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import type {InventoryRow, NativeUser} from '../../api/client';
 import {canAdjustStock} from '../auth/roleCapabilities';
 import {StockAdjustmentControls} from './StockAdjustmentControls';
+import {StockOperations} from './StockOperations';
 import {AppIcon} from '../navigation/AppIcon';
 
 const palette = {
@@ -54,8 +55,9 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
         {item.workOrder && <DetailField label="Work order" value={item.workOrder} />}
       </View>
 
+      {!item.isAllocated && canChangeStock && <StockOperations item={item} userId={userId} onRefresh={onRefresh} />}
       {!item.isAllocated && canChangeStock && (
-        <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} onRefresh={onRefresh} />
+        <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} onRefresh={onRefresh} showAddStock={false} />
       )}
       {!item.isAllocated && user?.id === userId && !canChangeStock && (
         <View accessibilityRole="text" style={styles.accessNotice}>
