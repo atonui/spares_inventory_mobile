@@ -9,11 +9,12 @@ import {offlineStockStore} from './offlineStockStore';
 type Mode = 'add' | 'count';
 type UndoableCount = {adjustment: QueuedStockAdjustment; previousQuantity: number};
 
-export function StockAdjustmentControls({item, userId, onQuantityChange, onRefresh}: {
+export function StockAdjustmentControls({item, userId, onQuantityChange, onRefresh, showAddStock = true}: {
   item: InventoryRow;
   userId: number;
   onQuantityChange: (quantity: number) => void;
   onRefresh: () => Promise<number>;
+  showAddStock?: boolean;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [value, setValue] = useState('');
@@ -241,9 +242,9 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
     <View>
       {!item.isAllocated && (
         <View style={styles.actions}>
-          <Pressable accessibilityRole="button" disabled={hasConflict || saving || undoing} onPress={() => {setMode('add'); setValue(''); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.primaryButton}>
+          {showAddStock && <Pressable accessibilityRole="button" disabled={hasConflict || saving || undoing} onPress={() => {setMode('add'); setValue(''); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Add stock</Text>
-          </Pressable>
+          </Pressable>}
           <Pressable accessibilityRole="button" disabled={hasConflict || saving || undoing} onPress={() => {setMode('count'); setValue(String(item.quantity)); setNotice(''); setZeroCountConfirmationVisible(false);}} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Edit count</Text>
           </Pressable>
