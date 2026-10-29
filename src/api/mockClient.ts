@@ -79,6 +79,16 @@ export function createMockApiClient(): MobileApi {
       }
       item.quantity = adjustment.newQuantity;
     },
+    async receiveStock(input) {
+      const item = previewInventory.find(row => row.partId === input.partId && row.storeId === input.storeId && !row.isAllocated);
+      if (!item) throw new Error('Inventory item not found.');
+      item.quantity += input.quantity;
+    },
+    async issueStock(input) {
+      const item = previewInventory.find(row => row.id === input.inventoryId);
+      if (!item || item.isAllocated || item.quantity < input.quantity || !input.workOrder.trim()) throw new Error('Check the stock quantity and work order.');
+      item.quantity -= input.quantity;
+    },
     async logout() {
       if (!session) throw new Error('Please sign in to continue.');
       session = null;
