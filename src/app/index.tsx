@@ -27,7 +27,7 @@ import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/off
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {getConnectivityStatus} from '../features/network/connectivity';
 import DesktopPairing from '../features/auth/DesktopPairing';
-import {StoresDirectory} from '../features/inventory/StoresDirectory';
+import {StoresDirectory, summarizeStores} from '../features/inventory/StoresDirectory';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
 
@@ -113,6 +113,8 @@ export default function InventoryScreen() {
   const [filterSortVisible, setFilterSortVisible] = useState(false);
   const [draftInventoryFilter, setDraftInventoryFilter] = useState<InventoryFilter>('all');
   const [draftInventorySort, setDraftInventorySort] = useState<InventorySort>('default');
+  const [draftStoreId, setDraftStoreId] = useState<number | null>(null);
+  const stores = useMemo(() => summarizeStores(inventory), [inventory]);
 
   const loadInventory = useCallback(async (userId: number) => {
     if (!syncInFlightRef.current) {
@@ -428,12 +430,14 @@ export default function InventoryScreen() {
   }
 
   function openFilterSort() {
+    setDraftStoreId(selectedStoreId);
     setDraftInventoryFilter(inventoryFilter);
     setDraftInventorySort(inventorySort);
     setFilterSortVisible(true);
   }
 
   function applyFilterSort() {
+    router.setParams({storeId: draftStoreId === null ? undefined : String(draftStoreId)});
     if (draftInventoryFilter !== inventoryFilter) {
       const nextVisibleInventory = getVisibleInventory(draftInventoryFilter);
       announceInventoryResultCount(nextVisibleInventory.length, inventory.length, search, draftInventoryFilter);
@@ -444,6 +448,7 @@ export default function InventoryScreen() {
   }
 
   const activeFilterSortLabels = [
+    selectedStoreId !== null ? stores.find(store => store.id === selectedStoreId)?.name ?? 'Selected store' : undefined,
     inventoryFilter !== 'all' ? inventoryFilterOptions.find(option => option.value === inventoryFilter)?.label : undefined,
     inventorySort !== 'default' ? inventorySortOptions.find(option => option.value === inventorySort)?.label : undefined,
   ].filter((label): label is string => Boolean(label));
@@ -521,6 +526,14 @@ export default function InventoryScreen() {
               )}
             </View>
 
+            <View style={styles.controlsRow}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Browse stores" style={styles.filterSortButton}
+                onPress={() => router.setParams({view: showingStores ? undefined : 'stores', storeId: undefined, query: undefined, filter: undefined})}>
+                <AppIcon name="inventory" color={palette.white} size={18} />
+                <Text style={styles.filterSortButtonText}>{showingStores ? 'All inventory' : `Stores (${stores.length})`}</Text>
+              </Pressable>
+            </View>
+
             {selectedStoreId !== null && <Pressable accessibilityRole="button" onPress={() => router.setParams({view: 'stores', storeId: undefined, query: undefined, filter: undefined})} style={styles.resetControlsButton}><Text style={styles.resetControlsText}>All stores</Text></Pressable>}
             {!showingStores && <View style={styles.controlsRow}>
             <Pressable
@@ -536,7 +549,7 @@ export default function InventoryScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Reset filters and sorting"
-                onPress={() => {router.setParams({filter: undefined}); setInventorySort('default');}}
+                onPress={() => {router.setParams({filter: undefined, storeId: undefined}); setInventorySort('default');}}
                 style={styles.resetControlsButton}
               >
                 <Text style={styles.resetControlsText}>Reset</Text>
@@ -657,6 +670,17 @@ export default function InventoryScreen() {
                 </Pressable>
               </View>
               <ScrollView style={styles.filterSortOptions} showsVerticalScrollIndicator={false}>
+                <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Store</Text>
+                <View accessibilityRole="radiogroup" accessibilityLabel="Filter by store">
+                  {[{id: null, name: 'All stores'}, ...stores].map(store => (
+                    <Pressable key={String(store.id)} accessibilityRole="radio" accessibilityLabel={store.name}
+                      accessibilityState={{checked: draftStoreId === store.id}} onPress={() => setDraftStoreId(store.id)}
+                      style={[styles.filterSortOption, draftStoreId === store.id && styles.filterSortOptionSelected]}>
+                      <View style={styles.optionRadio}>{draftStoreId === store.id && <View style={styles.optionRadioSelected} />}</View>
+                      <Text style={styles.filterSortOptionText}>{store.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
                 <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Stock status</Text>
                 <View accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
                   {inventoryFilterOptions.map(option => {
@@ -703,7 +727,7 @@ export default function InventoryScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Reset filters and sorting"
-                  onPress={() => {setDraftInventoryFilter('all'); setDraftInventorySort('default');}}
+                  onPress={() => {setDraftInventoryFilter('all'); setDraftInventorySort('default'); setDraftStoreId(null);}}
                   style={styles.filterSortResetButton}
                 >
                   <Text style={styles.filterSortResetText}>Reset</Text>
