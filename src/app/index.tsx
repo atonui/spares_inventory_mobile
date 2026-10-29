@@ -27,6 +27,7 @@ import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/off
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {getConnectivityStatus} from '../features/network/connectivity';
 import DesktopPairing from '../features/auth/DesktopPairing';
+import {StoresDirectory} from '../features/inventory/StoresDirectory';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
 
@@ -86,7 +87,9 @@ const inventorySortOptions: {value: InventorySort; label: string}[] = [
 export default function InventoryScreen() {
   const router = useRouter();
   const [pairingPhase, setPairingPhase] = useState<'welcome' | 'scan' | 'pending'>('welcome');
-  const routeParams = useLocalSearchParams<{filter?: string | string[]; query?: string | string[]}>();
+  const routeParams = useLocalSearchParams<{filter?: string | string[]; query?: string | string[]; view?: string; storeId?: string}>();
+  const showingStores = routeParams.view === 'stores';
+  const selectedStoreId = routeParams.storeId ? Number(routeParams.storeId) : null;
   const routeFilterValue = Array.isArray(routeParams.filter) ? routeParams.filter[0] : routeParams.filter;
   const routeQueryValue = Array.isArray(routeParams.query) ? routeParams.query[0] : routeParams.query;
   const search = routeQueryValue ?? '';
@@ -383,13 +386,14 @@ export default function InventoryScreen() {
           (filter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
           (filter === 'available' && !row.isAllocated) ||
           (filter === 'allocated' && row.isAllocated);
-        return matchesSearch && matchesFilter;
+        return matchesSearch && matchesFilter && (selectedStoreId === null || row.storeId === selectedStoreId);
       })
       .map(({row}) => row);
     return sortInventory(filtered, inventorySort);
-  }, [searchableInventory, search, queryTerms, inventorySort]);
+  }, [searchableInventory, search, queryTerms, inventorySort, selectedStoreId]);
 
   const visibleInventory = useMemo(() => getVisibleInventory(inventoryFilter), [getVisibleInventory, inventoryFilter]);
+  const storeItemCount = inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length;
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
   const isOffline = usingCachedInventory || networkConnected === false;
@@ -460,7 +464,7 @@ export default function InventoryScreen() {
               <View style={styles.brandMark}><Image source={require('../../assets/icon.png')} style={styles.brandIcon} /></View>
               <View style={styles.brandCopy}>
                 <Text style={styles.wordmark}>Spares Tracker</Text>
-                <Text accessibilityRole="header" style={styles.pageTitle}>Inventory</Text>
+                <Text accessibilityRole="header" style={styles.pageTitle}>{showingStores ? 'Stores' : selectedStoreId !== null ? inventory.find(row => row.storeId === selectedStoreId)?.storeName ?? 'Store inventory' : 'Inventory'}</Text>
               </View>
               <View style={[styles.connectionPill, isOffline && styles.connectionPillOffline,
                 connectionUnknown && styles.connectionPillChecking]}>
@@ -475,12 +479,12 @@ export default function InventoryScreen() {
 
             <View style={styles.welcomeRow}>
               <View>
-                <Text style={styles.welcome}>Stock on hand</Text>
+                <Text style={styles.welcome}>{showingStores ? 'Find a store' : 'Stock on hand'}</Text>
                 <Text style={styles.headerSubline}>{user.role.replaceAll('_', ' ')} · {isMockMode ? 'preview data' : 'live inventory'}</Text>
               </View>
               <View style={styles.totalBadge}>
-                <Text style={styles.totalNumber}>{inventory.length}</Text>
-                <Text style={styles.totalLabel}>ITEMS</Text>
+                <Text style={styles.totalNumber}>{showingStores ? new Set(inventory.map(row => row.storeId)).size : inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length}</Text>
+                <Text style={styles.totalLabel}>{showingStores ? 'STORES' : 'ITEMS'}</Text>
               </View>
             </View>
 
@@ -502,9 +506,9 @@ export default function InventoryScreen() {
 
             <View style={styles.searchBox}>
               <AppIcon name="search" color={palette.muted} size={19} />
-              <TextInput accessibilityLabel="Search inventory" value={search}
+              <TextInput accessibilityLabel={showingStores ? 'Search stores' : 'Search inventory'} value={search}
                 onChangeText={value => router.setParams({query: value || undefined})}
-                placeholder="Part, store, or work order" placeholderTextColor={palette.placeholder}
+                placeholder={showingStores ? 'Search store name or type' : 'Part, store, or work order'} placeholderTextColor={palette.placeholder}
                 accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
                 autoCapitalize="none" autoCorrect={false}
                 style={styles.searchInput} returnKeyType="search"
@@ -517,7 +521,8 @@ export default function InventoryScreen() {
               )}
             </View>
 
-            <View style={styles.controlsRow}>
+            {selectedStoreId !== null && <Pressable accessibilityRole="button" onPress={() => router.setParams({view: 'stores', storeId: undefined, query: undefined, filter: undefined})} style={styles.resetControlsButton}><Text style={styles.resetControlsText}>All stores</Text></Pressable>}
+            {!showingStores && <View style={styles.controlsRow}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Filter and sort inventory${activeFilterSortLabels.length ? `, active: ${activeFilterSortLabels.join(', ')}` : ''}`}
@@ -537,12 +542,13 @@ export default function InventoryScreen() {
                 <Text style={styles.resetControlsText}>Reset</Text>
               </Pressable>
             )}
-            </View>
+            </View>}
           </View>
 
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
 
-          <FlatList
+          {showingStores ? <StoresDirectory items={inventory} search={search} refreshing={refreshing} onRefresh={refresh}
+            onSelect={id => router.setParams({view: undefined, storeId: String(id), query: undefined, filter: undefined})} /> : <FlatList
             data={visibleInventory}
             keyExtractor={row => String(row.id)}
             contentContainerStyle={styles.listContent}
@@ -551,8 +557,8 @@ export default function InventoryScreen() {
             ListHeaderComponent={visibleInventory.length > 0 ? (
               <Text accessibilityRole="text" style={styles.resultsSummary}>
                 {hasInventoryCriteria
-                  ? `Showing ${visibleInventory.length} of ${inventory.length} ${inventory.length === 1 ? 'item' : 'items'}`
-                  : `${inventory.length} ${inventory.length === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
+                  ? `Showing ${visibleInventory.length} of ${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'}`
+                  : `${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
               </Text>
             ) : undefined}
             ListEmptyComponent={loading && !error ? <InventorySkeleton /> : error ? <></> : (
@@ -616,8 +622,9 @@ export default function InventoryScreen() {
               );
             }}
           />
+          }
           <AppBottomNavigation
-            active="inventory"
+            active={showingStores ? 'more' : 'inventory'}
             queuedCount={snapshotStatus.queued}
             conflictCount={snapshotStatus.conflicts}
             onSignOut={() => void requestSignOut()}
