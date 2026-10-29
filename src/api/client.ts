@@ -337,6 +337,23 @@ export function createApiClient({
         });
       });
     },
+    receiveStock(input: {partId: number; storeId: number; quantity: number}) {
+      return authenticated(async token => {
+        const result = await request<{success: boolean}>('/api/v1/inventory/add', {
+          token, method: 'POST', body: {part_id: input.partId, store_id: input.storeId, quantity: input.quantity},
+        });
+        if (result?.success !== true) throw new ApiError('The stock operation could not be confirmed. Check inventory before trying again.', 0);
+      });
+    },
+    issueStock(input: {inventoryId: number; quantity: number; workOrder: string; notes?: string}) {
+      return authenticated(async token => {
+        const result = await request<{success: boolean}>('/api/v1/inventory/consume', {
+          token, method: 'POST', body: {inventory_id: input.inventoryId, quantity: input.quantity,
+            work_order_number: input.workOrder.trim(), notes: input.notes?.trim() || null},
+        });
+        if (result?.success !== true) throw new ApiError('The stock operation could not be confirmed. Check inventory before trying again.', 0);
+      });
+    },
     logout() {
       return authenticated(async token => {
         const result = await request<{success: boolean}>('/api/v1/auth/logout', {token, method: 'POST'});
