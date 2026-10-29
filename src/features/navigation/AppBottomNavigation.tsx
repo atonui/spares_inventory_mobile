@@ -56,7 +56,7 @@ export function AppBottomNavigation({
                 if (tab.key === 'more') setMenuVisible(true);
                 else if (selected) return;
                 else if (tab.key === 'home') navigateTo('/home');
-                else if (tab.key === 'inventory') router.push({pathname: '/', params: {filter: undefined, query: undefined}});
+                else if (tab.key === 'inventory') router.push({pathname: '/', params: {filter: undefined, query: undefined, storeId: undefined, view: undefined}});
                 else if (tab.key === 'scan') navigateTo('/scan');
                 else if (tab.key === 'changes') navigateTo('/offline-changes');
               }}
@@ -89,6 +89,8 @@ export function AppBottomNavigation({
               </Pressable>
             </View>
             <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuContent} showsVerticalScrollIndicator={false}>
+              <Text style={styles.groupLabel}>INVENTORY</Text>
+              <MenuAction icon="inventory" title="Stores" subtitle="Browse stock by store" onPress={() => {setMenuVisible(false); router.push({pathname: '/', params: {view: 'stores', storeId: undefined, query: undefined, filter: undefined}});}} />
               <Text style={styles.groupLabel}>ACCOUNT & APP</Text>
               <MenuAction icon="profile" title="Profile" subtitle="View your account details" onPress={() => navigateTo('/profile')} />
               <MenuAction icon="settings" title="Settings" subtitle="Scanner feedback and offline data" onPress={() => navigateTo('/settings')} />
