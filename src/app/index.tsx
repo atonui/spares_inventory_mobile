@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 13462)
+Total output lines: 979
+
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
@@ -115,6 +118,9 @@ export default function InventoryScreen() {
   const [draftInventorySort, setDraftInventorySort] = useState<InventorySort>('default');
   const [draftStoreId, setDraftStoreId] = useState<number | null>(null);
   const stores = useMemo(() => summarizeStores(inventory), [inventory]);
+  const totalParts = useMemo(() => new Set(inventory
+    .filter(row => selectedStoreId === null || row.storeId === selectedStoreId)
+    .map(row => row.partNumber)).size, [inventory, selectedStoreId]);
 
   const loadInventory = useCallback(async (userId: number) => {
     if (!syncInFlightRef.current) {
@@ -485,11 +491,13 @@ export default function InventoryScreen() {
             <View style={styles.welcomeRow}>
               <View>
                 <Text style={styles.welcome}>{showingStores ? 'Find a store' : 'Stock on hand'}</Text>
-                <Text style={styles.headerSubline}>{user.role.replaceAll('_', ' ')} · {isMockMode ? 'preview data' : 'live inventory'}</Text>
+                <Text style={styles.headerSubline}>{showingStores
+                  ? `${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`
+                  : `${totalParts} total parts · ${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`}</Text>
               </View>
               <View style={styles.totalBadge}>
                 <Text style={styles.totalNumber}>{showingStores ? new Set(inventory.map(row => row.storeId)).size : inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length}</Text>
-                <Text style={styles.totalLabel}>{showingStores ? 'STORES' : 'ITEMS'}</Text>
+                <Text style={styles.totalLabel}>{showingStores ? 'STORES' : 'STOCK ENTRIES'}</Text>
               </View>
             </View>
 
@@ -515,103 +523,7 @@ export default function InventoryScreen() {
                 onChangeText={value => router.setParams({query: value || undefined})}
                 placeholder={showingStores ? 'Search store name or type' : 'Part, store, or work order'} placeholderTextColor={palette.placeholder}
                 accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
-                autoCapitalize="none" autoCorrect={false}
-                style={styles.searchInput} returnKeyType="search"
-                onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
-              {search.length > 0 && (
-                <Pressable accessibilityRole="button" accessibilityLabel="Clear search" accessibilityHint="Clears the inventory search"
-                  onPress={() => router.setParams({query: undefined})} style={styles.clearSearchButton} hitSlop={4}>
-                  <Text style={styles.clearSearchText}>×</Text>
-                </Pressable>
-              )}
-            </View>
-
-            <View style={styles.controlsRow}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Browse stores" style={styles.filterSortButton}
-                onPress={() => router.setParams({view: showingStores ? undefined : 'stores', storeId: undefined, query: undefined, filter: undefined})}>
-                <AppIcon name="inventory" color={palette.white} size={18} />
-                <Text style={styles.filterSortButtonText}>{showingStores ? 'All inventory' : `Stores (${stores.length})`}</Text>
-              </Pressable>
-            </View>
-
-            {selectedStoreId !== null && <Pressable accessibilityRole="button" onPress={() => router.setParams({view: 'stores', storeId: undefined, query: undefined, filter: undefined})} style={styles.resetControlsButton}><Text style={styles.resetControlsText}>All stores</Text></Pressable>}
-            {!showingStores && <View style={styles.controlsRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Filter and sort inventory${activeFilterSortLabels.length ? `, active: ${activeFilterSortLabels.join(', ')}` : ''}`}
-              onPress={openFilterSort}
-              style={[styles.filterSortButton, activeFilterSortLabels.length > 0 && styles.filterSortButtonActive]}
-            >
-              <AppIcon name="filter" color={palette.white} size={18} />
-              <Text numberOfLines={1} style={styles.filterSortButtonText}>{filterSortButtonLabel}</Text>
-            </Pressable>
-            {activeFilterSortLabels.length > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Reset filters and sorting"
-                onPress={() => {router.setParams({filter: undefined, storeId: undefined}); setInventorySort('default');}}
-                style={styles.resetControlsButton}
-              >
-                <Text style={styles.resetControlsText}>Reset</Text>
-              </Pressable>
-            )}
-            </View>}
-          </View>
-
-          {!!error && <ErrorNotice message={error} onRetry={refresh} />}
-
-          {showingStores ? <StoresDirectory items={inventory} search={search} refreshing={refreshing} onRefresh={refresh}
-            onSelect={id => router.setParams({view: undefined, storeId: String(id), query: undefined, filter: undefined})} /> : <FlatList
-            data={visibleInventory}
-            keyExtractor={row => String(row.id)}
-            contentContainerStyle={styles.listContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={palette.navy} />}
-            keyboardShouldPersistTaps="handled"
-            ListHeaderComponent={visibleInventory.length > 0 ? (
-              <Text accessibilityRole="text" style={styles.resultsSummary}>
-                {hasInventoryCriteria
-                  ? `Showing ${visibleInventory.length} of ${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'}`
-                  : `${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
-              </Text>
-            ) : undefined}
-            ListEmptyComponent={loading && !error ? <InventorySkeleton /> : error ? <></> : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
-                <Text style={styles.muted}>
-                  {hasInventoryCriteria
-                    ? 'Try changing your search or filter.'
-                    : 'Pull down to refresh your inventory.'}
-                </Text>
-                {hasInventoryCriteria && inventory.length > 0 && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Clear search and filters"
-                    accessibilityHint="Clears the search, shows all stock, and restores the default sort"
-                    onPress={clearInventoryCriteria}
-                    style={styles.emptyResetButton}
-                  >
-                    <Text style={styles.emptyResetText}>Clear search and filters</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-            renderItem={({item: row}) => {
-              const outOfStock = row.quantity === 0;
-              const lowStock = row.quantity <= row.minThreshold;
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={inventoryRowAccessibilityLabel(row)}
-                  accessibilityHint="Opens stock details"
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    router.push({pathname: '/inventory/[itemId]', params: {itemId: String(row.id), userId: String(user?.id ?? '')}});
-                  }}
-                  style={({pressed}) => [styles.stockCard, pressed && styles.stockCardPressed]}
-                >
-                  <View style={styles.itemMark}><AppIcon name="inventory" color={palette.navy} size={19} /></View>
-                  <View style={styles.itemCopy}>
-                    <View style={styles.itemTitleRow}>
+                autoCapitalize="…1462 tokens truncated…               <View style={styles.itemTitleRow}>
                       <Text style={styles.partNumber} numberOfLines={1}>{row.partNumber}</Text>
                       <View style={[styles.quantityBadge, lowStock && styles.lowQuantityBadge, outOfStock && styles.outQuantityBadge]}>
                         <View style={[styles.statusDot, lowStock && styles.lowStatusDot, outOfStock && styles.outStatusDot]} />
