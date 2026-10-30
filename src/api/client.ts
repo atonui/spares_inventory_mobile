@@ -4,6 +4,7 @@ import {
   type InventoryItem,
 } from '../features/inventory/inventoryRepository.ts';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
+import {parseStore, parseTransfer, readNativePages} from './transferContract.ts';
 
 export type NativeUser = {
   id: number;
@@ -335,6 +336,26 @@ export function createApiClient({
             new_quantity: adjustment.newQuantity,
           },
         });
+      });
+    },
+    getStores() {
+      return authenticated(token => readNativePages(cursor => request(`/api/v1/stores?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, {token}), parseStore));
+    },
+    getPendingTransfers() {
+      return authenticated(token => readNativePages(cursor => request(`/api/v1/inventory/transfers?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, {token}), parseTransfer));
+    },
+    dispatchStock(input: {inventoryId: number; toStoreId: number; quantity: number}) {
+      return authenticated(async token => {
+        const result = await request<{success: boolean}>('/api/v1/inventory/transfer', {token, method: 'POST',
+          body: {inventory_id: input.inventoryId, to_store_id: input.toStoreId, quantity: input.quantity}});
+        if (result?.success !== true) throw new ApiError('The transfer could not be confirmed.', 0);
+      });
+    },
+    completeTransfer(id: number, action: 'receive' | 'return') {
+      if (!Number.isSafeInteger(id) || id < 1 || !['receive', 'return'].includes(action)) throw new ApiError('Invalid transfer action.', 400);
+      return authenticated(async token => {
+        const result = await request<{success: boolean}>(`/api/v1/inventory/transfers/${id}/${action}`, {token, method: 'POST', body: {confirmed: true}});
+        if (result?.success !== true) throw new ApiError('The transfer could not be confirmed.', 0);
       });
     },
     receiveStock(input: {partId: number; storeId: number; quantity: number}) {

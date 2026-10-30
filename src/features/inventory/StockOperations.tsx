@@ -3,8 +3,9 @@ import {KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet
 import {api} from '../../api/runtime';
 import {ApiError, type InventoryRow} from '../../api/client';
 import {offlineStockStore} from './offlineStockStore';
+import type {StoreDestination} from '../../api/transferContract';
 
-type Operation = 'receive' | 'issue';
+type Operation = 'receive' | 'issue' | 'transfer';
 
 export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; userId: number; onRefresh: () => Promise<number>}) {
   const [mode, setMode] = useState<Operation | null>(null);
@@ -18,10 +19,28 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
   const [finished, setFinished] = useState(false);
   const locked = useRef(false);
   const units = Number(quantity);
+  const [stores, setStores] = useState<StoreDestination[]>([]);
+  const [destination, setDestination] = useState<StoreDestination | null>(null);
+  const [storeSearch, setStoreSearch] = useState('');
+  const [loadingStores, setLoadingStores] = useState(false);
+  const storeRequest = useRef(0);
+
+  async function loadStores() {
+    const request = ++storeRequest.current;
+    setLoadingStores(true); setError('');
+    try {
+      const rows = await api.getStores();
+      if (request === storeRequest.current) setStores(rows.filter(store => store.id !== item.storeId).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch {if (request === storeRequest.current) setError('Could not load destinations. Check your connection and retry.');}
+    finally {if (request === storeRequest.current) setLoadingStores(false);}
+  }
 
   function open(operation: Operation) {
     setMode(operation); setQuantity(''); setWorkOrder(''); setNotes('');
     setReviewedQuantity(null); setFinished(false); setError(''); setNotice('');
+    setDestination(null); setStoreSearch(''); setStores([]);
+    storeRequest.current++;
+    if (operation === 'transfer') void loadStores();
   }
 
   async function checkStock() {
@@ -32,7 +51,11 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
     const rows = await api.getInventory();
     const current = rows.find(row => row.id === item.id);
     if (!current || current.isAllocated) throw new Error('This stock is no longer available for this action. Return to inventory.');
-    if (mode === 'issue' && units > current.quantity) throw new Error(`Only ${current.quantity} units are available. Enter a smaller quantity.`);
+    if (mode !== 'receive' && units > current.quantity) throw new Error(`Only ${current.quantity} units are available. Enter a smaller quantity.`);
+    if (mode === 'transfer') {
+      const currentStores = await api.getStores();
+      if (!destination || destination.id === item.storeId || !currentStores.some(store => store.id === destination.id)) throw new Error('Choose an active destination store.');
+    }
     return current.quantity;
   }
 
@@ -42,6 +65,7 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
       setError('Enter a whole quantity greater than zero.'); return;
     }
     if (mode === 'issue' && !workOrder.trim()) {setError('Enter the work order for this issue.'); return;}
+    if (mode === 'transfer' && !destination) {setError('Choose a destination store.'); return;}
     locked.current = true; setBusy(true); setError('');
     let sent = false;
     try {
@@ -52,9 +76,10 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
       }
       sent = true;
       if (mode === 'receive') await api.receiveStock({partId: item.partId, storeId: item.storeId, quantity: units});
+      else if (mode === 'transfer') await api.dispatchStock({inventoryId: item.id, toStoreId: destination!.id, quantity: units});
       else await api.issueStock({inventoryId: item.id, quantity: units, workOrder, notes});
       setFinished(true);
-      setNotice(mode === 'receive' ? 'Stock received successfully.' : 'Stock issued successfully.');
+      setNotice(mode === 'transfer' ? 'Stock dispatched. The destination must confirm receipt before it becomes available there.' : mode === 'receive' ? 'Stock received successfully.' : 'Stock issued successfully.');
       try {await onRefresh();}
       catch {setNotice('Stock saved. Refresh inventory to see the current balance. Do not submit it again.');}
     } catch (reason) {
@@ -71,20 +96,31 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
 
   return <View style={styles.card}>
     <Text style={styles.title}>Stock movements</Text>
-    <Text style={styles.body}>Receive deliveries or issue stock to a work order. Connection required.</Text>
+    <Text style={styles.body}>Receive, issue or transfer stock. Connection required.</Text>
     <View style={styles.actions}>
       <Pressable accessibilityRole="button" onPress={() => open('receive')} style={styles.secondary}><Text style={styles.label}>Receive stock</Text></Pressable>
       <Pressable accessibilityRole="button" disabled={item.quantity === 0} onPress={() => open('issue')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Issue stock</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={item.quantity === 0} onPress={() => open('transfer')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Transfer stock</Text></Pressable>
     </View>
     <Modal visible={mode !== null} animationType="slide" onRequestClose={() => {if (!busy) setMode(null);}}>
       <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text accessibilityRole="header" style={styles.title}>{mode === 'receive' ? 'Receive stock' : 'Issue stock'}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{mode === 'transfer' ? 'Transfer stock' : mode === 'receive' ? 'Receive stock' : 'Issue stock'}</Text>
           <Text style={styles.label}>{item.partNumber} · {item.storeName}</Text>
           <Text style={styles.body}>{item.description}</Text>
           {!finished && reviewedQuantity === null && <>
             <Text style={styles.label}>Quantity</Text>
             <TextInput accessibilityLabel="Movement quantity" style={styles.input} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" autoFocus editable={!busy} />
+            {mode === 'transfer' && <>
+              <Text style={styles.label}>Destination{destination ? `: ${destination.name}` : ''}</Text>
+              <TextInput accessibilityLabel="Search destination stores" placeholder="Search stores" value={storeSearch} onChangeText={setStoreSearch} style={styles.input} autoCorrect={false} editable={!busy} />
+              {loadingStores ? <Text style={styles.body}>Loading destinations…</Text> : <>
+                {stores.filter(store => store.name.toLocaleLowerCase().includes(storeSearch.trim().toLocaleLowerCase())).slice(0, 20).map(store => <Pressable key={store.id} accessibilityRole="radio" accessibilityLabel={store.name} accessibilityState={{checked: destination?.id === store.id}} disabled={busy} onPress={() => setDestination(store)} style={styles.secondary}><Text style={styles.label}>{destination?.id === store.id ? 'Selected: ' : ''}{store.name}</Text></Pressable>)}
+                {stores.filter(store => store.name.toLocaleLowerCase().includes(storeSearch.trim().toLocaleLowerCase())).length > 20 && <Text style={styles.body}>Showing the first 20 matches. Refine your search to find another store.</Text>}
+                {stores.length === 0 && <Text style={styles.body}>No other stores are available.</Text>}
+                <Pressable accessibilityRole="button" disabled={busy} onPress={() => void loadStores()} style={styles.secondary}><Text style={styles.label}>Reload destinations</Text></Pressable>
+              </>}
+            </>}
             {mode === 'issue' && <>
               <Text style={styles.label}>Work order (required)</Text>
               <TextInput accessibilityLabel="Work order" style={styles.input} value={workOrder} onChangeText={setWorkOrder} autoCorrect={false} editable={!busy} />
@@ -93,7 +129,8 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
             </>}
           </>}
           {!finished && reviewedQuantity !== null && <View style={styles.card}>
-            <Text style={styles.label}>{mode === 'receive' ? 'Receive' : 'Issue'} {units} units</Text>
+            <Text style={styles.label}>{mode === 'transfer' ? 'Dispatch' : mode === 'receive' ? 'Receive' : 'Issue'} {units} units</Text>
+            {mode === 'transfer' && <><Text style={styles.body}>From: {item.storeName}</Text><Text style={styles.body}>To: {destination?.name}</Text><Text style={styles.body}>Destination stock stays unavailable until receipt is confirmed.</Text></>}
             {mode === 'issue' && <Text style={styles.body}>Work order: {workOrder.trim()}</Text>}
             {mode === 'issue' && !!notes.trim() && <Text style={styles.body}>Notes: {notes.trim()}</Text>}
             <Text style={styles.body}>On hand: {reviewedQuantity} → {reviewedQuantity + (mode === 'receive' ? units : -units)}</Text>
