@@ -4,7 +4,7 @@ import {api} from '../../api/runtime';
 import {offlineStockStore} from './offlineStockStore';
 import type {InventoryRow} from '../../api/client';
 
-jest.mock('../../api/runtime', () => ({api: {getMe: jest.fn(), getInventory: jest.fn(), receiveStock: jest.fn(), issueStock: jest.fn()}}));
+jest.mock('../../api/runtime', () => ({api: {getMe: jest.fn(), getInventory: jest.fn(), receiveStock: jest.fn(), issueStock: jest.fn(), getStores: jest.fn(), dispatchStock: jest.fn()}}));
 jest.mock('./offlineStockStore', () => ({offlineStockStore: {list: jest.fn()}}));
 const item: InventoryRow = {id: 1, partId: 2, storeId: 3, partNumber: 'PART-1', description: 'Test part', storeName: 'Main', storeType: 'central', storeOwner: null, quantity: 5, minThreshold: 1, isAllocated: false, workOrder: null};
 
@@ -13,6 +13,21 @@ beforeEach(() => {
   jest.mocked(api.getMe).mockResolvedValue({id: 7} as Awaited<ReturnType<typeof api.getMe>>);
   jest.mocked(api.getInventory).mockResolvedValue([item]);
   jest.mocked(offlineStockStore.list).mockResolvedValue([]);
+  jest.mocked(api.getStores).mockResolvedValue([{id: 3, name: 'Main', type: 'central'}, {id: 4, name: 'Empty store', type: 'central'}]);
+});
+
+it('dispatches only after reviewing a different active destination', async () => {
+  await render(<StockOperations item={item} userId={7} onRefresh={jest.fn().mockResolvedValue(3)} />);
+  await fireEvent.press(screen.getByText('Transfer stock'));
+  await fireEvent.changeText(screen.getByLabelText('Movement quantity'), '2');
+  await waitFor(() => expect(screen.getByRole('radio', {name: 'Empty store'})).toBeTruthy());
+  expect(screen.queryByRole('radio', {name: 'Main'})).toBeNull();
+  await fireEvent.press(screen.getByRole('radio', {name: 'Empty store'}));
+  await fireEvent.press(screen.getByText('Review movement'));
+  await waitFor(() => expect(screen.getByText('To: Empty store')).toBeTruthy());
+  expect(api.dispatchStock).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByText('Confirm movement'));
+  await waitFor(() => expect(api.dispatchStock).toHaveBeenCalledWith({inventoryId: 1, toStoreId: 4, quantity: 2}));
 });
 
 it('requires a work order and confirmation before issuing stock', async () => {
