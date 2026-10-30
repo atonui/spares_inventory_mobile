@@ -1,6 +1,7 @@
 import type {MobileApi, NativeLogin, NativeSession, NativeUser} from './client';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
+import type {PendingTransfer} from './transferContract';
 
 const previewUser: NativeUser = {
   id: 1,
@@ -20,6 +21,9 @@ const previewInventory: InventoryItem[] = [
 export function createMockApiClient(): MobileApi {
   let session: NativeSession | null = null;
   let pairingPolls = 0;
+  const transfers: (PendingTransfer & {source: InventoryItem})[] = [];
+  let nextTransferId = 1;
+  const stores = [...new Map(previewInventory.map(row => [row.storeId, {id: row.storeId, name: row.storeName, type: row.storeType}])).values(), {id: 4, name: 'Empty destination store', type: 'central'}];
   return {
     async login({email, password}) {
       if (!email.trim() || !password) throw new Error('Enter your email and password to continue.');
@@ -78,6 +82,28 @@ export function createMockApiClient(): MobileApi {
         throw Object.assign(new Error('Stock changed since this count was recorded.'), {status: 409});
       }
       item.quantity = adjustment.newQuantity;
+    },
+    async getStores() {return stores.map(store => ({...store}));},
+    async getPendingTransfers() {return transfers.map(({source: _source, ...transfer}) => ({...transfer}));},
+    async dispatchStock(input) {
+      const source = previewInventory.find(row => row.id === input.inventoryId);
+      const target = stores.find(store => store.id === input.toStoreId);
+      if (!source || !target || source.storeId === target.id || input.quantity < 1 || input.quantity > source.quantity) throw new Error('Check the transfer quantity and destination.');
+      source.quantity -= input.quantity;
+      transfers.push({id: nextTransferId++, quantity: input.quantity, partNumber: source.partNumber, description: source.description,
+        fromStoreId: source.storeId, toStoreId: target.id, fromStoreName: source.storeName, toStoreName: target.name,
+        createdAt: new Date().toISOString(), canReceive: true, canReturn: true, source: {...source}});
+    },
+    async completeTransfer(id, action) {
+      const index = transfers.findIndex(transfer => transfer.id === id);
+      const transfer = transfers[index];
+      if (!transfer) throw new Error('Transfer is no longer pending.');
+      const storeId = action === 'receive' ? transfer.toStoreId : transfer.fromStoreId;
+      const target = stores.find(store => store.id === storeId)!;
+      const stock = previewInventory.find(row => row.partId === transfer.source.partId && row.storeId === storeId && !row.isAllocated);
+      if (stock) stock.quantity += transfer.quantity;
+      else previewInventory.push({...transfer.source, id: Math.max(...previewInventory.map(row => row.id)) + 1, storeId, storeName: target.name, storeType: target.type, storeOwner: previewUser.id, quantity: transfer.quantity});
+      transfers.splice(index, 1);
     },
     async receiveStock(input) {
       const item = previewInventory.find(row => row.partId === input.partId && row.storeId === input.storeId && !row.isAllocated);
