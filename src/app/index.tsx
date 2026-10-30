@@ -115,6 +115,9 @@ export default function InventoryScreen() {
   const [draftInventorySort, setDraftInventorySort] = useState<InventorySort>('default');
   const [draftStoreId, setDraftStoreId] = useState<number | null>(null);
   const stores = useMemo(() => summarizeStores(inventory), [inventory]);
+  const totalParts = useMemo(() => new Set(inventory
+    .filter(row => selectedStoreId === null || row.storeId === selectedStoreId)
+    .map(row => row.partNumber)).size, [inventory, selectedStoreId]);
 
   const loadInventory = useCallback(async (userId: number) => {
     if (!syncInFlightRef.current) {
@@ -485,11 +488,13 @@ export default function InventoryScreen() {
             <View style={styles.welcomeRow}>
               <View>
                 <Text style={styles.welcome}>{showingStores ? 'Find a store' : 'Stock on hand'}</Text>
-                <Text style={styles.headerSubline}>{user.role.replaceAll('_', ' ')} · {isMockMode ? 'preview data' : 'live inventory'}</Text>
+                <Text style={styles.headerSubline}>{showingStores
+                  ? `${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`
+                  : `${totalParts} total parts · ${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`}</Text>
               </View>
               <View style={styles.totalBadge}>
                 <Text style={styles.totalNumber}>{showingStores ? new Set(inventory.map(row => row.storeId)).size : inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length}</Text>
-                <Text style={styles.totalLabel}>{showingStores ? 'STORES' : 'ITEMS'}</Text>
+                <Text style={styles.totalLabel}>{showingStores ? 'STORES' : 'STOCK ENTRIES'}</Text>
               </View>
             </View>
 
