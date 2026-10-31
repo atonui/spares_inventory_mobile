@@ -4,7 +4,7 @@ import {
   type InventoryItem,
 } from '../features/inventory/inventoryRepository.ts';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
-import {parseStore, parseTransfer, readNativePages} from './transferContract.ts';
+import {parseEquipment, parsePart, parseStore, parseTransfer, readNativePages, type EquipmentRecord, type PartRecord} from './transferContract.ts';
 
 export type NativeUser = {
   id: number;
@@ -307,6 +307,42 @@ export function createApiClient({
       return authenticated(async token => {
         const response = await request<unknown>('/api/v1/me', {token});
         return parseNativeUser(response);
+      });
+    },
+    getOverviewStats() {
+      return authenticated(async token => {
+        const [inventory, equipment] = await Promise.all([
+          request<unknown>('/api/stats', {token}),
+          request<unknown>('/api/equipment/statistics', {token}),
+        ]);
+        if (!isRecord(inventory) || !isRecord(equipment)) throw new ApiError('The server returned invalid overview totals.', 0);
+        const count = (record: Record<string, unknown>, key: string) => {
+          const value = record[key];
+          if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new ApiError('The server returned invalid overview totals.', 0);
+          return value;
+        };
+        return {
+          totalParts: count(inventory, 'total_parts'),
+          activeStores: count(inventory, 'total_stores'),
+          myEquipment: count(equipment, 'my_equipment'),
+          myParts: count(inventory, 'my_parts'),
+        };
+      });
+    },
+    getParts(): Promise<PartRecord[]> {
+      return authenticated(async token => {
+        const result = await request<unknown>('/api/parts', {token});
+        if (!Array.isArray(result)) throw new ApiError('The server returned an invalid parts response.', 0);
+        try { return result.map(parsePart); }
+        catch { throw new ApiError('The server returned an invalid parts response.', 0); }
+      });
+    },
+    getEquipment(): Promise<EquipmentRecord[]> {
+      return authenticated(async token => {
+        const result = await request<unknown>('/api/equipment', {token});
+        if (!Array.isArray(result)) throw new ApiError('The server returned an invalid equipment response.', 0);
+        try { return result.map(parseEquipment); }
+        catch { throw new ApiError('The server returned an invalid equipment response.', 0); }
       });
     },
     async getInventory(): Promise<InventoryRow[]> {

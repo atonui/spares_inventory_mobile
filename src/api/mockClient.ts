@@ -1,7 +1,7 @@
 import type {MobileApi, NativeLogin, NativeSession, NativeUser} from './client';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
-import type {PendingTransfer} from './transferContract';
+import type {EquipmentRecord, PartRecord, PendingTransfer} from './transferContract';
 
 const previewUser: NativeUser = {
   id: 1,
@@ -24,6 +24,11 @@ export function createMockApiClient(): MobileApi {
   const transfers: (PendingTransfer & {source: InventoryItem})[] = [];
   let nextTransferId = 1;
   const stores = [...new Map(previewInventory.map(row => [row.storeId, {id: row.storeId, name: row.storeName, type: row.storeType}])).values(), {id: 4, name: 'Empty destination store', type: 'central'}];
+  const parts: PartRecord[] = [...new Map(previewInventory.map(row => [row.partId, {id: row.partId, partNumber: row.partNumber, description: row.description, category: 'Preview'}])).values()];
+  const equipment: EquipmentRecord[] = [
+    {id: 1, name: 'Portable analyzer', make: 'Demo', model: 'PA-1', serialNumber: 'DEMO-001', assignedUserId: previewUser.id, assignedUserName: previewUser.name, nextCalibrationDate: null, status: 'active'},
+    {id: 2, name: 'Torque wrench', make: 'Demo', model: 'TW-2', serialNumber: 'DEMO-002', assignedUserId: 2, assignedUserName: 'Other engineer', nextCalibrationDate: null, status: 'active'},
+  ];
   return {
     async login({email, password}) {
       if (!email.trim() || !password) throw new Error('Enter your email and password to continue.');
@@ -73,6 +78,12 @@ export function createMockApiClient(): MobileApi {
       if (!session) throw new Error('Please sign in to continue.');
       return {...previewUser};
     },
+    async getOverviewStats() {
+      const userPartIds = new Set(previewInventory.filter(row => row.storeOwner === previewUser.id).map(row => row.partId));
+      return {totalParts: parts.length, activeStores: stores.length, myEquipment: equipment.filter(row => row.assignedUserId === previewUser.id).length, myParts: userPartIds.size};
+    },
+    async getParts() {return parts.map(part => ({...part}));},
+    async getEquipment() {return equipment.map(item => ({...item}));},
     async getInventory() { return previewInventory.map(row => ({...row})); },
     async adjustStock(adjustment: QueuedStockAdjustment) {
       const item = previewInventory.find(row => row.id === adjustment.inventoryId);
