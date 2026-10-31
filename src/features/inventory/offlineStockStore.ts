@@ -2,7 +2,7 @@ import {Platform} from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import type {InventoryItem} from './inventoryRepository';
 import {parseStockMovement, type NativeUser, type OverviewStats, type StockMovement} from '../../api/client';
-import {parseEquipment, parsePart, parseStore, type EquipmentRecord, type PartRecord, type StoreDestination} from '../../api/transferContract';
+import {parseEquipment, parsePart, parseStore, parseTransfer, type EquipmentRecord, type PartRecord, type PendingTransfer, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment, StockQueueStore} from './offlineStockQueue';
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -27,6 +27,8 @@ export type OfflineStockStorage = StockQueueStore & {
   loadOverviewStats(userId: number): Promise<OverviewStats | null>;
   getOverviewStatsSavedAt(userId: number): Promise<number | null>;
   getInventorySnapshotSavedAt(userId: number): Promise<number | null>;
+  savePendingTransfers(userId: number, rows: PendingTransfer[]): Promise<number>;
+  loadPendingTransfers(userId: number): Promise<{rows: PendingTransfer[]; savedAt: number} | null>;
   saveMovementHistory(userId: number, partId: number, storeId: number, rows: StockMovement[]): Promise<number>;
   loadMovementHistory(userId: number, partId: number, storeId: number): Promise<{rows: StockMovement[]; savedAt: number} | null>;
   subscribeQueueChanges(listener: () => void): () => void;
@@ -114,6 +116,26 @@ function parseEquipmentRecord(value: unknown): EquipmentRecord {
     assigned_user_name: equipment.assignedUserName, next_calibration_date: equipment.nextCalibrationDate,
     status: equipment.status,
   });
+}
+
+function parsePendingTransfer(value: unknown): PendingTransfer {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Invalid saved transfer');
+  const row = value as Record<string, unknown>;
+  return parseTransfer({id: row.id, quantity: row.quantity, part_number: row.partNumber, description: row.description,
+    from_store_id: row.fromStoreId, to_store_id: row.toStoreId, from_store_name: row.fromStoreName,
+    to_store_name: row.toStoreName, created_at: row.createdAt, can_receive: row.canReceive,
+    can_return: row.canReturn, status: 'in_transit'});
+}
+
+function parsePendingTransferCache(raw: string | null): {rows: PendingTransfer[]; savedAt: number} | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const cache = value as Record<string, unknown>;
+    if (!Number.isSafeInteger(cache.savedAt) || (cache.savedAt as number) < 1 || !Array.isArray(cache.rows) || cache.rows.length > 500) return null;
+    return {rows: cache.rows.map(parsePendingTransfer), savedAt: cache.savedAt as number};
+  } catch { return null; }
 }
 
 function parseOverviewStats(value: unknown): OverviewStats | null {
@@ -313,6 +335,28 @@ export const offlineStockStore: OfflineStockStorage = {
     const row = await db.getFirstAsync<{saved_at: number}>(
       'SELECT saved_at FROM inventory_snapshot_state WHERE user_id=?', userId);
     return row?.saved_at ?? null;
+  },
+  async savePendingTransfers(userId: number, rows: PendingTransfer[]): Promise<number> {
+    const key = `pending_transfers.v1.${userId}`;
+    const savedAt = Date.now();
+    const value = JSON.stringify({rows: rows.slice(0, 500), savedAt});
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, value);
+      return savedAt;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, value);
+    return savedAt;
+  },
+  async loadPendingTransfers(userId: number) {
+    const key = `pending_transfers.v1.${userId}`;
+    let raw: string | null;
+    if (Platform.OS === 'web') raw = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    return parsePendingTransferCache(raw);
   },
   async saveMovementHistory(userId: number, partId: number, storeId: number, rows: StockMovement[]): Promise<number> {
     const key = `movement_history.v1.${userId}.${partId}.${storeId}`;

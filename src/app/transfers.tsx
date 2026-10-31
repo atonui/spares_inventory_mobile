@@ -11,6 +11,20 @@ import {clearInventorySnapshot, setInventorySnapshot} from '../features/inventor
 
 type Confirmation = {transfer: PendingTransfer; action: 'receive' | 'return'};
 
+function isNetworkFailure(reason: unknown) {
+  return reason instanceof TypeError || (reason instanceof ApiError && reason.status === 0);
+}
+
+function formatSavedAge(savedAt: number) {
+  const minutes = Math.floor(Math.max(0, Date.now() - savedAt) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+}
+
 export default function TransfersScreen() {
   const router = useRouter();
   const [transfers, setTransfers] = useState<PendingTransfer[]>([]);
@@ -19,22 +33,39 @@ export default function TransfersScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [offlineSavedAt, setOfflineSavedAt] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const locked = useRef(false);
   const generation = useRef(0);
 
   const load = useCallback(async () => {
     const request = ++generation.current;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setOfflineSavedAt(null); setNotice('');
     try {
       const user = await api.getMe();
       const rows = await api.getPendingTransfers();
+      try { await offlineStockStore.savePendingTransfers(user.id, rows); }
+      catch { /* Cache failures must not block current transfers. */ }
       if (request === generation.current) {setUserId(user.id); setTransfers(rows);}
     } catch (reason) {
       if (request !== generation.current) return;
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
         await api.clearSession(); clearInventorySnapshot(); setTransfers([]); router.replace('/');
-      } else setError('Could not refresh transfers. Connect to the server and retry.');
+      } else if (isNetworkFailure(reason)) {
+        try {
+          const activeUserId = await offlineStockStore.getActiveUserId();
+          const cached = activeUserId === null ? null : await offlineStockStore.loadPendingTransfers(activeUserId);
+          if (request !== generation.current) return;
+          if (activeUserId !== null && cached !== null) {
+            setUserId(activeUserId);
+            setTransfers(cached.rows);
+            setOfflineSavedAt(cached.savedAt);
+            setNotice(`Offline · Saved transfer list from ${formatSavedAge(cached.savedAt)}. Actions are disabled until you reconnect.${cached.rows.length === 500 ? ' Showing the 500 most recent transfers.' : ''}`);
+          } else {
+            setError('Could not reach the server, and no saved transfer list is available on this device.');
+          }
+        } catch {setError('Could not reach the server, and no saved transfer list is available on this device.');}
+      } else setError(reason instanceof ApiError ? reason.message : 'Could not refresh transfers. Connect to the server and retry.');
     } finally {if (request === generation.current) setLoading(false);}
   }, [router]);
 
@@ -54,7 +85,10 @@ export default function TransfersScreen() {
         !(confirmation.action === 'receive' ? current.canReceive : current.canReturn)) throw new Error('This transfer changed or your permission was removed. Refresh transfers.');
       sent = true;
       await api.completeTransfer(current.id, confirmation.action);
-      setTransfers(rows => rows.filter(row => row.id !== current.id));
+      const remainingTransfers = transfers.filter(row => row.id !== current.id);
+      setTransfers(remainingTransfers);
+      try { await offlineStockStore.savePendingTransfers(user.id, remainingTransfers); }
+      catch { /* The live action is confirmed even if the local view cannot be refreshed. */ }
       setConfirmation(null);
       setNotice(confirmation.action === 'receive' ? 'Receipt confirmed. Stock is available at the destination.' : 'Return confirmed. Stock is available at the source store.');
       try {
@@ -88,9 +122,10 @@ export default function TransfersScreen() {
         <Text style={styles.body}>From: {item.fromStoreName}</Text><Text style={styles.body}>To: {item.toStoreName}</Text>
         <Text style={styles.body}>{new Date(item.createdAt).toLocaleString()}</Text>
         <View style={styles.actions}>
-          {item.canReceive && <Pressable accessibilityRole="button" accessibilityLabel={`Receive transfer ${item.id}`} disabled={loading || saving || !!error} style={styles.button} onPress={() => setConfirmation({transfer: item, action: 'receive'})}><Text style={styles.label}>Receive</Text></Pressable>}
-          {item.canReturn && <Pressable accessibilityRole="button" accessibilityLabel={`Return transfer ${item.id}`} disabled={loading || saving || !!error} style={styles.button} onPress={() => setConfirmation({transfer: item, action: 'return'})}><Text style={styles.label}>Return to source</Text></Pressable>}
-          {!item.canReceive && !item.canReturn && <Text style={styles.body}>Awaiting confirmation by an authorized user.</Text>}
+          {!offlineSavedAt && item.canReceive && <Pressable accessibilityRole="button" accessibilityLabel={`Receive transfer ${item.id}`} disabled={loading || saving || !!error} style={styles.button} onPress={() => setConfirmation({transfer: item, action: 'receive'})}><Text style={styles.label}>Receive</Text></Pressable>}
+          {!offlineSavedAt && item.canReturn && <Pressable accessibilityRole="button" accessibilityLabel={`Return transfer ${item.id}`} disabled={loading || saving || !!error} style={styles.button} onPress={() => setConfirmation({transfer: item, action: 'return'})}><Text style={styles.label}>Return to source</Text></Pressable>}
+          {offlineSavedAt !== null && <Text style={styles.body}>Reconnect to confirm receipt or return.</Text>}
+          {!offlineSavedAt && !item.canReceive && !item.canReturn && <Text style={styles.body}>Awaiting confirmation by an authorized user.</Text>}
         </View>
       </View>} />}
     <AppBottomNavigation active="more" />
