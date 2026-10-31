@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRouter} from 'expo-router';
+import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api, isMockMode} from '../../api/runtime';
 import {ApiError, type NativeUser} from '../../api/client';
 import type {PartRecord, StoreDestination} from '../../api/transferContract';
@@ -25,6 +25,8 @@ function normalized(value: string) {
 
 export function ReceiveStockScreen() {
   const router = useRouter();
+  const {partId: partIdParam} = useLocalSearchParams<{partId?: string}>();
+  const requestedPartId = /^\d+$/.test(partIdParam ?? '') ? Number(partIdParam) : null;
   const [user, setUser] = useState<NativeUser | null>(null);
   const [parts, setParts] = useState<PartRecord[]>([]);
   const [stores, setStores] = useState<StoreDestination[]>([]);
@@ -51,7 +53,10 @@ export function ReceiveStockScreen() {
       setUser(currentUser);
       setParts(partRows.sort((a, b) => a.partNumber.localeCompare(b.partNumber)));
       setStores(storeRows.sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedPart(current => current ? partRows.find(part => part.id === current.id) ?? null : null);
+      setSelectedPart(current => current
+        ? partRows.find(part => part.id === current.id) ?? null
+        : partRows.find(part => part.id === requestedPartId) ?? null);
+      if (requestedPartId !== null) setPartQuery('');
       setSelectedStore(current => current ? storeRows.find(store => store.id === current.id) ?? null : null);
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
@@ -60,7 +65,7 @@ export function ReceiveStockScreen() {
         router.replace('/');
       } else setError(messageFor(reason));
     } finally { setLoading(false); }
-  }, [router]);
+  }, [router, requestedPartId]);
 
   useEffect(() => {
     let active = true;
