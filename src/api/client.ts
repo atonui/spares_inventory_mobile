@@ -17,6 +17,7 @@ export type NativeUser = {
 };
 
 export type InventoryRow = InventoryItem;
+export type OverviewStats = {totalParts: number; activeStores: number; myEquipment: number; myParts: number};
 
 export type NativeSession = {
   access_token: string;
@@ -313,7 +314,7 @@ export function createApiClient({
         return parseNativeUser(response);
       });
     },
-    getOverviewStats() {
+    getOverviewStats(): Promise<OverviewStats> {
       return authenticated(async token => {
         const [inventory, equipment] = await Promise.all([
           request<unknown>('/api/stats', {token}),
