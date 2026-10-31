@@ -178,6 +178,22 @@ export const offlineStockStore: OfflineStockStorage = {
     const key = `spares-tracker.movement_history.v1.${userId}.${partId}.${storeId}`;
     return parseMovementHistory(globalThis.localStorage?.getItem(key) ?? null);
   },
+  async saveRecentWorkOrder(userId: number, workOrder: string): Promise<string[]> {
+    const key = `spares-tracker.recent_work_orders.v1.${userId}`;
+    const previous = await offlineStockStore.loadRecentWorkOrders(userId);
+    const trimmed = workOrder.trim();
+    const next = [trimmed, ...previous.filter(value => value.toLocaleLowerCase() !== trimmed.toLocaleLowerCase())].slice(0, 8);
+    globalThis.localStorage?.setItem(key, JSON.stringify(next));
+    return next;
+  },
+  async loadRecentWorkOrders(userId: number): Promise<string[]> {
+    try {
+      const raw = globalThis.localStorage?.getItem(`spares-tracker.recent_work_orders.v1.${userId}`);
+      const value: unknown = raw ? JSON.parse(raw) : [];
+      return Array.isArray(value) && value.length <= 8 && value.every(item => typeof item === 'string' && item.trim().length > 0 && item.length <= 200)
+        ? value.map(item => item.trim()) : [];
+    } catch { return []; }
+  },
   async saveProfile(profile: NativeUser) {
     globalThis.localStorage?.setItem(`spares-tracker.profile.v1.${profile.id}`, JSON.stringify(profile));
     globalThis.localStorage?.setItem('spares-tracker.active-user.v1', String(profile.id));
