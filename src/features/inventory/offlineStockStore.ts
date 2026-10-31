@@ -2,7 +2,7 @@ import {Platform} from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import type {InventoryItem} from './inventoryRepository';
 import type {NativeUser} from '../../api/client';
-import {parseStore, type StoreDestination} from '../../api/transferContract';
+import {parseEquipment, parsePart, parseStore, type EquipmentRecord, type PartRecord, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment, StockQueueStore} from './offlineStockQueue';
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -18,6 +18,10 @@ export type OfflineStockStorage = StockQueueStore & {
   loadInventorySnapshot(userId: number): Promise<InventoryItem[] | null>;
   saveStoreDirectory(userId: number, stores: StoreDestination[]): Promise<void>;
   loadStoreDirectory(userId: number): Promise<StoreDestination[] | null>;
+  savePartCatalog(userId: number, parts: PartRecord[]): Promise<void>;
+  loadPartCatalog(userId: number): Promise<PartRecord[] | null>;
+  saveEquipmentDirectory(userId: number, equipment: EquipmentRecord[]): Promise<void>;
+  loadEquipmentDirectory(userId: number): Promise<EquipmentRecord[] | null>;
   getInventorySnapshotSavedAt(userId: number): Promise<number | null>;
   subscribeQueueChanges(listener: () => void): () => void;
   saveProfile(profile: NativeUser): Promise<void>;
@@ -79,6 +83,31 @@ function isQueuedAdjustment(value: unknown): value is QueuedStockAdjustment {
     typeof item.newQuantity === 'number' && typeof item.createdAt === 'number' &&
     (item.status === 'queued' || item.status === 'conflict') &&
     (item.error === null || typeof item.error === 'string');
+}
+
+function parseCachedDirectory<T>(raw: string | null, parse: (item: unknown) => T): T[] | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) ? value.map(parse) : null;
+  } catch { return null; }
+}
+
+function parsePartRecord(value: unknown): PartRecord {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Invalid saved part');
+  const part = value as Record<string, unknown>;
+  return parsePart({id: part.id, part_number: part.partNumber, description: part.description, category: part.category});
+}
+
+function parseEquipmentRecord(value: unknown): EquipmentRecord {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Invalid saved equipment');
+  const equipment = value as Record<string, unknown>;
+  return parseEquipment({
+    id: equipment.id, equipment_name: equipment.name, make: equipment.make, model: equipment.model,
+    serial_number: equipment.serialNumber, assigned_user_id: equipment.assignedUserId,
+    assigned_user_name: equipment.assignedUserName, next_calibration_date: equipment.nextCalibrationDate,
+    status: equipment.status,
+  });
 }
 
 export const offlineStockStore: OfflineStockStorage = {
@@ -144,6 +173,44 @@ export const offlineStockStore: OfflineStockStorage = {
       if (!Array.isArray(stores)) return null;
       return stores.map(parseStore);
     } catch { return null; }
+  },
+  async savePartCatalog(userId: number, parts: PartRecord[]) {
+    const key = `parts_catalog.v1.${userId}`;
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, JSON.stringify(parts));
+      return;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(parts));
+  },
+  async loadPartCatalog(userId: number): Promise<PartRecord[] | null> {
+    const key = `parts_catalog.v1.${userId}`;
+    let raw: string | null;
+    if (Platform.OS === 'web') raw = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    return parseCachedDirectory(raw, parsePartRecord);
+  },
+  async saveEquipmentDirectory(userId: number, equipment: EquipmentRecord[]) {
+    const key = `equipment_directory.v1.${userId}`;
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, JSON.stringify(equipment));
+      return;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(equipment));
+  },
+  async loadEquipmentDirectory(userId: number): Promise<EquipmentRecord[] | null> {
+    const key = `equipment_directory.v1.${userId}`;
+    let raw: string | null;
+    if (Platform.OS === 'web') raw = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    return parseCachedDirectory(raw, parseEquipmentRecord);
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     if (Platform.OS === 'web') {
