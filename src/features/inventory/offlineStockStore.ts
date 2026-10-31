@@ -1,7 +1,7 @@
 import {Platform} from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import type {InventoryItem} from './inventoryRepository';
-import type {NativeUser} from '../../api/client';
+import type {NativeUser, OverviewStats} from '../../api/client';
 import {parseEquipment, parsePart, parseStore, type EquipmentRecord, type PartRecord, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment, StockQueueStore} from './offlineStockQueue';
 
@@ -23,6 +23,9 @@ export type OfflineStockStorage = StockQueueStore & {
   saveEquipmentDirectory(userId: number, equipment: EquipmentRecord[]): Promise<void>;
   loadEquipmentDirectory(userId: number): Promise<EquipmentRecord[] | null>;
   getDirectorySavedAt(userId: number, directory: 'parts' | 'stores' | 'equipment'): Promise<number | null>;
+  saveOverviewStats(userId: number, stats: OverviewStats): Promise<number>;
+  loadOverviewStats(userId: number): Promise<OverviewStats | null>;
+  getOverviewStatsSavedAt(userId: number): Promise<number | null>;
   getInventorySnapshotSavedAt(userId: number): Promise<number | null>;
   subscribeQueueChanges(listener: () => void): () => void;
   saveProfile(profile: NativeUser): Promise<void>;
@@ -109,6 +112,15 @@ function parseEquipmentRecord(value: unknown): EquipmentRecord {
     assigned_user_name: equipment.assignedUserName, next_calibration_date: equipment.nextCalibrationDate,
     status: equipment.status,
   });
+}
+
+function parseOverviewStats(value: unknown): OverviewStats | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const stats = value as Record<string, unknown>;
+  const keys = ['totalParts', 'activeStores', 'myEquipment', 'myParts'] as const;
+  if (keys.some(key => typeof stats[key] !== 'number' || !Number.isSafeInteger(stats[key]) || (stats[key] as number) < 0)) return null;
+  return {totalParts: stats.totalParts as number, activeStores: stats.activeStores as number,
+    myEquipment: stats.myEquipment as number, myParts: stats.myParts as number};
 }
 
 export const offlineStockStore: OfflineStockStorage = {
@@ -233,6 +245,44 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async getDirectorySavedAt(userId: number, directory: 'parts' | 'stores' | 'equipment'): Promise<number | null> {
     const key = `directory_saved_at.v1.${directory}.${userId}`;
+    let value: string | null;
+    if (Platform.OS === 'web') value = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      value = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    return value && /^\d+$/.test(value) ? Number(value) : null;
+  },
+  async saveOverviewStats(userId: number, stats: OverviewStats): Promise<number> {
+    const key = `overview_stats.v1.${userId}`;
+    const savedAtKey = `overview_stats_saved_at.v1.${userId}`;
+    const savedAt = Date.now();
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, JSON.stringify(stats));
+      globalThis.localStorage?.setItem(`spares-tracker.${savedAtKey}`, String(savedAt));
+      return savedAt;
+    }
+    const db = await database();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(stats));
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', savedAtKey, String(savedAt));
+    });
+    return savedAt;
+  },
+  async loadOverviewStats(userId: number): Promise<OverviewStats | null> {
+    const key = `overview_stats.v1.${userId}`;
+    let raw: string | null;
+    if (Platform.OS === 'web') raw = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    if (!raw) return null;
+    try { return parseOverviewStats(JSON.parse(raw)); }
+    catch { return null; }
+  },
+  async getOverviewStatsSavedAt(userId: number): Promise<number | null> {
+    const key = `overview_stats_saved_at.v1.${userId}`;
     let value: string | null;
     if (Platform.OS === 'web') value = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
     else {
