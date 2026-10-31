@@ -12,6 +12,7 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
   const [quantity, setQuantity] = useState('');
   const [workOrder, setWorkOrder] = useState('');
   const [notes, setNotes] = useState('');
+  const [recentWorkOrders, setRecentWorkOrders] = useState<string[]>([]);
   const [reviewedQuantity, setReviewedQuantity] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +42,9 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
     setDestination(null); setStoreSearch(''); setStores([]);
     storeRequest.current++;
     if (operation === 'transfer') void loadStores();
+    if (operation === 'issue') {
+      void offlineStockStore.loadRecentWorkOrders(userId).then(setRecentWorkOrders).catch(() => setRecentWorkOrders([]));
+    }
   }
 
   async function checkStock() {
@@ -78,6 +82,10 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
       if (mode === 'receive') await api.receiveStock({partId: item.partId, storeId: item.storeId, quantity: units});
       else if (mode === 'transfer') await api.dispatchStock({inventoryId: item.id, toStoreId: destination!.id, quantity: units});
       else await api.issueStock({inventoryId: item.id, quantity: units, workOrder, notes});
+      if (mode === 'issue') {
+        try { setRecentWorkOrders(await offlineStockStore.saveRecentWorkOrder(userId, workOrder.trim())); }
+        catch { /* The confirmed issue remains successful if recent suggestions cannot be saved. */ }
+      }
       setFinished(true);
       setNotice(mode === 'transfer' ? 'Stock dispatched. The destination must confirm receipt before it becomes available there.' : mode === 'receive' ? 'Stock received successfully.' : 'Stock issued successfully.');
       try {await onRefresh();}
@@ -123,7 +131,13 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
             </>}
             {mode === 'issue' && <>
               <Text style={styles.label}>Work order (required)</Text>
-              <TextInput accessibilityLabel="Work order" style={styles.input} value={workOrder} onChangeText={setWorkOrder} autoCorrect={false} editable={!busy} />
+              <TextInput accessibilityLabel="Work order" placeholder="Enter work order reference" style={styles.input} value={workOrder} onChangeText={setWorkOrder} autoCapitalize="characters" autoCorrect={false} editable={!busy} />
+              {recentWorkOrders.length > 0 && <View style={styles.recentWorkOrders}>
+                <Text style={styles.body}>Recent work orders</Text>
+                <View style={styles.recentWorkOrderList}>{recentWorkOrders.map(value => <Pressable key={value} accessibilityRole="button" accessibilityLabel={`Use work order ${value}`} disabled={busy} onPress={() => setWorkOrder(value)} style={styles.recentWorkOrder}>
+                  <Text style={styles.recentWorkOrderText}>{value}</Text>
+                </Pressable>)}</View>
+              </View>}
               <Text style={styles.label}>Notes (optional)</Text>
               <TextInput accessibilityLabel="Issue notes" style={styles.input} value={notes} onChangeText={setNotes} maxLength={1000} editable={!busy} />
             </>}
@@ -160,4 +174,8 @@ const styles = StyleSheet.create({
   content: {padding: 24, paddingTop: 64, paddingBottom: 48, gap: 16},
   input: {minHeight: 48, borderWidth: 1, borderColor: '#64748B', borderRadius: 10, padding: 12, backgroundColor: '#FFFFFF', fontSize: 16, color: '#15263B'},
   error: {fontSize: 16, lineHeight: 24, color: '#A13A32'},
+  recentWorkOrders: {gap: 7},
+  recentWorkOrderList: {flexDirection: 'row', flexWrap: 'wrap', gap: 7},
+  recentWorkOrder: {minHeight: 38, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 19, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF'},
+  recentWorkOrderText: {fontSize: 13, fontWeight: '700', color: '#15263B'},
 });
