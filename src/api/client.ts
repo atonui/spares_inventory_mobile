@@ -24,7 +24,7 @@ export type StockMovement = {
   transferStatus: string | null; completedByName: string | null; completedAt: string | null;
 };
 
-function parseStockMovement(value: unknown): StockMovement {
+export function parseStockMovement(value: unknown): StockMovement {
   if (!isRecord(value)) throw new ApiError('The server returned invalid movement history.', 0);
   const optionalText = (key: string): string | null => {
     const field = value[key];
