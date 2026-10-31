@@ -12,6 +12,7 @@ let mockBarcodeValue = 'PN-0042';
 let mockCameraGranted = true;
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
   useRouter: () => ({push: mockPush, back: mockBack}),
   useLocalSearchParams: () => ({userId: '7'}),
 }));

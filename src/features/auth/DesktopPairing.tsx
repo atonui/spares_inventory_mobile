@@ -1,8 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import {CameraView, useCameraPermissions} from 'expo-camera';
 import * as Linking from 'expo-linking';
-import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {AppIcon} from '../navigation/AppIcon';
+import type {MobilePairingCredential} from '../../api/client';
 
 const palette = {
   navy: '#15263B',
@@ -18,12 +19,12 @@ const palette = {
 
 type Props = {
   mockMode: boolean;
-  onPair: (qrData: string, onApprovalRequired: () => void) => Promise<void>;
+  onPair: (credential: MobilePairingCredential, onApprovalRequired: () => void) => Promise<void>;
   onCancel?: () => void;
   onPhaseChange?: (phase: Phase) => void;
 };
 
-type Phase = 'welcome' | 'scan' | 'pending';
+type Phase = 'welcome' | 'scan' | 'code' | 'pending';
 
 export const PREVIEW_PAIRING_QR = 'sparesflow://pair?token=preview-pairing-token';
 
@@ -35,21 +36,22 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
   const [cameraAttempt, setCameraAttempt] = useState(0);
   const [retryingCamera, setRetryingCamera] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
+  const [pairingCode, setPairingCode] = useState('');
   const scanned = useRef(false);
 
   useEffect(() => {onPhaseChange?.(phase);}, [onPhaseChange, phase]);
 
-  async function beginPairing(qrData: string) {
+  async function beginPairing(credential: MobilePairingCredential) {
     if (scanned.current) return;
     scanned.current = true;
     setError('');
     setApprovalRequired(false);
     setPhase('pending');
     try {
-      await onPair(qrData, () => setApprovalRequired(true));
+      await onPair(credential, () => setApprovalRequired(true));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Pairing could not be completed. Try again.');
-      setPhase('scan');
+      setPhase('pairingCode' in credential ? 'code' : 'scan');
       scanned.current = false;
     }
   }
@@ -105,30 +107,66 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
       {phase === 'welcome' && (
         <>
           <Text style={styles.body}>
-            On your signed-in desktop, open your profile and generate a one-time QR code to connect this phone.
+            On your signed-in desktop, open your profile and generate a one-time QR code or manual pairing code.
           </Text>
           <View style={styles.steps}>
             <Step number="1" text="Open Spares Tracker on your desktop" />
             <Step number="2" text="Go to Profile → Connect mobile app" />
-            <Step number="3" text="Scan the QR code and approve this device there" />
+            <Step number="3" text="Scan the QR code or enter its code, then approve this device there" />
           </View>
           <View style={styles.qrGuide}>
             <View style={styles.qrMark}><AppIcon name="scan" color={palette.white} size={20} /></View>
             <View style={styles.qrCopy}>
               <Text style={styles.qrTitle}>Ready to connect</Text>
-              <Text style={styles.qrDescription}>Point your camera at the one-time QR code on your desktop. The Scan screen also reads stock barcodes and QR codes.</Text>
+              <Text style={styles.qrDescription}>Scan the one-time QR code on your desktop, or enter its pairing code if the camera cannot scan. The Scan screen also reads stock barcodes and QR codes.</Text>
             </View>
           </View>
           <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('scan');}} style={styles.primaryButton}>
             <AppIcon name="scan" color={palette.white} size={18} />
             <Text style={styles.primaryButtonText}>Scan pairing QR</Text>
           </Pressable>
-          <Text style={styles.privacyNote}>The QR code expires quickly and can only be used once.</Text>
+          <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('code');}} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Enter pairing code</Text>
+          </Pressable>
+          <Text style={styles.privacyNote}>The QR code and manual code expire in two minutes and can each be used once.</Text>
           {mockMode && (
-            <Pressable accessibilityRole="button" onPress={() => void beginPairing(PREVIEW_PAIRING_QR)} style={styles.previewButton}>
+            <Pressable accessibilityRole="button" onPress={() => void beginPairing({qrData: PREVIEW_PAIRING_QR})} style={styles.previewButton}>
               <Text style={styles.previewButtonText}>Try preview pairing</Text>
             </Pressable>
           )}
+        </>
+      )}
+
+      {phase === 'code' && (
+        <>
+          <Text style={styles.body}>Enter the one-time code shown beside the QR code in your desktop profile. Desktop approval is still required.</Text>
+          <TextInput
+            accessibilityLabel="Pairing code"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={11}
+            onChangeText={value => {
+              const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+              setPairingCode(normalized.length > 5 ? `${normalized.slice(0, 5)}-${normalized.slice(5)}` : normalized);
+            }}
+            placeholder="ABCDE-23456"
+            placeholderTextColor={palette.slate}
+            style={styles.codeInput}
+            value={pairingCode}
+          />
+          <Pressable
+            accessibilityRole="button"
+            disabled={pairingCode.replace('-', '').length !== 10}
+            onPress={() => void beginPairing({pairingCode})}
+            style={[styles.primaryButton, pairingCode.replace('-', '').length !== 10 && styles.disabledButton]}
+          >
+            <Text style={styles.primaryButtonText}>Continue</Text>
+          </Pressable>
+          <Text style={styles.privacyNote}>This code expires in two minutes and can be used once.</Text>
+          {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+          <Pressable accessibilityRole="button" onPress={cancelPairing} style={styles.textButton}>
+            <Text style={styles.textButtonLabel}>Back</Text>
+          </Pressable>
         </>
       )}
 
@@ -152,7 +190,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
                   style={StyleSheet.absoluteFill}
                   facing="back"
                   barcodeScannerSettings={{barcodeTypes: ['qr']}}
-                  onBarcodeScanned={({data}) => void beginPairing(data)}
+                  onBarcodeScanned={({data}) => void beginPairing({qrData: data})}
                   onMountError={() => setCameraMountError(true)}
                 />
                 <View pointerEvents="none" style={styles.scanFrame}><View style={styles.scanCorners} /></View>
@@ -179,8 +217,11 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
               )}
             </View>
           )}
+          <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('code');}} style={styles.manualCodeButton}>
+            <Text style={styles.manualCodeButtonText}>Enter pairing code instead</Text>
+          </Pressable>
           {mockMode && (
-            <Pressable accessibilityRole="button" onPress={() => void beginPairing(PREVIEW_PAIRING_QR)} style={styles.previewButton}>
+            <Pressable accessibilityRole="button" onPress={() => void beginPairing({qrData: PREVIEW_PAIRING_QR})} style={styles.previewButton}>
               <Text style={styles.previewButtonText}>Use preview QR</Text>
             </Pressable>
           )}
@@ -234,6 +275,8 @@ const styles = StyleSheet.create({
   qrDescription: {marginTop: 2, fontSize: 11, lineHeight: 16, color: palette.muted},
   primaryButton: {minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 11, backgroundColor: palette.navy},
   primaryButtonText: {fontSize: 14, fontWeight: '800', color: palette.white},
+  disabledButton: {opacity: 0.5},
+  codeInput: {height: 54, marginTop: 18, marginBottom: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: palette.border, borderRadius: 11, backgroundColor: palette.white, color: palette.navy, fontSize: 18, fontWeight: '800', letterSpacing: 2, textAlign: 'center'},
   privacyNote: {marginTop: 13, textAlign: 'center', fontSize: 12, lineHeight: 18, color: palette.slate},
   previewButton: {minHeight: 46, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background},
   previewButtonText: {fontSize: 13, fontWeight: '700', color: palette.navy},
@@ -252,6 +295,8 @@ const styles = StyleSheet.create({
   secondaryButtonText: {fontSize: 14, fontWeight: '700', color: palette.white},
   settingsCheckButton: {minHeight: 44, marginTop: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   settingsCheckButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
+  manualCodeButton: {minHeight: 44, marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
+  manualCodeButtonText: {fontSize: 14, fontWeight: '700', color: palette.navy},
   textButton: {alignSelf: 'center', minHeight: 44, marginTop: 15, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center'},
   textButtonLabel: {fontSize: 14, fontWeight: '700', color: palette.slate},
   pendingCard: {alignItems: 'center', marginTop: 20, padding: 22, borderRadius: 16, backgroundColor: palette.background},

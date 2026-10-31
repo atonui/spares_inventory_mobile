@@ -22,7 +22,24 @@ describe('desktop pairing onboarding', () => {
     expect(screen.getByText(/Go to Profile → Connect mobile app/i)).toBeTruthy();
     expect(screen.getByText(/The Scan screen also reads stock barcodes and QR codes/i)).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Scan pairing QR'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Enter pairing code'})).toBeTruthy();
     expect(screen.queryByLabelText('Email address')).toBeNull();
+  });
+
+
+  it('allows manual pairing when the camera cannot scan', async () => {
+    const onPair = jest.fn(async (_credential, onApprovalRequired) => {onApprovalRequired();});
+    const screen = await render(<DesktopPairing mockMode={false} onPair={onPair} />);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Enter pairing code'}));
+    await fireEvent.changeText(screen.getByLabelText('Pairing code'), 'abcde23456');
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Continue'}).props.disabled).toBeFalsy());
+    await fireEvent.press(screen.getByRole('button', {name: 'Continue'}));
+
+    await waitFor(() => expect(onPair).toHaveBeenCalledWith(
+      {pairingCode: 'ABCDE-23456'}, expect.any(Function),
+    ));
+    expect(screen.getByText('Waiting for desktop approval')).toBeTruthy();
   });
 
   it('offers a clearly marked mock pairing path only in preview mode', async () => {
@@ -33,7 +50,7 @@ describe('desktop pairing onboarding', () => {
 
     expect(screen.getByText('Waiting for desktop approval')).toBeTruthy();
     await waitFor(() => expect(onPair).toHaveBeenCalledWith(
-      'sparesflow://pair?token=preview-pairing-token', expect.any(Function),
+      {qrData: 'sparesflow://pair?token=preview-pairing-token'}, expect.any(Function),
     ));
   });
 

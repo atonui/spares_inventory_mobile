@@ -30,6 +30,7 @@ export type NativeLogin = NativeSession & {
   user: NativeUser;
 };
 
+export type MobilePairingCredential = {qrData: string} | {pairingCode: string};
 export type MobilePairingClaim = {claimToken: string; expiresAt: string};
 export type MobilePairingStatus = {status: 'pending'} | {status: 'approved'; session: NativeLogin};
 
@@ -266,10 +267,13 @@ export function createApiClient({
       });
       return parseNativeLoginResponse(result);
     },
-    async claimMobilePairing(qrData: string, deviceName: string): Promise<MobilePairingClaim> {
+    async claimMobilePairing(credential: MobilePairingCredential, deviceName: string): Promise<MobilePairingClaim> {
+      const pairingCredential = 'qrData' in credential
+        ? {qr_data: credential.qrData}
+        : {pairing_code: credential.pairingCode};
       const result = await request<unknown>('/api/v1/auth/mobile-pairing/claim', {
         method: 'POST',
-        body: {qr_data: qrData, device_name: deviceName},
+        body: {...pairingCredential, device_name: deviceName},
       });
       if (!isRecord(result) || !isNonEmptyString(result.claim_token) || !isDateTime(result.expires_at)) {
         throw new ApiError('The pairing request could not be started.', 0);

@@ -51,6 +51,7 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
 }));
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
   useRouter: () => ({push: mockPush, back: mockBack, setParams: mockSetParams}),
   useLocalSearchParams: () => {
     const React = require('react');
