@@ -22,6 +22,7 @@ export type OfflineStockStorage = StockQueueStore & {
   loadPartCatalog(userId: number): Promise<PartRecord[] | null>;
   saveEquipmentDirectory(userId: number, equipment: EquipmentRecord[]): Promise<void>;
   loadEquipmentDirectory(userId: number): Promise<EquipmentRecord[] | null>;
+  getDirectorySavedAt(userId: number, directory: 'parts' | 'stores' | 'equipment'): Promise<number | null>;
   getInventorySnapshotSavedAt(userId: number): Promise<number | null>;
   subscribeQueueChanges(listener: () => void): () => void;
   saveProfile(profile: NativeUser): Promise<void>;
@@ -149,13 +150,19 @@ export const offlineStockStore: OfflineStockStorage = {
     catch { return null; }
   },
   async saveStoreDirectory(userId: number, stores: StoreDestination[]) {
+    const key = `store_directory.v1.${userId}`;
+    const savedAtKey = `directory_saved_at.v1.stores.${userId}`;
+    const savedAt = Date.now();
     if (Platform.OS === 'web') {
       globalThis.localStorage?.setItem(`spares-tracker.stores.v1.${userId}`, JSON.stringify(stores));
+      globalThis.localStorage?.setItem(`spares-tracker.${savedAtKey}`, String(savedAt));
       return;
     }
     const db = await database();
-    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)',
-      `store_directory.v1.${userId}`, JSON.stringify(stores));
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(stores));
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', savedAtKey, String(savedAt));
+    });
   },
   async loadStoreDirectory(userId: number): Promise<StoreDestination[] | null> {
     let raw: string | null;
@@ -176,12 +183,18 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async savePartCatalog(userId: number, parts: PartRecord[]) {
     const key = `parts_catalog.v1.${userId}`;
+    const savedAtKey = `directory_saved_at.v1.parts.${userId}`;
+    const savedAt = Date.now();
     if (Platform.OS === 'web') {
       globalThis.localStorage?.setItem(`spares-tracker.${key}`, JSON.stringify(parts));
+      globalThis.localStorage?.setItem(`spares-tracker.${savedAtKey}`, String(savedAt));
       return;
     }
     const db = await database();
-    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(parts));
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(parts));
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', savedAtKey, String(savedAt));
+    });
   },
   async loadPartCatalog(userId: number): Promise<PartRecord[] | null> {
     const key = `parts_catalog.v1.${userId}`;
@@ -195,12 +208,18 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async saveEquipmentDirectory(userId: number, equipment: EquipmentRecord[]) {
     const key = `equipment_directory.v1.${userId}`;
+    const savedAtKey = `directory_saved_at.v1.equipment.${userId}`;
+    const savedAt = Date.now();
     if (Platform.OS === 'web') {
       globalThis.localStorage?.setItem(`spares-tracker.${key}`, JSON.stringify(equipment));
+      globalThis.localStorage?.setItem(`spares-tracker.${savedAtKey}`, String(savedAt));
       return;
     }
     const db = await database();
-    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(equipment));
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, JSON.stringify(equipment));
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', savedAtKey, String(savedAt));
+    });
   },
   async loadEquipmentDirectory(userId: number): Promise<EquipmentRecord[] | null> {
     const key = `equipment_directory.v1.${userId}`;
@@ -211,6 +230,16 @@ export const offlineStockStore: OfflineStockStorage = {
       raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
     }
     return parseCachedDirectory(raw, parseEquipmentRecord);
+  },
+  async getDirectorySavedAt(userId: number, directory: 'parts' | 'stores' | 'equipment'): Promise<number | null> {
+    const key = `directory_saved_at.v1.${directory}.${userId}`;
+    let value: string | null;
+    if (Platform.OS === 'web') value = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      value = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    return value && /^\d+$/.test(value) ? Number(value) : null;
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     if (Platform.OS === 'web') {
