@@ -1,5 +1,5 @@
 import type {InventoryItem} from './inventoryRepository';
-import type {NativeUser} from '../../api/client';
+import type {NativeUser, OverviewStats} from '../../api/client';
 import {parseEquipment, parsePart, parseStore, type EquipmentRecord, type PartRecord, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment} from './offlineStockQueue';
 import type {OfflineStockStorage} from './offlineStockStore';
@@ -19,6 +19,15 @@ function isQueuedAdjustment(value: unknown): value is QueuedStockAdjustment {
     typeof item.newQuantity === 'number' && typeof item.createdAt === 'number' &&
     (item.status === 'queued' || item.status === 'conflict') &&
     (item.error === null || typeof item.error === 'string');
+}
+
+function parseOverviewStats(value: unknown): OverviewStats | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const stats = value as Record<string, unknown>;
+  const keys = ['totalParts', 'activeStores', 'myEquipment', 'myParts'] as const;
+  if (keys.some(key => typeof stats[key] !== 'number' || !Number.isSafeInteger(stats[key]) || (stats[key] as number) < 0)) return null;
+  return {totalParts: stats.totalParts as number, activeStores: stats.activeStores as number,
+    myEquipment: stats.myEquipment as number, myParts: stats.myParts as number};
 }
 
 function getWebEntries(): QueuedStockAdjustment[] {
@@ -99,6 +108,22 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async getDirectorySavedAt(userId: number, directory: 'parts' | 'stores' | 'equipment'): Promise<number | null> {
     const value = globalThis.localStorage?.getItem(`spares-tracker.directory_saved_at.v1.${directory}.${userId}`);
+    return value && /^\d+$/.test(value) ? Number(value) : null;
+  },
+  async saveOverviewStats(userId: number, stats: OverviewStats): Promise<number> {
+    const savedAt = Date.now();
+    globalThis.localStorage?.setItem(`spares-tracker.overview_stats.v1.${userId}`, JSON.stringify(stats));
+    globalThis.localStorage?.setItem(`spares-tracker.overview_stats_saved_at.v1.${userId}`, String(savedAt));
+    return savedAt;
+  },
+  async loadOverviewStats(userId: number): Promise<OverviewStats | null> {
+    try {
+      const raw = globalThis.localStorage?.getItem(`spares-tracker.overview_stats.v1.${userId}`);
+      return raw ? parseOverviewStats(JSON.parse(raw)) : null;
+    } catch { return null; }
+  },
+  async getOverviewStatsSavedAt(userId: number): Promise<number | null> {
+    const value = globalThis.localStorage?.getItem(`spares-tracker.overview_stats_saved_at.v1.${userId}`);
     return value && /^\d+$/.test(value) ? Number(value) : null;
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
