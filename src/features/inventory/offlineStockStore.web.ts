@@ -1,5 +1,5 @@
 import type {InventoryItem} from './inventoryRepository';
-import type {NativeUser, OverviewStats} from '../../api/client';
+import {parseStockMovement, type NativeUser, type OverviewStats, type StockMovement} from '../../api/client';
 import {parseEquipment, parsePart, parseStore, type EquipmentRecord, type PartRecord, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment} from './offlineStockQueue';
 import type {OfflineStockStorage} from './offlineStockStore';
@@ -28,6 +28,17 @@ function parseOverviewStats(value: unknown): OverviewStats | null {
   if (keys.some(key => typeof stats[key] !== 'number' || !Number.isSafeInteger(stats[key]) || (stats[key] as number) < 0)) return null;
   return {totalParts: stats.totalParts as number, activeStores: stats.activeStores as number,
     myEquipment: stats.myEquipment as number, myParts: stats.myParts as number};
+}
+
+function parseMovementHistory(raw: string | null): {rows: StockMovement[]; savedAt: number} | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const cache = value as Record<string, unknown>;
+    if (!Number.isSafeInteger(cache.savedAt) || (cache.savedAt as number) < 1 || !Array.isArray(cache.rows) || cache.rows.length > 20) return null;
+    return {rows: cache.rows.map(parseStockMovement), savedAt: cache.savedAt as number};
+  } catch { return null; }
 }
 
 function getWebEntries(): QueuedStockAdjustment[] {
@@ -129,6 +140,16 @@ export const offlineStockStore: OfflineStockStorage = {
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     const value = globalThis.localStorage?.getItem(`spares-tracker.inventory-saved-at.v1.${userId}`);
     return value && /^\d+$/.test(value) ? Number(value) : null;
+  },
+  async saveMovementHistory(userId: number, partId: number, storeId: number, rows: StockMovement[]): Promise<number> {
+    const savedAt = Date.now();
+    const key = `spares-tracker.movement_history.v1.${userId}.${partId}.${storeId}`;
+    globalThis.localStorage?.setItem(key, JSON.stringify({rows: rows.slice(0, 20), savedAt}));
+    return savedAt;
+  },
+  async loadMovementHistory(userId: number, partId: number, storeId: number) {
+    const key = `spares-tracker.movement_history.v1.${userId}.${partId}.${storeId}`;
+    return parseMovementHistory(globalThis.localStorage?.getItem(key) ?? null);
   },
   async saveProfile(profile: NativeUser) {
     globalThis.localStorage?.setItem(`spares-tracker.profile.v1.${profile.id}`, JSON.stringify(profile));

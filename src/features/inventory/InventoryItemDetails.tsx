@@ -71,7 +71,7 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
         <Text accessibilityRole="header" style={styles.sectionTitle}>Storage location</Text>
         <DetailField label="Store type" value={storeTypeLabel(item.storeType)} />
       </View>
-      <StockMovementHistory item={item} refreshKey={movementRefreshKey} />
+      <StockMovementHistory item={item} userId={userId} refreshKey={movementRefreshKey} />
     </ScrollView>
   );
 }
