@@ -1,4 +1,4 @@
-export type StoreDestination = {id: number; name: string; type: string; location?: string | null};
+export type StoreDestination = {id: number; name: string; type: string; location?: string | null; assignedUserId?: number | null};
 export type PendingTransfer = {
   id: number; quantity: number; partNumber: string; description: string;
   fromStoreId: number; toStoreId: number; fromStoreName: string; toStoreName: string;
@@ -25,8 +25,10 @@ function label(value: unknown): string {
 }
 export function parseStore(value: unknown): StoreDestination {
   const row = record(value);
-  if (!(row.location === undefined || row.location === null || typeof row.location === 'string')) throw new Error('Invalid server response');
-  return {id: id(row.id), name: label(row.name), type: label(row.type), location: typeof row.location === 'string' ? row.location : null};
+  if (!(row.location === undefined || row.location === null || typeof row.location === 'string') ||
+      !(row.assigned_user_id === undefined || row.assigned_user_id === null || (typeof row.assigned_user_id === 'number' && Number.isSafeInteger(row.assigned_user_id) && row.assigned_user_id > 0))) throw new Error('Invalid server response');
+  return {id: id(row.id), name: label(row.name), type: label(row.type), location: typeof row.location === 'string' ? row.location : null,
+    assignedUserId: typeof row.assigned_user_id === 'number' ? row.assigned_user_id : null};
 }
 export function parsePart(value: unknown): PartRecord {
   const row = record(value);
