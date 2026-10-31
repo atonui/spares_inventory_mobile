@@ -1,8 +1,14 @@
-export type StoreDestination = {id: number; name: string; type: string};
+export type StoreDestination = {id: number; name: string; type: string; location?: string | null};
 export type PendingTransfer = {
   id: number; quantity: number; partNumber: string; description: string;
   fromStoreId: number; toStoreId: number; fromStoreName: string; toStoreName: string;
   createdAt: string; canReceive: boolean; canReturn: boolean;
+};
+export type PartRecord = {id: number; partNumber: string; description: string; category: string};
+export type EquipmentRecord = {
+  id: number; name: string; make: string; model: string; serialNumber: string;
+  assignedUserId: number | null; assignedUserName: string | null;
+  nextCalibrationDate: string | null; status: string;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -19,7 +25,33 @@ function label(value: unknown): string {
 }
 export function parseStore(value: unknown): StoreDestination {
   const row = record(value);
-  return {id: id(row.id), name: label(row.name), type: label(row.type)};
+  if (!(row.location === undefined || row.location === null || typeof row.location === 'string')) throw new Error('Invalid server response');
+  return {id: id(row.id), name: label(row.name), type: label(row.type), location: typeof row.location === 'string' ? row.location : null};
+}
+export function parsePart(value: unknown): PartRecord {
+  const row = record(value);
+  if (typeof row.description !== 'string' || typeof row.category !== 'string') throw new Error('Invalid server response');
+  return {id: id(row.id), partNumber: label(row.part_number), description: row.description, category: row.category};
+}
+export function parseEquipment(value: unknown): EquipmentRecord {
+  const row = record(value);
+  const text = (key: string): string => {
+    if (typeof row[key] !== 'string') throw new Error('Invalid server response');
+    return row[key] as string;
+  };
+  const optionalString = (key: string): string | null => {
+    const value = row[key];
+    if (value === null || value === undefined) return null;
+    if (typeof value !== 'string') throw new Error('Invalid server response');
+    return value;
+  };
+  return {
+    id: id(row.id), name: label(row.equipment_name), make: text('make'), model: text('model'),
+    serialNumber: text('serial_number'),
+    assignedUserId: row.assigned_user_id === null || row.assigned_user_id === undefined ? null : id(row.assigned_user_id),
+    assignedUserName: optionalString('assigned_user_name'),
+    nextCalibrationDate: optionalString('next_calibration_date'), status: label(row.status),
+  };
 }
 export function parseTransfer(value: unknown): PendingTransfer {
   const row = record(value);
