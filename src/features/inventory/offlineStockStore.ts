@@ -31,6 +31,8 @@ export type OfflineStockStorage = StockQueueStore & {
   loadPendingTransfers(userId: number): Promise<{rows: PendingTransfer[]; savedAt: number} | null>;
   saveMovementHistory(userId: number, partId: number, storeId: number, rows: StockMovement[]): Promise<number>;
   loadMovementHistory(userId: number, partId: number, storeId: number): Promise<{rows: StockMovement[]; savedAt: number} | null>;
+  saveRecentWorkOrder(userId: number, workOrder: string): Promise<string[]>;
+  loadRecentWorkOrders(userId: number): Promise<string[]>;
   subscribeQueueChanges(listener: () => void): () => void;
   saveProfile(profile: NativeUser): Promise<void>;
   loadProfile(userId: number): Promise<NativeUser | null>;
@@ -379,6 +381,33 @@ export const offlineStockStore: OfflineStockStorage = {
       raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
     }
     return parseMovementHistory(raw);
+  },
+  async saveRecentWorkOrder(userId: number, workOrder: string): Promise<string[]> {
+    const key = `recent_work_orders.v1.${userId}`;
+    const previous = await offlineStockStore.loadRecentWorkOrders(userId);
+    const next = [workOrder.trim(), ...previous.filter(value => value.toLocaleLowerCase() !== workOrder.trim().toLocaleLowerCase())].slice(0, 8);
+    const value = JSON.stringify(next);
+    if (Platform.OS === 'web') globalThis.localStorage?.setItem(`spares-tracker.${key}`, value);
+    else {
+      const db = await database();
+      await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, value);
+    }
+    return next;
+  },
+  async loadRecentWorkOrders(userId: number): Promise<string[]> {
+    const key = `recent_work_orders.v1.${userId}`;
+    let raw: string | null;
+    if (Platform.OS === 'web') raw = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    if (!raw) return [];
+    try {
+      const value: unknown = JSON.parse(raw);
+      return Array.isArray(value) && value.length <= 8 && value.every(item => typeof item === 'string' && item.trim().length > 0 && item.length <= 200)
+        ? value.map(item => item.trim()) : [];
+    } catch { return []; }
   },
   async saveProfile(profile: NativeUser) {
     if (Platform.OS === 'web') {
