@@ -26,7 +26,7 @@ import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAcc
 import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {getConnectivityStatus} from '../features/network/connectivity';
-import DesktopPairing from '../features/auth/DesktopPairing';
+import DesktopPairing, {type MobilePairingCredential} from '../features/auth/DesktopPairing';
 import {StoresDirectory, summarizeStores} from '../features/inventory/StoresDirectory';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
@@ -86,7 +86,7 @@ const inventorySortOptions: {value: InventorySort; label: string}[] = [
 
 export default function InventoryScreen() {
   const router = useRouter();
-  const [pairingPhase, setPairingPhase] = useState<'welcome' | 'scan' | 'pending'>('welcome');
+  const [pairingPhase, setPairingPhase] = useState<'welcome' | 'scan' | 'code' | 'pending'>('welcome');
   const routeParams = useLocalSearchParams<{filter?: string | string[]; query?: string | string[]; view?: string; storeId?: string}>();
   const showingStores = routeParams.view === 'stores';
   const selectedStoreId = routeParams.storeId ? Number(routeParams.storeId) : null;
@@ -249,7 +249,7 @@ export default function InventoryScreen() {
     return offlineStockStore.subscribeQueueChanges(() => { void updateQueuedCount(); });
   }, [user]);
 
-  async function pairWithDesktop(qrData: string, onApprovalRequired: () => void) {
+  async function pairWithDesktop(credential: MobilePairingCredential, onApprovalRequired: () => void) {
     setError('');
     setLoading(true);
     let issuedSession = false;
@@ -257,11 +257,11 @@ export default function InventoryScreen() {
     clearInventorySnapshot();
     try {
       const deviceName = Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android phone' : 'Web preview';
-      const claim = await api.claimMobilePairing(qrData, deviceName);
+      const claim = await api.claimMobilePairing(credential, deviceName);
       onApprovalRequired();
       while (!pairingCancelledRef.current) {
         if (Date.parse(claim.expiresAt) <= Date.now()) {
-          throw new ApiError('This pairing request expired. Generate a new QR code from desktop and try again.', 410);
+          throw new ApiError('This pairing request expired. Generate a new QR code or pairing code from desktop and try again.', 410);
         }
         const result = await api.completeMobilePairing(claim.claimToken);
         if (result.status === 'approved') {
@@ -786,8 +786,8 @@ export default function InventoryScreen() {
               </View>
             </View>
             <View style={styles.pairingProgressLabel}>
-              <Text style={styles.heroLabel}>{pairingPhase === 'welcome' ? 'STEP 1 OF 3' : pairingPhase === 'scan' ? 'STEP 2 OF 3' : 'STEP 3 OF 3'}</Text>
-              <Text style={styles.heroStep}>{pairingPhase === 'welcome' ? 'Pair this device' : pairingPhase === 'scan' ? 'Scan desktop QR' : 'Approve this device'}</Text>
+              <Text style={styles.heroLabel}>{pairingPhase === 'welcome' ? 'STEP 1 OF 3' : pairingPhase === 'pending' ? 'STEP 3 OF 3' : 'STEP 2 OF 3'}</Text>
+              <Text style={styles.heroStep}>{pairingPhase === 'welcome' ? 'Pair this device' : pairingPhase === 'scan' ? 'Scan desktop QR' : pairingPhase === 'code' ? 'Enter pairing code' : 'Approve this device'}</Text>
             </View>
             <View style={styles.progressTrack}><View style={[styles.progressFill, pairingPhase === 'scan' && styles.progressFillScan, pairingPhase === 'pending' && styles.progressFillPending]} /></View>
           </View>
