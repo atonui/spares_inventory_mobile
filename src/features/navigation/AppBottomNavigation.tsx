@@ -32,7 +32,7 @@ export function AppBottomNavigation({
     {key: 'more', label: 'More', icon: 'more'},
   ];
 
-  function navigateTo(path: '/' | '/home' | '/scan' | '/offline-changes' | '/profile' | '/settings' | '/transfers') {
+  function navigateTo(path: '/' | '/home' | '/scan' | '/offline-changes' | '/profile' | '/settings' | '/transfers' | '/receive-stock') {
     setMenuVisible(false);
     router.push(path);
   }
@@ -90,6 +90,7 @@ export function AppBottomNavigation({
             </View>
             <ScrollView style={styles.menuScroll} contentContainerStyle={styles.menuContent} showsVerticalScrollIndicator={false}>
               <Text style={styles.groupLabel}>INVENTORY</Text>
+              <MenuAction icon="inventory" title="Receive stock" subtitle="Add stock to a part at a store" onPress={() => navigateTo('/receive-stock')} />
               <MenuAction icon="changes" title="Transfers" subtitle="Receive or return stock in transit" onPress={() => navigateTo('/transfers')} />
               <MenuAction icon="inventory" title="Stores" subtitle="Browse stock by store" onPress={() => {setMenuVisible(false); router.push({pathname: '/', params: {view: 'stores', storeId: undefined, query: undefined, filter: undefined}});}} />
               <Text style={styles.groupLabel}>ACCOUNT & APP</Text>
