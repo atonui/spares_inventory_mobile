@@ -4,7 +4,6 @@ import {
   type InventoryItem,
 } from '../features/inventory/inventoryRepository.ts';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
-import type {MobilePairingCredential} from '../features/auth/DesktopPairing';
 import {parseEquipment, parsePart, parseStore, parseTransfer, readNativePages, type EquipmentRecord, type PartRecord} from './transferContract.ts';
 
 export type NativeUser = {
