@@ -4,7 +4,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useRouter} from 'expo-router';
 import {useNetworkState} from 'expo-network';
 import {api, isMockMode} from '../api/runtime';
-import {ApiError} from '../api/client';
+import {ApiError, type OverviewStats} from '../api/client';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {getConnectivityStatus} from '../features/network/connectivity';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
@@ -16,10 +16,24 @@ const palette = {
   warning: '#8A5A0A', warningBackground: '#FFF4DB', error: '#A13A32', errorBackground: '#FCE8E6',
 };
 
-type DashboardStats = {totalParts: number; activeStores: number; myEquipment: number; myParts: number};
 type QueueStatus = {queued: number; conflicts: number; hasSnapshot: boolean};
-type MetricKey = keyof DashboardStats;
+type MetricKey = keyof OverviewStats;
 const emptyQueue: QueueStatus = {queued: 0, conflicts: 0, hasSnapshot: false};
+
+function isNetworkFailure(reason: unknown): boolean {
+  return reason instanceof TypeError || (reason instanceof ApiError && reason.status === 0);
+}
+
+function formatSavedAge(savedAt: number | null): string | null {
+  if (savedAt === null) return null;
+  const minutes = Math.floor(Math.max(0, Date.now() - savedAt) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.floor(hours / 24);
+  return days < 30 ? `${days} ${days === 1 ? 'day' : 'days'} ago` : new Date(savedAt).toLocaleDateString();
+}
 
 const metrics: {key: MetricKey; label: string; route: '/parts' | '/stores' | '/equipment' | '/my-parts'; icon: 'inventory' | 'store' | 'equipment' | 'profile'}[] = [
   {key: 'totalParts', label: 'Total parts', route: '/parts', icon: 'inventory'},
@@ -31,7 +45,9 @@ const metrics: {key: MetricKey; label: string; route: '/parts' | '/stores' | '/e
 export default function HomeScreen() {
   const router = useRouter();
   const network = useNetworkState();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [statsSavedAt, setStatsSavedAt] = useState<number | null>(null);
+  const [usingSavedStats, setUsingSavedStats] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -43,8 +59,30 @@ export default function HomeScreen() {
     setLoading(true);
     setError('');
     try {
-      setStats(await api.getOverviewStats());
+      const [user, nextStats] = await Promise.all([api.getMe(), api.getOverviewStats()]);
+      setStats(nextStats);
+      setUsingSavedStats(false);
+      try { setStatsSavedAt(await offlineStockStore.saveOverviewStats(user.id, nextStats)); }
+      catch { setStatsSavedAt(Date.now()); }
     } catch (reason) {
+      if (isNetworkFailure(reason)) {
+        try {
+          const userId = await offlineStockStore.getActiveUserId();
+          if (userId !== null) {
+            const savedStats = await offlineStockStore.loadOverviewStats(userId);
+            if (savedStats !== null) {
+              setStats(savedStats);
+              setUsingSavedStats(true);
+              try { setStatsSavedAt(await offlineStockStore.getOverviewStatsSavedAt(userId)); }
+              catch { setStatsSavedAt(null); }
+              return;
+            }
+          }
+        } catch { /* Show the connection error when no readable cached totals are available. */ }
+      }
+      setStats(null);
+      setStatsSavedAt(null);
+      setUsingSavedStats(false);
       setError(reason instanceof ApiError || (isMockMode && reason instanceof Error)
         ? reason.message : 'Could not reach the server. Check your connection and try again.');
     } finally {
@@ -133,14 +171,16 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          {offline && (
+          {(offline || usingSavedStats) && (
             <View accessibilityRole="summary" style={styles.offlineBanner}>
               <View style={styles.offlineDot} />
               <View style={styles.bannerCopy}>
-                <Text style={styles.offlineTitle}>Offline</Text>
-                <Text style={styles.offlineText}>{queue.hasSnapshot
-                  ? 'Your saved inventory is available. Overview totals update when you reconnect.'
-                  : 'Overview totals need a connection. Changes will sync when you’re back online.'}</Text>
+                <Text style={styles.offlineTitle}>{offline ? 'Offline' : 'Showing saved totals'}</Text>
+                <Text style={styles.offlineText}>{usingSavedStats
+                  ? `${statsSavedAt === null ? 'Showing totals from an earlier successful refresh; refresh time unavailable.' : `These overview totals were last refreshed ${formatSavedAge(statsSavedAt)}.`} They update when you reconnect.`
+                  : queue.hasSnapshot
+                    ? 'Your saved inventory is available. Overview totals update when you reconnect.'
+                    : 'Overview totals need a connection. Changes will sync when you’re back online.'}</Text>
               </View>
             </View>
           )}
