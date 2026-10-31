@@ -3,6 +3,7 @@ import type {InventoryRow, NativeUser} from '../../api/client';
 import {canAdjustStock} from '../auth/roleCapabilities';
 import {StockAdjustmentControls} from './StockAdjustmentControls';
 import {StockOperations} from './StockOperations';
+import {StockMovementHistory} from './StockMovementHistory';
 import {AppIcon} from '../navigation/AppIcon';
 
 const palette = {
@@ -14,12 +15,13 @@ const palette = {
   background: '#F5F7FA',
 };
 
-export function InventoryItemDetails({item, user, userId, onQuantityChange, onRefresh}: {
+export function InventoryItemDetails({item, user, userId, onQuantityChange, onRefresh, movementRefreshKey = 0}: {
   item: InventoryRow;
   user: NativeUser | null;
   userId: number;
   onQuantityChange: (quantity: number) => void;
   onRefresh: () => Promise<number>;
+  movementRefreshKey?: number;
 }) {
   const outOfStock = item.quantity === 0;
   const lowStock = !outOfStock && item.quantity <= item.minThreshold;
@@ -69,6 +71,7 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
         <Text accessibilityRole="header" style={styles.sectionTitle}>Storage location</Text>
         <DetailField label="Store type" value={storeTypeLabel(item.storeType)} />
       </View>
+      <StockMovementHistory item={item} refreshKey={movementRefreshKey} />
     </ScrollView>
   );
 }
