@@ -18,6 +18,34 @@ export type NativeUser = {
 
 export type InventoryRow = InventoryItem;
 export type OverviewStats = {totalParts: number; activeStores: number; myEquipment: number; myParts: number};
+export type StockMovement = {
+  id: number; fromStoreName: string | null; toStoreName: string | null; partNumber: string; quantity: number;
+  movementType: string; workOrder: string | null; createdByName: string; createdAt: string;
+  transferStatus: string | null; completedByName: string | null; completedAt: string | null;
+};
+
+function parseStockMovement(value: unknown): StockMovement {
+  if (!isRecord(value)) throw new ApiError('The server returned invalid movement history.', 0);
+  const optionalText = (key: string): string | null => {
+    const field = value[key];
+    if (field === null || field === undefined) return null;
+    if (typeof field !== 'string') throw new ApiError('The server returned invalid movement history.', 0);
+    return field;
+  };
+  if (typeof value.id !== 'number' || !Number.isSafeInteger(value.id) || value.id < 1 ||
+      typeof value.quantity !== 'number' || !Number.isSafeInteger(value.quantity) || value.quantity < 0 ||
+      !isNonEmptyString(value.part_number) || !isNonEmptyString(value.movement_type) ||
+      !isNonEmptyString(value.created_by_name) || !isDateTime(value.created_at)) {
+    throw new ApiError('The server returned invalid movement history.', 0);
+  }
+  return {
+    id: value.id, fromStoreName: optionalText('from_store_name'), toStoreName: optionalText('to_store_name'),
+    partNumber: value.part_number, quantity: value.quantity, movementType: value.movement_type,
+    workOrder: optionalText('work_order'), createdByName: value.created_by_name, createdAt: value.created_at,
+    transferStatus: optionalText('transfer_status'), completedByName: optionalText('completed_by_name'),
+    completedAt: optionalText('completed_at'),
+  };
+}
 
 export type NativeSession = {
   access_token: string;
@@ -364,6 +392,21 @@ export function createApiClient({
           }
         },
       }));
+    },
+    getMovements(input: {partId: number; storeId: number; limit?: number}): Promise<StockMovement[]> {
+      const limit = input.limit ?? 20;
+      if (!Number.isSafeInteger(input.partId) || input.partId < 1 || !Number.isSafeInteger(input.storeId) || input.storeId < 1 ||
+          !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ApiError('Invalid movement history request.', 400);
+      return authenticated(async token => {
+        const query = `?part_id=${input.partId}&store_id=${input.storeId}&limit=${limit}`;
+        const result = await request<unknown>(`/api/movements${query}`, {token});
+        if (!Array.isArray(result)) throw new ApiError('The server returned invalid movement history.', 0);
+        try { return result.map(parseStockMovement); }
+        catch (reason) {
+          if (reason instanceof ApiError) throw reason;
+          throw new ApiError('The server returned invalid movement history.', 0);
+        }
+      });
     },
     adjustStock(adjustment: QueuedStockAdjustment): Promise<void> {
       return authenticated(async token => {
