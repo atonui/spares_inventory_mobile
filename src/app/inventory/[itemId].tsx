@@ -20,6 +20,7 @@ export default function InventoryItemDetailScreen() {
   const [userId, setUserId] = useState<number | null>(null);
   const [user, setUser] = useState<NativeUser | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [movementRefreshKey, setMovementRefreshKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -110,6 +111,7 @@ export default function InventoryItemDetailScreen() {
     const current = rows.find(row => row.id === Number(itemId));
     if (!current) throw new Error('Stock item is no longer available');
     setItem(current);
+    setMovementRefreshKey(value => value + 1);
     return current.quantity;
   }
 
@@ -167,6 +169,7 @@ export default function InventoryItemDetailScreen() {
             item={item}
             user={user}
             userId={userId}
+            movementRefreshKey={movementRefreshKey}
             onRefresh={refreshCurrentQuantity}
             onQuantityChange={quantity => {
               setItem(current => {

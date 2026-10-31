@@ -1,4 +1,4 @@
-import type {MobileApi, NativeLogin, NativeSession, NativeUser} from './client';
+import type {MobileApi, NativeLogin, NativeSession, NativeUser, StockMovement} from './client';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
 import type {EquipmentRecord, PartRecord, PendingTransfer} from './transferContract';
@@ -21,14 +21,20 @@ const previewInventory: InventoryItem[] = [
 export function createMockApiClient(): MobileApi {
   let session: NativeSession | null = null;
   let pairingPolls = 0;
-  const transfers: (PendingTransfer & {source: InventoryItem})[] = [];
+  const transfers: (PendingTransfer & {source: InventoryItem; movementId: number})[] = [];
+  type MockMovement = StockMovement & {partId: number; fromStoreId: number | null; toStoreId: number | null};
+  const movementHistory: MockMovement[] = [];
   let nextTransferId = 1;
+  let nextMovementId = 1;
   const stores = [...new Map(previewInventory.map(row => [row.storeId, {id: row.storeId, name: row.storeName, type: row.storeType, assignedUserId: row.storeOwner}])).values(), {id: 4, name: 'Empty destination store', type: 'central', assignedUserId: null}];
   const parts: PartRecord[] = [...new Map(previewInventory.map(row => [row.partId, {id: row.partId, partNumber: row.partNumber, description: row.description, category: 'Preview'}])).values()];
   const equipment: EquipmentRecord[] = [
     {id: 1, name: 'Portable analyzer', make: 'Demo', model: 'PA-1', serialNumber: 'DEMO-001', assignedUserId: previewUser.id, assignedUserName: previewUser.name, nextCalibrationDate: null, status: 'active'},
     {id: 2, name: 'Torque wrench', make: 'Demo', model: 'TW-2', serialNumber: 'DEMO-002', assignedUserId: 2, assignedUserName: 'Other engineer', nextCalibrationDate: null, status: 'active'},
   ];
+  function recordMovement(input: Omit<MockMovement, 'id' | 'createdAt' | 'createdByName'>) {
+    movementHistory.unshift({...input, id: nextMovementId++, createdAt: new Date().toISOString(), createdByName: previewUser.name});
+  }
   return {
     async login({email, password}) {
       if (!email.trim() || !password) throw new Error('Enter your email and password to continue.');
@@ -95,18 +101,31 @@ export function createMockApiClient(): MobileApi {
       if (item.quantity !== adjustment.expectedQuantity) {
         throw Object.assign(new Error('Stock changed since this count was recorded.'), {status: 409});
       }
+      const difference = adjustment.newQuantity - item.quantity;
       item.quantity = adjustment.newQuantity;
+      if (difference !== 0) recordMovement({partId: item.partId, fromStoreId: item.storeId, toStoreId: item.storeId,
+        fromStoreName: item.storeName, toStoreName: item.storeName, partNumber: item.partNumber,
+        quantity: Math.abs(difference), movementType: difference > 0 ? 'add' : 'remove', workOrder: item.workOrder,
+        transferStatus: null, completedByName: null, completedAt: null});
     },
     async getStores() {return stores.map(store => ({...store}));},
-    async getPendingTransfers() {return transfers.map(({source: _source, ...transfer}) => ({...transfer}));},
+    async getPendingTransfers() {return transfers.map(({source: _source, movementId: _movementId, ...transfer}) => ({...transfer}));},
+    async getMovements({partId, storeId, limit = 20}) {
+      return movementHistory.filter(movement => movement.partId === partId && (movement.fromStoreId === storeId || movement.toStoreId === storeId))
+        .slice(0, limit).map(({partId: _partId, fromStoreId: _fromStoreId, toStoreId: _toStoreId, ...movement}) => ({...movement}));
+    },
     async dispatchStock(input) {
       const source = previewInventory.find(row => row.id === input.inventoryId);
       const target = stores.find(store => store.id === input.toStoreId);
       if (!source || !target || source.storeId === target.id || input.quantity < 1 || input.quantity > source.quantity) throw new Error('Check the transfer quantity and destination.');
       source.quantity -= input.quantity;
-      transfers.push({id: nextTransferId++, quantity: input.quantity, partNumber: source.partNumber, description: source.description,
+      const transferId = nextTransferId++;
+      recordMovement({partId: source.partId, fromStoreId: source.storeId, toStoreId: target.id,
+        fromStoreName: source.storeName, toStoreName: target.name, partNumber: source.partNumber, quantity: input.quantity,
+        movementType: 'transfer', workOrder: source.workOrder, transferStatus: 'in_transit', completedByName: null, completedAt: null});
+      transfers.push({id: transferId, quantity: input.quantity, partNumber: source.partNumber, description: source.description,
         fromStoreId: source.storeId, toStoreId: target.id, fromStoreName: source.storeName, toStoreName: target.name,
-        createdAt: new Date().toISOString(), canReceive: true, canReturn: true, source: {...source}});
+        createdAt: new Date().toISOString(), canReceive: true, canReturn: true, source: {...source}, movementId: nextMovementId - 1});
     },
     async completeTransfer(id, action) {
       const index = transfers.findIndex(transfer => transfer.id === id);
@@ -117,6 +136,12 @@ export function createMockApiClient(): MobileApi {
       const stock = previewInventory.find(row => row.partId === transfer.source.partId && row.storeId === storeId && !row.isAllocated);
       if (stock) stock.quantity += transfer.quantity;
       else previewInventory.push({...transfer.source, id: Math.max(...previewInventory.map(row => row.id)) + 1, storeId, storeName: target.name, storeType: target.type, storeOwner: previewUser.id, quantity: transfer.quantity});
+      const movement = movementHistory.find(row => row.id === transfer.movementId);
+      if (movement) {
+        movement.transferStatus = action === 'receive' ? 'received' : 'returned';
+        movement.completedByName = previewUser.name;
+        movement.completedAt = new Date().toISOString();
+      }
       transfers.splice(index, 1);
     },
     async receiveStock(input) {
@@ -130,11 +155,18 @@ export function createMockApiClient(): MobileApi {
           partNumber: part.partNumber, description: part.description, storeName: store.name, storeType: store.type,
           storeOwner: store.assignedUserId ?? null, quantity: input.quantity, minThreshold: 0, isAllocated: false, workOrder: null});
       }
+      const receivedItem = previewInventory.find(row => row.partId === input.partId && row.storeId === input.storeId && !row.isAllocated)!;
+      recordMovement({partId: receivedItem.partId, fromStoreId: null, toStoreId: receivedItem.storeId,
+        fromStoreName: null, toStoreName: receivedItem.storeName, partNumber: receivedItem.partNumber, quantity: input.quantity,
+        movementType: 'add', workOrder: receivedItem.workOrder, transferStatus: null, completedByName: null, completedAt: null});
     },
     async issueStock(input) {
       const item = previewInventory.find(row => row.id === input.inventoryId);
       if (!item || item.isAllocated || item.quantity < input.quantity || !input.workOrder.trim()) throw new Error('Check the stock quantity and work order.');
       item.quantity -= input.quantity;
+      recordMovement({partId: item.partId, fromStoreId: item.storeId, toStoreId: null, fromStoreName: item.storeName,
+        toStoreName: null, partNumber: item.partNumber, quantity: input.quantity, movementType: 'consume', workOrder: input.workOrder.trim(),
+        transferStatus: null, completedByName: null, completedAt: null});
     },
     async logout() {
       if (!session) throw new Error('Please sign in to continue.');
