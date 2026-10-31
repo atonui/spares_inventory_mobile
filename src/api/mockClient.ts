@@ -23,7 +23,7 @@ export function createMockApiClient(): MobileApi {
   let pairingPolls = 0;
   const transfers: (PendingTransfer & {source: InventoryItem})[] = [];
   let nextTransferId = 1;
-  const stores = [...new Map(previewInventory.map(row => [row.storeId, {id: row.storeId, name: row.storeName, type: row.storeType}])).values(), {id: 4, name: 'Empty destination store', type: 'central'}];
+  const stores = [...new Map(previewInventory.map(row => [row.storeId, {id: row.storeId, name: row.storeName, type: row.storeType, assignedUserId: row.storeOwner}])).values(), {id: 4, name: 'Empty destination store', type: 'central', assignedUserId: null}];
   const parts: PartRecord[] = [...new Map(previewInventory.map(row => [row.partId, {id: row.partId, partNumber: row.partNumber, description: row.description, category: 'Preview'}])).values()];
   const equipment: EquipmentRecord[] = [
     {id: 1, name: 'Portable analyzer', make: 'Demo', model: 'PA-1', serialNumber: 'DEMO-001', assignedUserId: previewUser.id, assignedUserName: previewUser.name, nextCalibrationDate: null, status: 'active'},
@@ -121,8 +121,15 @@ export function createMockApiClient(): MobileApi {
     },
     async receiveStock(input) {
       const item = previewInventory.find(row => row.partId === input.partId && row.storeId === input.storeId && !row.isAllocated);
-      if (!item) throw new Error('Inventory item not found.');
-      item.quantity += input.quantity;
+      if (item) item.quantity += input.quantity;
+      else {
+        const part = parts.find(row => row.id === input.partId);
+        const store = stores.find(row => row.id === input.storeId);
+        if (!part || !store || !Number.isSafeInteger(input.quantity) || input.quantity < 1) throw new Error('Choose a valid part, store and quantity.');
+        previewInventory.push({id: Math.max(0, ...previewInventory.map(row => row.id)) + 1, partId: part.id, storeId: store.id,
+          partNumber: part.partNumber, description: part.description, storeName: store.name, storeType: store.type,
+          storeOwner: store.assignedUserId ?? null, quantity: input.quantity, minThreshold: 0, isAllocated: false, workOrder: null});
+      }
     },
     async issueStock(input) {
       const item = previewInventory.find(row => row.id === input.inventoryId);
