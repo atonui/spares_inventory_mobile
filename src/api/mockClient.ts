@@ -41,8 +41,11 @@ export function createMockApiClient(): MobileApi {
         user: {...previewUser, email: email.trim()},
       } satisfies NativeLogin;
     },
-    async claimMobilePairing(qrData, deviceName) {
-      if (!qrData.includes('token=preview-pairing-token')) {
+    async claimMobilePairing(credential, deviceName) {
+      const validCredential = 'qrData' in credential
+        ? credential.qrData.includes('token=preview-pairing-token')
+        : credential.pairingCode.trim().length > 0;
+      if (!validCredential) {
         throw new Error('This QR code is invalid or has expired. Generate a new code from your desktop account.');
       }
       if (!deviceName.trim()) throw new Error('This device could not be identified. Try pairing again.');
