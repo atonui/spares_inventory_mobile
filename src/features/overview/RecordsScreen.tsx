@@ -63,7 +63,12 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
     setOfflineNotice('');
     try {
       let next: RecordRow[];
-      if (kind === 'parts') next = makeRows(kind, {parts: await api.getParts()});
+      if (kind === 'parts') {
+        const [user, parts] = await Promise.all([api.getMe(), api.getParts()]);
+        try { await offlineStockStore.savePartCatalog(user.id, parts); }
+        catch { /* A local cache failure must not hide the live parts catalog. */ }
+        next = makeRows(kind, {parts});
+      }
       else if (kind === 'stores') {
         const [user, stores] = await Promise.all([api.getMe(), api.getStores()]);
         try { await offlineStockStore.saveStoreDirectory(user.id, stores); }
@@ -72,7 +77,10 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
       }
       else if (kind === 'equipment') {
         const [user, equipment] = await Promise.all([api.getMe(), api.getEquipment()]);
-        next = makeRows(kind, {equipment, userId: user.id});
+        const assigned = equipment.filter(item => item.assignedUserId === user.id);
+        try { await offlineStockStore.saveEquipmentDirectory(user.id, assigned); }
+        catch { /* A local cache failure must not hide assigned equipment. */ }
+        next = makeRows(kind, {equipment: assigned, userId: user.id});
       } else {
         const [user, inventory] = await Promise.all([api.getMe(), api.getInventory()]);
         next = makeRows(kind, {inventory, userId: user.id});
@@ -84,13 +92,26 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
           ? reason.message : 'Could not reach the server. Check your connection and try again.');
         return;
       }
-      if (kind === 'equipment') {
-        setError('Equipment records are not saved on this device. Connect to refresh them.');
-        return;
-      }
       try {
         const userId = await offlineStockStore.getActiveUserId();
         if (userId === null) throw new Error('No saved store directory or inventory is available.');
+        if (kind === 'parts') {
+          const savedParts = await offlineStockStore.loadPartCatalog(userId);
+          if (savedParts !== null) {
+            setRows(makeRows(kind, {parts: savedParts}));
+            setOfflineNotice('Offline · Showing your last saved parts catalog.');
+            return;
+          }
+        } else if (kind === 'equipment') {
+          const savedEquipment = await offlineStockStore.loadEquipmentDirectory(userId);
+          if (savedEquipment !== null) {
+            setRows(makeRows(kind, {equipment: savedEquipment, userId}));
+            setOfflineNotice('Offline · Showing equipment assigned to you from your last saved directory.');
+            return;
+          }
+          setError('Equipment is not saved on this device yet. Connect and open this directory to make it available offline.');
+          return;
+        }
         if (kind === 'stores') {
           const savedStores = await offlineStockStore.loadStoreDirectory(userId);
           if (savedStores !== null) {
