@@ -32,7 +32,8 @@ describe('desktop pairing onboarding', () => {
     const screen = await render(<DesktopPairing mockMode={false} onPair={onPair} />);
 
     await fireEvent.press(screen.getByRole('button', {name: 'Enter pairing code'}));
-    fireEvent.changeText(screen.getByLabelText('Pairing code'), 'abcde23456');
+    await fireEvent.changeText(screen.getByLabelText('Pairing code'), 'abcde23456');
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Continue'}).props.disabled).toBe(false));
     await fireEvent.press(screen.getByRole('button', {name: 'Continue'}));
 
     await waitFor(() => expect(onPair).toHaveBeenCalledWith(

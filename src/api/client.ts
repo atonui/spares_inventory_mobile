@@ -31,6 +31,7 @@ export type NativeLogin = NativeSession & {
   user: NativeUser;
 };
 
+export type MobilePairingCredential = {qrData: string} | {pairingCode: string};
 export type MobilePairingClaim = {claimToken: string; expiresAt: string};
 export type MobilePairingStatus = {status: 'pending'} | {status: 'approved'; session: NativeLogin};
 

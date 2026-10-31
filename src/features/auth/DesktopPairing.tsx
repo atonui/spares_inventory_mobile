@@ -3,6 +3,7 @@ import {CameraView, useCameraPermissions} from 'expo-camera';
 import * as Linking from 'expo-linking';
 import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {AppIcon} from '../navigation/AppIcon';
+import type {MobilePairingCredential} from '../../api/client';
 
 const palette = {
   navy: '#15263B',
@@ -15,8 +16,6 @@ const palette = {
   danger: '#A13A32',
   dangerTint: '#FFF0EE',
 };
-
-export type MobilePairingCredential = {qrData: string} | {pairingCode: string};
 
 type Props = {
   mockMode: boolean;
@@ -130,9 +129,6 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
             <Text style={styles.secondaryButtonText}>Enter pairing code</Text>
           </Pressable>
           <Text style={styles.privacyNote}>The QR code and manual code expire in two minutes and can each be used once.</Text>
-          <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('code');}} style={styles.manualCodeButton}>
-            <Text style={styles.manualCodeButtonText}>Enter pairing code instead</Text>
-          </Pressable>
           {mockMode && (
             <Pressable accessibilityRole="button" onPress={() => void beginPairing({qrData: PREVIEW_PAIRING_QR})} style={styles.previewButton}>
               <Text style={styles.previewButtonText}>Try preview pairing</Text>
@@ -161,7 +157,7 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
           <Pressable
             accessibilityRole="button"
             disabled={pairingCode.replace('-', '').length !== 10}
-            onPress={() => void beginPairing({pairingCode: pairingCode.replace('-', '')})}
+            onPress={() => void beginPairing({pairingCode})}
             style={[styles.primaryButton, pairingCode.replace('-', '').length !== 10 && styles.disabledButton]}
           >
             <Text style={styles.primaryButtonText}>Continue</Text>
@@ -221,6 +217,9 @@ export default function DesktopPairing({mockMode, onPair, onCancel, onPhaseChang
               )}
             </View>
           )}
+          <Pressable accessibilityRole="button" onPress={() => {setError(''); setPhase('code');}} style={styles.manualCodeButton}>
+            <Text style={styles.manualCodeButtonText}>Enter pairing code instead</Text>
+          </Pressable>
           {mockMode && (
             <Pressable accessibilityRole="button" onPress={() => void beginPairing({qrData: PREVIEW_PAIRING_QR})} style={styles.previewButton}>
               <Text style={styles.previewButtonText}>Use preview QR</Text>
