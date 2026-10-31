@@ -64,7 +64,12 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
     try {
       let next: RecordRow[];
       if (kind === 'parts') next = makeRows(kind, {parts: await api.getParts()});
-      else if (kind === 'stores') next = makeRows(kind, {stores: await api.getStores()});
+      else if (kind === 'stores') {
+        const [user, stores] = await Promise.all([api.getMe(), api.getStores()]);
+        try { await offlineStockStore.saveStoreDirectory(user.id, stores); }
+        catch { /* A local cache failure must not hide the live store directory. */ }
+        next = makeRows(kind, {stores});
+      }
       else if (kind === 'equipment') {
         const [user, equipment] = await Promise.all([api.getMe(), api.getEquipment()]);
         next = makeRows(kind, {equipment, userId: user.id});
@@ -85,7 +90,15 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
       }
       try {
         const userId = await offlineStockStore.getActiveUserId();
-        if (userId === null) throw new Error('No saved inventory is available.');
+        if (userId === null) throw new Error('No saved store directory or inventory is available.');
+        if (kind === 'stores') {
+          const savedStores = await offlineStockStore.loadStoreDirectory(userId);
+          if (savedStores !== null) {
+            setRows(makeRows(kind, {stores: savedStores}));
+            setOfflineNotice('Offline · Showing your last saved store directory, including empty stores.');
+            return;
+          }
+        }
         const [savedRows, queue] = await Promise.all([
           offlineStockStore.loadInventorySnapshot(userId), offlineStockStore.list(userId),
         ]);
@@ -106,10 +119,10 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
             id: row.storeId, name: row.storeName, type: row.storeType, location: null,
           }])).values()];
           setRows(makeRows(kind, {stores}));
-          setOfflineNotice('Offline · Showing stores in saved inventory. Empty stores are not available offline.');
+          setOfflineNotice('Offline · Showing stores represented in saved inventory. Open the store directory online once to save empty stores for offline use.');
         }
       } catch {
-        setError('Could not reach the server, and no saved inventory is available on this device.');
+        setError('Could not reach the server, and no saved store directory or inventory is available on this device.');
       }
     } finally {
       setLoading(false);
