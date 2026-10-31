@@ -1,7 +1,7 @@
 import {Platform} from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import type {InventoryItem} from './inventoryRepository';
-import type {NativeUser, OverviewStats} from '../../api/client';
+import {parseStockMovement, type NativeUser, type OverviewStats, type StockMovement} from '../../api/client';
 import {parseEquipment, parsePart, parseStore, type EquipmentRecord, type PartRecord, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment, StockQueueStore} from './offlineStockQueue';
 
@@ -27,6 +27,8 @@ export type OfflineStockStorage = StockQueueStore & {
   loadOverviewStats(userId: number): Promise<OverviewStats | null>;
   getOverviewStatsSavedAt(userId: number): Promise<number | null>;
   getInventorySnapshotSavedAt(userId: number): Promise<number | null>;
+  saveMovementHistory(userId: number, partId: number, storeId: number, rows: StockMovement[]): Promise<number>;
+  loadMovementHistory(userId: number, partId: number, storeId: number): Promise<{rows: StockMovement[]; savedAt: number} | null>;
   subscribeQueueChanges(listener: () => void): () => void;
   saveProfile(profile: NativeUser): Promise<void>;
   loadProfile(userId: number): Promise<NativeUser | null>;
@@ -121,6 +123,17 @@ function parseOverviewStats(value: unknown): OverviewStats | null {
   if (keys.some(key => typeof stats[key] !== 'number' || !Number.isSafeInteger(stats[key]) || (stats[key] as number) < 0)) return null;
   return {totalParts: stats.totalParts as number, activeStores: stats.activeStores as number,
     myEquipment: stats.myEquipment as number, myParts: stats.myParts as number};
+}
+
+function parseMovementHistory(raw: string | null): {rows: StockMovement[]; savedAt: number} | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const cache = value as Record<string, unknown>;
+    if (!Number.isSafeInteger(cache.savedAt) || (cache.savedAt as number) < 1 || !Array.isArray(cache.rows) || cache.rows.length > 20) return null;
+    return {rows: cache.rows.map(parseStockMovement), savedAt: cache.savedAt as number};
+  } catch { return null; }
 }
 
 export const offlineStockStore: OfflineStockStorage = {
@@ -300,6 +313,28 @@ export const offlineStockStore: OfflineStockStorage = {
     const row = await db.getFirstAsync<{saved_at: number}>(
       'SELECT saved_at FROM inventory_snapshot_state WHERE user_id=?', userId);
     return row?.saved_at ?? null;
+  },
+  async saveMovementHistory(userId: number, partId: number, storeId: number, rows: StockMovement[]): Promise<number> {
+    const key = `movement_history.v1.${userId}.${partId}.${storeId}`;
+    const savedAt = Date.now();
+    const value = JSON.stringify({rows: rows.slice(0, 20), savedAt});
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.${key}`, value);
+      return savedAt;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)', key, value);
+    return savedAt;
+  },
+  async loadMovementHistory(userId: number, partId: number, storeId: number) {
+    const key = `movement_history.v1.${userId}.${partId}.${storeId}`;
+    let raw: string | null;
+    if (Platform.OS === 'web') raw = globalThis.localStorage?.getItem(`spares-tracker.${key}`) ?? null;
+    else {
+      const db = await database();
+      raw = (await db.getFirstAsync<{value: string}>('SELECT value FROM offline_metadata WHERE key=?', key))?.value ?? null;
+    }
+    return parseMovementHistory(raw);
   },
   async saveProfile(profile: NativeUser) {
     if (Platform.OS === 'web') {
