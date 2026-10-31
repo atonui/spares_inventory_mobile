@@ -26,6 +26,26 @@ function isNetworkFailure(reason: unknown): boolean {
   return reason instanceof TypeError || (reason instanceof ApiError && reason.status === 0);
 }
 
+function formatSavedAge(savedAt: number | null): string | null {
+  if (savedAt === null) return null;
+  const minutes = Math.floor(Math.max(0, Date.now() - savedAt) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  return new Date(savedAt).toLocaleDateString();
+}
+
+async function offlineDirectoryNotice(userId: number, directory: 'parts' | 'stores' | 'equipment', message: string) {
+  let savedAt: number | null = null;
+  try { savedAt = await offlineStockStore.getDirectorySavedAt(userId, directory); }
+  catch { /* Keep the saved directory visible when its freshness marker is unavailable. */ }
+  const age = formatSavedAge(savedAt);
+  return age ? `${message} Last refreshed ${age}.` : message;
+}
+
 function makeRows(kind: DirectoryKind, input: {parts?: PartRecord[]; stores?: StoreDestination[]; equipment?: EquipmentRecord[]; inventory?: InventoryItem[]; userId?: number}): RecordRow[] {
   if (kind === 'parts') return (input.parts ?? []).map(part => ({id: String(part.id), title: part.partNumber, detail: part.description, meta: part.category || 'Uncategorised', query: part.partNumber}));
   if (kind === 'stores') return (input.stores ?? []).map(store => ({id: String(store.id), title: store.name, detail: store.location || store.type.replaceAll('_', ' '), meta: store.type.replaceAll('_', ' '), storeId: store.id}));
@@ -99,14 +119,14 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
           const savedParts = await offlineStockStore.loadPartCatalog(userId);
           if (savedParts !== null) {
             setRows(makeRows(kind, {parts: savedParts}));
-            setOfflineNotice('Offline · Showing your last saved parts catalog.');
+            setOfflineNotice(await offlineDirectoryNotice(userId, 'parts', 'Offline · Showing your last saved parts catalog.'));
             return;
           }
         } else if (kind === 'equipment') {
           const savedEquipment = await offlineStockStore.loadEquipmentDirectory(userId);
           if (savedEquipment !== null) {
             setRows(makeRows(kind, {equipment: savedEquipment, userId}));
-            setOfflineNotice('Offline · Showing equipment assigned to you from your last saved directory.');
+            setOfflineNotice(await offlineDirectoryNotice(userId, 'equipment', 'Offline · Showing equipment assigned to you from your last saved directory.'));
             return;
           }
           setError('Equipment is not saved on this device yet. Connect and open this directory to make it available offline.');
@@ -116,7 +136,7 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
           const savedStores = await offlineStockStore.loadStoreDirectory(userId);
           if (savedStores !== null) {
             setRows(makeRows(kind, {stores: savedStores}));
-            setOfflineNotice('Offline · Showing your last saved store directory, including empty stores.');
+            setOfflineNotice(await offlineDirectoryNotice(userId, 'stores', 'Offline · Showing your last saved store directory, including empty stores.'));
             return;
           }
         }

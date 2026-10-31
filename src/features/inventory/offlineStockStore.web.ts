@@ -56,6 +56,7 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async saveStoreDirectory(userId: number, stores: StoreDestination[]) {
     globalThis.localStorage?.setItem(`spares-tracker.stores.v1.${userId}`, JSON.stringify(stores));
+    globalThis.localStorage?.setItem(`spares-tracker.directory_saved_at.v1.stores.${userId}`, String(Date.now()));
   },
   async loadStoreDirectory(userId: number): Promise<StoreDestination[] | null> {
     try {
@@ -66,6 +67,7 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async savePartCatalog(userId: number, parts: PartRecord[]) {
     globalThis.localStorage?.setItem(`spares-tracker.parts_catalog.v1.${userId}`, JSON.stringify(parts));
+    globalThis.localStorage?.setItem(`spares-tracker.directory_saved_at.v1.parts.${userId}`, String(Date.now()));
   },
   async loadPartCatalog(userId: number): Promise<PartRecord[] | null> {
     try {
@@ -80,6 +82,7 @@ export const offlineStockStore: OfflineStockStorage = {
   },
   async saveEquipmentDirectory(userId: number, equipment: EquipmentRecord[]) {
     globalThis.localStorage?.setItem(`spares-tracker.equipment_directory.v1.${userId}`, JSON.stringify(equipment));
+    globalThis.localStorage?.setItem(`spares-tracker.directory_saved_at.v1.equipment.${userId}`, String(Date.now()));
   },
   async loadEquipmentDirectory(userId: number): Promise<EquipmentRecord[] | null> {
     try {
@@ -93,6 +96,10 @@ export const offlineStockStore: OfflineStockStorage = {
           assigned_user_name: row.assignedUserName, next_calibration_date: row.nextCalibrationDate, status: row.status});
       }) : null;
     } catch { return null; }
+  },
+  async getDirectorySavedAt(userId: number, directory: 'parts' | 'stores' | 'equipment'): Promise<number | null> {
+    const value = globalThis.localStorage?.getItem(`spares-tracker.directory_saved_at.v1.${directory}.${userId}`);
+    return value && /^\d+$/.test(value) ? Number(value) : null;
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     const value = globalThis.localStorage?.getItem(`spares-tracker.inventory-saved-at.v1.${userId}`);
