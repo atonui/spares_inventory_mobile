@@ -1,5 +1,6 @@
 import type {InventoryItem} from './inventoryRepository';
 import type {NativeUser} from '../../api/client';
+import {parseStore, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment} from './offlineStockQueue';
 import type {OfflineStockStorage} from './offlineStockStore';
 
@@ -52,6 +53,16 @@ export const offlineStockStore: OfflineStockStorage = {
     } catch {
       return null;
     }
+  },
+  async saveStoreDirectory(userId: number, stores: StoreDestination[]) {
+    globalThis.localStorage?.setItem(`spares-tracker.stores.v1.${userId}`, JSON.stringify(stores));
+  },
+  async loadStoreDirectory(userId: number): Promise<StoreDestination[] | null> {
+    try {
+      const raw = globalThis.localStorage?.getItem(`spares-tracker.stores.v1.${userId}`);
+      const stores: unknown = raw ? JSON.parse(raw) : null;
+      return Array.isArray(stores) ? stores.map(parseStore) : null;
+    } catch { return null; }
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     const value = globalThis.localStorage?.getItem(`spares-tracker.inventory-saved-at.v1.${userId}`);

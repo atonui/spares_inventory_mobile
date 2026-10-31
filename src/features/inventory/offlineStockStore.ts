@@ -2,6 +2,7 @@ import {Platform} from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import type {InventoryItem} from './inventoryRepository';
 import type {NativeUser} from '../../api/client';
+import {parseStore, type StoreDestination} from '../../api/transferContract';
 import type {QueuedStockAdjustment, StockQueueStore} from './offlineStockQueue';
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -15,6 +16,8 @@ function notifyQueueChanged() {
 export type OfflineStockStorage = StockQueueStore & {
   saveInventorySnapshot(userId: number, items: InventoryItem[]): Promise<void>;
   loadInventorySnapshot(userId: number): Promise<InventoryItem[] | null>;
+  saveStoreDirectory(userId: number, stores: StoreDestination[]): Promise<void>;
+  loadStoreDirectory(userId: number): Promise<StoreDestination[] | null>;
   getInventorySnapshotSavedAt(userId: number): Promise<number | null>;
   subscribeQueueChanges(listener: () => void): () => void;
   saveProfile(profile: NativeUser): Promise<void>;
@@ -115,6 +118,32 @@ export const offlineStockStore: OfflineStockStorage = {
     if (!marker) return null;
     try { return rows.map(row => JSON.parse(row.item_json) as InventoryItem); }
     catch { return null; }
+  },
+  async saveStoreDirectory(userId: number, stores: StoreDestination[]) {
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(`spares-tracker.stores.v1.${userId}`, JSON.stringify(stores));
+      return;
+    }
+    const db = await database();
+    await db.runAsync('INSERT OR REPLACE INTO offline_metadata(key,value) VALUES(?,?)',
+      `store_directory.v1.${userId}`, JSON.stringify(stores));
+  },
+  async loadStoreDirectory(userId: number): Promise<StoreDestination[] | null> {
+    let raw: string | null;
+    if (Platform.OS === 'web') {
+      raw = globalThis.localStorage?.getItem(`spares-tracker.stores.v1.${userId}`) ?? null;
+    } else {
+      const db = await database();
+      const row = await db.getFirstAsync<{value: string}>(
+        'SELECT value FROM offline_metadata WHERE key=?', `store_directory.v1.${userId}`);
+      raw = row?.value ?? null;
+    }
+    if (!raw) return null;
+    try {
+      const stores: unknown = JSON.parse(raw);
+      if (!Array.isArray(stores)) return null;
+      return stores.map(parseStore);
+    } catch { return null; }
   },
   async getInventorySnapshotSavedAt(userId: number): Promise<number | null> {
     if (Platform.OS === 'web') {
