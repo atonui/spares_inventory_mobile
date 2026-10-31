@@ -1,6 +1,6 @@
 import Svg, {Circle, Path} from 'react-native-svg';
 
-export type AppIconName = 'home' | 'inventory' | 'scan' | 'changes' | 'more' | 'filter' | 'search' | 'sort' | 'close' | 'signOut' | 'flashlight' | 'profile' | 'settings' | 'chevronRight';
+export type AppIconName = 'home' | 'inventory' | 'scan' | 'changes' | 'more' | 'filter' | 'search' | 'sort' | 'close' | 'signOut' | 'flashlight' | 'profile' | 'settings' | 'store' | 'equipment' | 'warning' | 'chevronRight';
 
 export function AppIcon({name, color, size = 22}: {name: AppIconName; color: string; size?: number}) {
   const shared = {stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const};
@@ -56,6 +56,18 @@ export function AppIcon({name, color, size = 22}: {name: AppIconName; color: str
       {name === 'settings' && <>
         <Circle cx="12" cy="12" r="3" {...shared} />
         <Path d="m19.4 15 .1.1 1 1.7-1.7 2.9-2 .1-.2-.1a7.9 7.9 0 0 1-1.7 1l-.9 1.5h-3.4l-.9-1.5a7.9 7.9 0 0 1-1.7-1l-2 .1-1.7-2.9 1-1.7a8.3 8.3 0 0 1 0-2l-1-1.7 1.7-2.9 2 .1a7.9 7.9 0 0 1 1.7-1L10.8 6h3.4l.9 1.5a7.9 7.9 0 0 1 1.7 1l2-.1 1.7 2.9-1 1.7a8.3 8.3 0 0 1-.1 2Z" {...shared} />
+      </>}
+      {name === 'store' && <>
+        <Path d="M4 10v10h16V10M3 10l2-6h14l2 6M3 10a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2 2 0 0 0 4 0" {...shared} />
+        <Path d="M9 20v-6h6v6" {...shared} />
+      </>}
+      {name === 'equipment' && <>
+        <Path d="M8 6a4 4 0 0 0 5.2 3.8L20 16.6 16.6 20l-6.8-6.8A4 4 0 0 1 5 8l2.4 2.4 2.8-2.8L8 5.2V6Z" {...shared} />
+        <Circle cx="17.4" cy="17.4" r="1" {...shared} />
+      </>}
+      {name === 'warning' && <>
+        <Path d="M12 3.5 22 20H2L12 3.5Z" {...shared} />
+        <Path d="M12 9v5M12 17.2v.1" {...shared} />
       </>}
       {name === 'chevronRight' && <Path d="m9 5 7 7-7 7" {...shared} />}
     </Svg>
