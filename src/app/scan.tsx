@@ -7,11 +7,14 @@ import {StatusBar} from 'expo-status-bar';
 import {AccessibilityInfo, ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useLocalSearchParams, useRouter} from 'expo-router';
+import {api} from '../api/runtime';
+import {ApiError} from '../api/client';
+import type {PartRecord} from '../api/transferContract';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import {getInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
-import {findInventoryMatches} from '../features/inventory/scanLookup';
+import {extractScannedPartNumber, findInventoryMatches} from '../features/inventory/scanLookup';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
 
@@ -32,6 +35,8 @@ export default function InventoryScanScreen() {
   const [hasScanned, setHasScanned] = useState(false);
   const [feedbackSource, setFeedbackSource] = useState<'camera' | 'manual'>('camera');
   const [matches, setMatches] = useState<InventoryItem[]>([]);
+  const [catalogMatch, setCatalogMatch] = useState<PartRecord | null>(null);
+  const [checkingCatalog, setCheckingCatalog] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [permissionError, setPermissionError] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
@@ -44,6 +49,7 @@ export default function InventoryScanScreen() {
   const [scanSoundsEnabled, setScanSoundsEnabled] = useState(false);
   const [manualPartNumber, setManualPartNumber] = useState('');
   const scanned = useRef(false);
+  const catalogLookupGeneration = useRef(0);
   const soundPlayers = useRef<{success: AudioPlayer | null; notFound: AudioPlayer | null}>({success: null, notFound: null});
 
   useEffect(() => {
@@ -84,6 +90,8 @@ export default function InventoryScanScreen() {
       setHasScanned(false);
       setScannedValue('');
       setMatches([]);
+      setCatalogMatch(null);
+      setCheckingCatalog(false);
       setSelectedMatchId(null);
     }
     setInventoryState('loading');
@@ -141,16 +149,18 @@ export default function InventoryScanScreen() {
     };
   }, [userIdParam]));
 
+  const scanFound = matches.length > 0 || catalogMatch !== null;
+
   useEffect(() => {
-    if (!hasScanned || !hapticsEnabled || feedbackSource !== 'camera') return;
+    if (!hasScanned || checkingCatalog || !hapticsEnabled || feedbackSource !== 'camera') return;
     const sendScanFeedback = async () => {
       try {
         if (Platform.OS === 'android') {
-          await Haptics.performAndroidHapticsAsync(matches.length > 0
+          await Haptics.performAndroidHapticsAsync(scanFound
             ? Haptics.AndroidHaptics.Confirm
             : Haptics.AndroidHaptics.Reject);
         } else {
-          await Haptics.notificationAsync(matches.length > 0
+          await Haptics.notificationAsync(scanFound
             ? Haptics.NotificationFeedbackType.Success
             : Haptics.NotificationFeedbackType.Error);
         }
@@ -159,17 +169,19 @@ export default function InventoryScanScreen() {
       }
     };
     void sendScanFeedback();
-  }, [hasScanned, hapticsEnabled, feedbackSource, matches.length]);
+  }, [hasScanned, checkingCatalog, hapticsEnabled, feedbackSource, scanFound]);
 
   useEffect(() => {
-    if (!hasScanned) return;
-    const announcement = matches.length === 0
+    if (!hasScanned || checkingCatalog) return;
+    const announcement = catalogMatch
+      ? `${catalogMatch.partNumber}, ${catalogMatch.description}. No stock record. Receive stock to add it to a store.`
+      : matches.length === 0
       ? `No matching stock item found for ${scannedValue}.`
       : matches.length === 1
         ? `${matches[0].partNumber}, ${matches[0].quantity} ${matches[0].quantity === 1 ? 'unit' : 'units'} at ${matches[0].storeName}.`
         : `${matches.length} stock locations found for ${matches[0].partNumber}. Select the location you are checking.`;
     AccessibilityInfo.announceForAccessibility(announcement);
-  }, [hasScanned, matches, scannedValue]);
+  }, [hasScanned, checkingCatalog, matches, scannedValue, catalogMatch]);
 
   async function playScanSound(foundMatch: boolean) {
     if (!scanSoundsEnabled) return;
@@ -186,13 +198,62 @@ export default function InventoryScanScreen() {
   function onBarcodeScanned(value: string, source: 'camera' | 'manual' = 'camera') {
     if (scanned.current || inventory === null) return;
     scanned.current = true;
+    const generation = ++catalogLookupGeneration.current;
     setFeedbackSource(source);
     setHasScanned(true);
     setScannedValue(value);
     const found = findInventoryMatches(inventory, value);
     setMatches(found);
+    setCatalogMatch(null);
     setSelectedMatchId(found.length === 1 ? found[0].id : null);
-    if (source === 'camera') void playScanSound(found.length > 0);
+    setCheckingCatalog(found.length === 0);
+    if (found.length > 0 && source === 'camera') void playScanSound(true);
+    if (found.length === 0) {
+      void findCatalogMatch(value, source, generation);
+    }
+  }
+
+  async function findCatalogMatch(value: string, source: 'camera' | 'manual', generation: number) {
+    const partNumber = extractScannedPartNumber(value);
+    if (!partNumber || signedInUserId === null) {if (generation === catalogLookupGeneration.current) setCheckingCatalog(false); return;}
+    const normalized = partNumber.trim().toLocaleUpperCase();
+    try {
+      let parts = await offlineStockStore.loadPartCatalog(signedInUserId);
+      const cachedMatch = parts?.find(part => part.partNumber.trim().toLocaleUpperCase() === normalized) ?? null;
+      if (cachedMatch) {
+        if (generation !== catalogLookupGeneration.current) return;
+        setCatalogMatch(cachedMatch);
+        setCheckingCatalog(false);
+        if (source === 'camera') void playScanSound(true);
+        return;
+      }
+      const refreshed = await api.getParts();
+      await offlineStockStore.savePartCatalog(signedInUserId, refreshed);
+      parts = refreshed;
+      const match = parts.find(part => part.partNumber.trim().toLocaleUpperCase() === normalized) ?? null;
+      if (generation !== catalogLookupGeneration.current) return;
+      setCatalogMatch(match);
+      setCheckingCatalog(false);
+      if (source === 'camera') void playScanSound(Boolean(match));
+    } catch (reason) {
+      if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
+        await api.clearSession();
+        setCheckingCatalog(false);
+        setCatalogMatch(null);
+        router.replace('/');
+        return;
+      }
+      // An existing cached directory remains useful only for temporary network failures.
+      try {
+        const cached = await offlineStockStore.loadPartCatalog(signedInUserId);
+        const match = cached?.find(part => part.partNumber.trim().toLocaleUpperCase() === normalized) ?? null;
+        if (generation !== catalogLookupGeneration.current) return;
+        setCatalogMatch(match);
+        setCheckingCatalog(false);
+        if (source === 'camera') void playScanSound(Boolean(match));
+      } catch { /* Keep the clear no-match result if the local directory is unavailable. */ }
+      setCheckingCatalog(false);
+    }
   }
 
   function scanAgain() {
@@ -201,6 +262,9 @@ export default function InventoryScanScreen() {
     setCameraMountError(false);
     setScannedValue('');
     setMatches([]);
+    setCatalogMatch(null);
+    catalogLookupGeneration.current += 1;
+    setCheckingCatalog(false);
     setSelectedMatchId(null);
     setTorchEnabled(false);
   }
@@ -214,6 +278,9 @@ export default function InventoryScanScreen() {
     setHasScanned(false);
     setScannedValue('');
     setMatches([]);
+    setCatalogMatch(null);
+    catalogLookupGeneration.current += 1;
+    setCheckingCatalog(false);
     onBarcodeScanned(partNumber, 'manual');
   }
 
@@ -318,18 +385,9 @@ export default function InventoryScanScreen() {
           </View>
         )}
 
-        {inventoryState === 'ready' && inventory?.length === 0 && (
-          <View style={styles.messageState}>
-            <Text style={styles.messageTitle}>No inventory to scan.</Text>
-            <Text style={styles.messageText}>Refresh Inventory and try again.</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Back to inventory</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {inventoryState === 'ready' && (inventory?.length ?? 0) > 0 && (
+        {inventoryState === 'ready' && (
           <>
+            {inventory?.length === 0 && <Text style={styles.emptyInventoryHint}>No saved stock rows. You can still scan a part and receive its first stock.</Text>}
             <ScrollView style={styles.scanContent} contentContainerStyle={styles.scanContentInner} keyboardShouldPersistTaps="handled">
             {permission?.granted ? (
               cameraMountError ? (
@@ -414,7 +472,33 @@ export default function InventoryScanScreen() {
 
             {hasScanned && (
               <View style={styles.results}>
-                {matches.length === 0 ? (
+                {checkingCatalog ? (
+                  <View style={styles.noMatchHeader}>
+                    <ActivityIndicator color={palette.navy} />
+                    <View style={styles.noMatchCopy}>
+                      <Text accessibilityRole="header" style={styles.resultsTitle}>Checking parts catalog</Text>
+                      <Text style={styles.resultHint}>Looking for a part without a stock record…</Text>
+                    </View>
+                  </View>
+                ) : catalogMatch ? (
+                  <>
+                    <View style={styles.matchHeader}>
+                      <View style={styles.matchDot}><Text style={styles.matchCheck}>✓</Text></View>
+                      <View style={styles.noMatchCopy}>
+                        <Text accessibilityRole="header" style={styles.resultsTitle}>Part found · no stock recorded</Text>
+                        <Text style={styles.resultHint}>Add it to a store to create its first stock record.</Text>
+                      </View>
+                    </View>
+                    <View style={styles.resultCard}>
+                      <View style={styles.locationMark}><AppIcon name="inventory" color={palette.navy} size={18} /></View>
+                      <View style={styles.resultCopy}>
+                        <Text style={styles.resultPart}>{catalogMatch.partNumber}</Text>
+                        <Text style={styles.resultDescription} numberOfLines={2}>{catalogMatch.description}</Text>
+                        <Text style={styles.resultStore}>{catalogMatch.category}</Text>
+                      </View>
+                    </View>
+                  </>
+                ) : matches.length === 0 ? (
                   <>
                     <View style={styles.noMatchHeader}>
                       <View style={styles.noMatchDot}><AppIcon name="close" color="#A13A32" size={17} /></View>
@@ -456,12 +540,15 @@ export default function InventoryScanScreen() {
                     ))}
                   </>
                 )}
+                {catalogMatch && <Pressable accessibilityRole="button"
+                  onPress={() => router.push({pathname: '/receive-stock', params: {partId: String(catalogMatch.id)}})}
+                  style={styles.openDetailsButton}><Text style={styles.openDetailsText}>Receive this part</Text></Pressable>}
                 {matches.length > 0 && <Pressable accessibilityRole="button" disabled={selectedMatchId === null}
                   onPress={() => {const selected = matches.find(item => item.id === selectedMatchId); if (selected) openItem(selected);}}
                   style={[styles.openDetailsButton, selectedMatchId === null && styles.actionDisabled]}><Text style={styles.openDetailsText}>Open item details</Text></Pressable>}
                 <View style={styles.resultActions}>
                   <Pressable accessibilityRole="button" onPress={scanAgain} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Scan again</Text></Pressable>
-                  {matches.length === 0 && <Pressable accessibilityRole="button" onPress={scanAgain} style={styles.manualSearchButton}><Text style={styles.manualSearchText}>Search manually</Text></Pressable>}
+                  {matches.length === 0 && !catalogMatch && !checkingCatalog && <Pressable accessibilityRole="button" onPress={scanAgain} style={styles.manualSearchButton}><Text style={styles.manualSearchText}>Search manually</Text></Pressable>}
                 </View>
               </View>
             )}
@@ -488,6 +575,7 @@ const styles = StyleSheet.create({
   scanHeading: {marginTop: 12},
   scanTitle: {fontSize: 21, lineHeight: 27, fontWeight: '800', color: palette.white},
   intro: {marginTop: 3, fontSize: 13, lineHeight: 19, color: '#C4D0DC'},
+  emptyInventoryHint: {marginTop: 10, padding: 11, borderRadius: 10, backgroundColor: '#243B55', fontSize: 13, lineHeight: 18, color: '#E2E8F0'},
   scanContent: {flex: 1, marginTop: 11},
   scanContentInner: {paddingBottom: 14},
   cameraFrame: {height: 320, overflow: 'hidden', borderRadius: 17, borderWidth: 1, borderColor: '#43576D', backgroundColor: '#0D1B2B'},
