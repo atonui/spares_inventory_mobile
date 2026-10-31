@@ -1,5 +1,5 @@
-import {useCallback, useRef, useState} from 'react';
-import {ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {useCallback, useMemo, useRef, useState} from 'react';
+import {ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useRouter} from 'expo-router';
 import {api} from '../api/runtime';
@@ -34,6 +34,8 @@ export default function TransfersScreen() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [offlineSavedAt, setOfflineSavedAt] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [actionOnly, setActionOnly] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const locked = useRef(false);
   const generation = useRef(0);
@@ -70,6 +72,15 @@ export default function TransfersScreen() {
   }, [router]);
 
   useFocusEffect(useCallback(() => {void load(); return () => {generation.current++;};}, [load]));
+
+  const filteredTransfers = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return [...transfers]
+      .filter(transfer => !actionOnly || transfer.canReceive || transfer.canReturn)
+      .filter(transfer => !query || `${transfer.id} ${transfer.partNumber} ${transfer.description} ${transfer.fromStoreName} ${transfer.toStoreName}`.toLocaleLowerCase().includes(query))
+      .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt));
+  }, [transfers, search, actionOnly]);
+  const actionCount = useMemo(() => transfers.filter(transfer => transfer.canReceive || transfer.canReturn).length, [transfers]);
 
   async function confirm() {
     if (!confirmation || locked.current || userId === null) return;
@@ -113,10 +124,26 @@ export default function TransfersScreen() {
     {!!notice && <Text accessibilityRole="alert" style={styles.body}>{notice}</Text>}
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     <Pressable accessibilityRole="button" disabled={loading || saving} onPress={() => void load()} style={styles.button}><Text style={styles.label}>Refresh transfers</Text></Pressable>
+    {transfers.length > 0 && <>
+      <View style={styles.searchBox}>
+        <TextInput accessibilityLabel="Search pending transfers" placeholder="Search part or store" placeholderTextColor="#64748B"
+          value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} returnKeyType="search" style={styles.searchInput} />
+        {!!search && <Pressable accessibilityRole="button" accessibilityLabel="Clear transfer search" onPress={() => setSearch('')} style={styles.clearButton}><Text style={styles.clearText}>Clear</Text></Pressable>}
+      </View>
+      <View style={styles.filterRow}>
+        <Pressable accessibilityRole="button" accessibilityState={{selected: !actionOnly}} onPress={() => setActionOnly(false)} style={[styles.filter, !actionOnly && styles.filterActive]}>
+          <Text style={[styles.filterText, !actionOnly && styles.filterTextActive]}>All · {transfers.length}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{selected: actionOnly}} onPress={() => setActionOnly(true)} style={[styles.filter, actionOnly && styles.filterActive]}>
+          <Text style={[styles.filterText, actionOnly && styles.filterTextActive]}>Needs action · {actionCount}</Text>
+        </Pressable>
+      </View>
+      <Text accessibilityRole="text" style={styles.resultCount}>Showing {filteredTransfers.length} of {transfers.length} transfers · newest first</Text>
+    </>}
     {loading && transfers.length === 0 ? <ActivityIndicator accessibilityLabel="Loading transfers" color="#15263B" /> : <FlatList
-      data={transfers} keyExtractor={row => String(row.id)} contentContainerStyle={styles.list}
+      data={filteredTransfers} keyExtractor={row => String(row.id)} contentContainerStyle={styles.list}
       refreshing={loading} onRefresh={() => {if (!saving) void load();}}
-      ListEmptyComponent={!error && !loading ? <View style={styles.card}><Text style={styles.label}>No pending transfers</Text><Text style={styles.body}>Open an item in Inventory to dispatch stock to another store.</Text></View> : undefined}
+      ListEmptyComponent={!error && !loading ? <View style={styles.card}><Text style={styles.label}>{transfers.length === 0 ? 'No pending transfers' : 'No matching transfers'}</Text><Text style={styles.body}>{transfers.length === 0 ? 'Open an item in Inventory to dispatch stock to another store.' : actionOnly && actionCount === 0 ? 'There are no transfers awaiting your action.' : 'Try another part number or store name.'}</Text></View> : undefined}
       renderItem={({item}) => <View style={styles.card}>
         <Text style={styles.label}>{item.partNumber} · {item.quantity} units</Text><Text style={styles.body}>{item.description}</Text>
         <Text style={styles.body}>From: {item.fromStoreName}</Text><Text style={styles.body}>To: {item.toStoreName}</Text>
@@ -149,6 +176,16 @@ const styles = StyleSheet.create({
   error: {fontSize: 14, lineHeight: 21, color: '#A13A32'}, list: {gap: 12, paddingBottom: 24},
   card: {backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#CBD5E1', padding: 16, gap: 10},
   actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  searchBox: {minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingRight: 4, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, backgroundColor: '#FFFFFF'},
+  searchInput: {flex: 1, minHeight: 46, fontSize: 15, color: '#15263B'},
+  clearButton: {minWidth: 48, minHeight: 44, alignItems: 'center', justifyContent: 'center'},
+  clearText: {fontSize: 13, fontWeight: '700', color: '#64748B'},
+  filterRow: {flexDirection: 'row', gap: 8},
+  filter: {minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 13, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 20, backgroundColor: '#FFFFFF'},
+  filterActive: {borderColor: '#15263B', backgroundColor: '#E9EEF4'},
+  filterText: {fontSize: 13, fontWeight: '600', color: '#64748B'},
+  filterTextActive: {color: '#15263B', fontWeight: '800'},
+  resultCount: {fontSize: 12, color: '#64748B'},
   button: {minHeight: 48, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center'},
   primary: {minHeight: 48, padding: 12, borderRadius: 10, backgroundColor: '#E9A23B', alignItems: 'center'},
   backdrop: {flex: 1, justifyContent: 'center', backgroundColor: 'rgba(21,38,59,0.4)', padding: 20},
