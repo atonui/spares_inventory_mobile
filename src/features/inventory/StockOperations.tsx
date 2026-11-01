@@ -103,12 +103,15 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
   }
 
   return <View style={styles.card}>
-    <Text style={styles.title}>Stock movements</Text>
-    <Text style={styles.body}>Receive stock, consume it against a work order, or transfer it to another store. Connection required.</Text>
+    <Text style={styles.title}>Use or move stock</Text>
+    <Text style={styles.body}>Record parts used against a work order. Stock movements require a connection.</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Consume stock" accessibilityHint="Enter a quantity and work order, then review before confirming." disabled={item.quantity === 0} onPress={() => open('issue')} style={[styles.primary, item.quantity === 0 && styles.disabled]}>
+      <Text style={styles.primaryLabel}>Consume stock</Text>
+    </Pressable>
+    {item.quantity === 0 && <Text style={styles.emptyHint}>No stock is available to consume or transfer.</Text>}
     <View style={styles.actions}>
-      <Pressable accessibilityRole="button" onPress={() => open('receive')} style={styles.secondary}><Text style={styles.label}>Receive stock</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Consume stock" disabled={item.quantity === 0} onPress={() => open('issue')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Consume stock</Text></Pressable>
-      <Pressable accessibilityRole="button" disabled={item.quantity === 0} onPress={() => open('transfer')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Transfer stock</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => open('receive')} style={styles.secondary}><Text style={styles.secondaryLabel}>Receive stock</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={item.quantity === 0} onPress={() => open('transfer')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.secondaryLabel}>Transfer stock</Text></Pressable>
     </View>
     <Modal visible={mode !== null} animationType="slide" onRequestClose={() => {if (!busy) setMode(null);}}>
       <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -166,9 +169,12 @@ const styles = StyleSheet.create({
   title: {fontSize: 20, fontWeight: '700', color: '#15263B'},
   body: {fontSize: 16, lineHeight: 24, color: '#64748B'},
   label: {fontSize: 16, lineHeight: 24, fontWeight: '600', color: '#15263B'},
-  actions: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  secondary: {minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, alignItems: 'center'},
-  primary: {minHeight: 48, padding: 12, backgroundColor: '#E9A23B', borderRadius: 10, alignItems: 'center'},
+  actions: {flexDirection: 'row', gap: 8},
+  secondary: {flex: 1, minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, alignItems: 'center', justifyContent: 'center'},
+  secondaryLabel: {fontSize: 14, fontWeight: '700', color: '#15263B'},
+  primary: {minHeight: 52, padding: 14, backgroundColor: '#E9A23B', borderRadius: 10, alignItems: 'center', justifyContent: 'center'},
+  primaryLabel: {fontSize: 16, fontWeight: '800', color: '#15263B'},
+  emptyHint: {fontSize: 13, lineHeight: 18, color: '#64748B'},
   disabled: {opacity: 0.5},
   modal: {flex: 1, backgroundColor: '#F5F7FA'},
   content: {padding: 24, paddingTop: 64, paddingBottom: 48, gap: 16},
