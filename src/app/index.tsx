@@ -425,9 +425,9 @@ export default function InventoryScreen() {
   const searchableInventory = useMemo(() => inventory.map(row => ({
     row,
     searchableText: normalizeInventorySearchText(
-      `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
+      `${row.partNumber} ${row.description} ${partCategories.get(row.partId) ?? ''} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
     ),
-  })), [inventory]);
+  })), [inventory, partCategories]);
 
   const queryTerms = useMemo(() => normalizeInventorySearchText(search.trim()).split(' ').filter(Boolean), [search]);
 
@@ -579,8 +579,10 @@ export default function InventoryScreen() {
               <AppIcon name="search" color={palette.muted} size={19} />
               <TextInput accessibilityLabel={showingStores ? 'Search stores' : 'Search inventory'} value={search}
                 onChangeText={value => router.setParams({query: value || undefined})}
-                placeholder={showingStores ? 'Search store name or type' : 'Part, store, or work order'} placeholderTextColor={palette.placeholder}
-                accessibilityHint="Searches part numbers, descriptions, store locations, and work-order numbers."
+                placeholder={showingStores ? 'Search store name or type' : 'Part, category, store, or work order'} placeholderTextColor={palette.placeholder}
+                accessibilityHint={showingStores
+                  ? 'Searches store names and types.'
+                  : 'Searches part numbers, descriptions, categories, store names and types, and work-order numbers.'}
                 autoCapitalize="none" autoCorrect={false}
                 style={styles.searchInput} returnKeyType="search"
                 onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
