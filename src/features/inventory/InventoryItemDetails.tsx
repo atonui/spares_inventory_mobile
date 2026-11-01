@@ -50,6 +50,8 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
         </View>
       </View>
 
+      {!item.isAllocated && canChangeStock && <StockOperations item={item} userId={userId} onRefresh={onRefresh} />}
+
       <View style={styles.card}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>Stock information</Text>
         <DetailField label="Minimum threshold" value={`${item.minThreshold} ${item.minThreshold === 1 ? 'unit' : 'units'}`} />
@@ -57,7 +59,6 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
         {item.workOrder && <DetailField label="Work order" value={item.workOrder} />}
       </View>
 
-      {!item.isAllocated && canChangeStock && <StockOperations item={item} userId={userId} onRefresh={onRefresh} />}
       {!item.isAllocated && canChangeStock && (
         <StockAdjustmentControls item={item} userId={userId} onQuantityChange={onQuantityChange} onRefresh={onRefresh} showAddStock={false} />
       )}
