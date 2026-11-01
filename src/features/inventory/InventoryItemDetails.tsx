@@ -63,7 +63,12 @@ export function InventoryItemDetails({item, user, userId, onQuantityChange, onRe
       )}
       {!item.isAllocated && user?.id === userId && !canChangeStock && (
         <View accessibilityRole="text" style={styles.accessNotice}>
-          <Text style={styles.accessNoticeText}>Stock adjustments are limited to central and assigned stores.</Text>
+          <Text style={styles.accessNoticeText}>You can view this item, but your role or store assignment doesn’t allow stock movements here.</Text>
+        </View>
+      )}
+      {item.isAllocated && user?.id === userId && (
+        <View accessibilityRole="text" style={styles.accessNotice}>
+          <Text style={styles.accessNoticeText}>This item is allocated to a work order, so stock movements and count changes are unavailable.</Text>
         </View>
       )}
 
