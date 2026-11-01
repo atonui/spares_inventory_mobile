@@ -68,7 +68,7 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
     if (!/^\d+$/.test(quantity) || !Number.isSafeInteger(units) || units < 1 || units > 2147483647) {
       setError('Enter a whole quantity greater than zero.'); return;
     }
-    if (mode === 'issue' && !workOrder.trim()) {setError('Enter the work order for this issue.'); return;}
+    if (mode === 'issue' && !workOrder.trim()) {setError('Enter the work order for this stock consumption.'); return;}
     if (mode === 'transfer' && !destination) {setError('Choose a destination store.'); return;}
     locked.current = true; setBusy(true); setError('');
     let sent = false;
@@ -87,7 +87,7 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
         catch { /* The confirmed issue remains successful if recent suggestions cannot be saved. */ }
       }
       setFinished(true);
-      setNotice(mode === 'transfer' ? 'Stock dispatched. The destination must confirm receipt before it becomes available there.' : mode === 'receive' ? 'Stock received successfully.' : 'Stock issued successfully.');
+      setNotice(mode === 'transfer' ? 'Stock dispatched. The destination must confirm receipt before it becomes available there.' : mode === 'receive' ? 'Stock received successfully.' : 'Stock consumed successfully.');
       try {await onRefresh();}
       catch {setNotice('Stock saved. Refresh inventory to see the current balance. Do not submit it again.');}
     } catch (reason) {
@@ -104,16 +104,16 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
 
   return <View style={styles.card}>
     <Text style={styles.title}>Stock movements</Text>
-    <Text style={styles.body}>Receive, issue or transfer stock. Connection required.</Text>
+    <Text style={styles.body}>Receive stock, consume it against a work order, or transfer it to another store. Connection required.</Text>
     <View style={styles.actions}>
       <Pressable accessibilityRole="button" onPress={() => open('receive')} style={styles.secondary}><Text style={styles.label}>Receive stock</Text></Pressable>
-      <Pressable accessibilityRole="button" disabled={item.quantity === 0} onPress={() => open('issue')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Issue stock</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Consume stock" disabled={item.quantity === 0} onPress={() => open('issue')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Consume stock</Text></Pressable>
       <Pressable accessibilityRole="button" disabled={item.quantity === 0} onPress={() => open('transfer')} style={[styles.secondary, item.quantity === 0 && styles.disabled]}><Text style={styles.label}>Transfer stock</Text></Pressable>
     </View>
     <Modal visible={mode !== null} animationType="slide" onRequestClose={() => {if (!busy) setMode(null);}}>
       <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text accessibilityRole="header" style={styles.title}>{mode === 'transfer' ? 'Transfer stock' : mode === 'receive' ? 'Receive stock' : 'Issue stock'}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{mode === 'transfer' ? 'Transfer stock' : mode === 'receive' ? 'Receive stock' : 'Consume stock'}</Text>
           <Text style={styles.label}>{item.partNumber} · {item.storeName}</Text>
           <Text style={styles.body}>{item.description}</Text>
           {!finished && reviewedQuantity === null && <>
@@ -139,11 +139,11 @@ export function StockOperations({item, userId, onRefresh}: {item: InventoryRow; 
                 </Pressable>)}</View>
               </View>}
               <Text style={styles.label}>Notes (optional)</Text>
-              <TextInput accessibilityLabel="Issue notes" style={styles.input} value={notes} onChangeText={setNotes} maxLength={1000} editable={!busy} />
+              <TextInput accessibilityLabel="Consumption notes" style={styles.input} value={notes} onChangeText={setNotes} maxLength={1000} editable={!busy} />
             </>}
           </>}
           {!finished && reviewedQuantity !== null && <View style={styles.card}>
-            <Text style={styles.label}>{mode === 'transfer' ? 'Dispatch' : mode === 'receive' ? 'Receive' : 'Issue'} {units} units</Text>
+            <Text style={styles.label}>{mode === 'transfer' ? 'Dispatch' : mode === 'receive' ? 'Receive' : 'Consume'} {units} units</Text>
             {mode === 'transfer' && <><Text style={styles.body}>From: {item.storeName}</Text><Text style={styles.body}>To: {destination?.name}</Text><Text style={styles.body}>Destination stock stays unavailable until receipt is confirmed.</Text></>}
             {mode === 'issue' && <Text style={styles.body}>Work order: {workOrder.trim()}</Text>}
             {mode === 'issue' && !!notes.trim() && <Text style={styles.body}>Notes: {notes.trim()}</Text>}
