@@ -436,7 +436,7 @@ export default function InventoryScreen() {
     .filter((category): category is string => Boolean(category)))].sort((first, second) =>
     first.localeCompare(second, undefined, {numeric: true, sensitivity: 'base'})), [inventory, partCategories]);
 
-  const getVisibleInventory = useCallback((filter: InventoryFilter, category = selectedPartCategory) => {
+  const getVisibleInventory = useCallback((filter: InventoryFilter, category = selectedPartCategory, storeId = selectedStoreId) => {
     const query = search.trim();
     const filtered = searchableInventory
       .filter(({row, searchableText}) => {
@@ -448,13 +448,15 @@ export default function InventoryScreen() {
           (filter === 'available' && !row.isAllocated) ||
           (filter === 'allocated' && row.isAllocated);
         const matchesCategory = category === null || partCategories.get(row.partId) === category;
-        return matchesSearch && matchesFilter && matchesCategory && (selectedStoreId === null || row.storeId === selectedStoreId);
+        return matchesSearch && matchesFilter && matchesCategory && (storeId === null || row.storeId === storeId);
       })
       .map(({row}) => row);
     return sortInventory(filtered, inventorySort);
   }, [searchableInventory, search, queryTerms, inventorySort, selectedStoreId, partCategories, selectedPartCategory]);
 
   const visibleInventory = useMemo(() => getVisibleInventory(inventoryFilter), [getVisibleInventory, inventoryFilter]);
+  const categoryFilterScope = useMemo(() => getVisibleInventory(draftInventoryFilter, null, draftStoreId),
+    [getVisibleInventory, draftInventoryFilter, draftStoreId]);
   const storeItemCount = inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length;
 
   const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all' || selectedPartCategory !== null;
@@ -473,7 +475,7 @@ export default function InventoryScreen() {
     ? 'Changes sync when you’re back online.'
     : '';
 
-  const inventoryFilterCounts = useMemo(() => inventory.reduce((counts, row) => {
+  const inventoryFilterCounts = useMemo(() => getVisibleInventory('all', draftPartCategory, draftStoreId).reduce((counts, row) => {
     counts.all += 1;
     if (row.quantity === 0 || row.quantity <= row.minThreshold) counts.needsAttention += 1;
     if (row.quantity === 0) counts.outOfStock += 1;
@@ -481,7 +483,8 @@ export default function InventoryScreen() {
     if (row.isAllocated) counts.allocated += 1;
     else counts.available += 1;
     return counts;
-  }, {all: 0, needsAttention: 0, outOfStock: 0, lowStock: 0, available: 0, allocated: 0}), [inventory]);
+  }, {all: 0, needsAttention: 0, outOfStock: 0, lowStock: 0, available: 0, allocated: 0}),
+  [getVisibleInventory, draftPartCategory, draftStoreId]);
 
   function clearInventoryCriteria() {
     Keyboard.dismiss();
@@ -751,16 +754,16 @@ export default function InventoryScreen() {
                 </View>
                 <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Part category</Text>
                 <View accessibilityRole="radiogroup" accessibilityLabel="Filter by part category">
-                  <Pressable accessibilityRole="radio" accessibilityLabel={`All categories, ${inventory.length} items`}
+                  <Pressable accessibilityRole="radio" accessibilityLabel={`All categories, ${categoryFilterScope.length} ${categoryFilterScope.length === 1 ? 'item' : 'items'}`}
                     accessibilityState={{checked: draftPartCategory === null}} onPress={() => setDraftPartCategory(null)}
                     style={[styles.filterSortOption, draftPartCategory === null && styles.filterSortOptionSelected]}>
                     <View style={styles.optionRadio}>{draftPartCategory === null && <View style={styles.optionRadioSelected} />}</View>
                     <Text style={[styles.filterSortOptionText, draftPartCategory === null && styles.filterSortOptionTextSelected]}>All categories</Text>
-                    <Text style={styles.filterSortOptionCount}>{inventory.length}</Text>
+                    <Text style={styles.filterSortOptionCount}>{categoryFilterScope.length}</Text>
                   </Pressable>
                   {inventoryPartCategories.map(category => {
                     const selected = draftPartCategory === category;
-                    const count = inventory.filter(row => partCategories.get(row.partId) === category).length;
+                    const count = categoryFilterScope.filter(row => partCategories.get(row.partId) === category).length;
                     return <Pressable key={category} accessibilityRole="radio" accessibilityLabel={`${category}, ${count} ${count === 1 ? 'item' : 'items'}`}
                       accessibilityState={{checked: selected}} onPress={() => setDraftPartCategory(category)}
                       style={[styles.filterSortOption, selected && styles.filterSortOptionSelected]}>
