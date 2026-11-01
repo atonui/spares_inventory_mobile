@@ -672,7 +672,7 @@ export default function InventoryScreen() {
               return (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={inventoryRowAccessibilityLabel(row)}
+                  accessibilityLabel={inventoryRowAccessibilityLabel(row, partCategories.get(row.partId))}
                   accessibilityHint="Opens stock details"
                   onPress={() => {
                     Keyboard.dismiss();
@@ -690,7 +690,12 @@ export default function InventoryScreen() {
                         <Text style={[styles.quantityCaption, lowStock && styles.lowQuantityText, outOfStock && styles.outQuantityText]}>{outOfStock ? 'Out' : lowStock ? 'Low' : 'Healthy'}</Text>
                       </View>
                     </View>
-                    <Text style={styles.description} numberOfLines={1}>{row.description}</Text>
+                    <View style={styles.descriptionRow}>
+                      <Text style={styles.description} numberOfLines={1}>{row.description}</Text>
+                      {!!partCategories.get(row.partId) && (
+                        <Text numberOfLines={1} style={styles.categoryTag}>Category · {partCategories.get(row.partId)}</Text>
+                      )}
+                    </View>
                     <View style={styles.statusRow}>
                       <Text style={styles.locationText} numberOfLines={1}>{row.storeName}</Text>
                       <Text style={styles.threshold}>Min. {row.minThreshold}</Text>
@@ -1020,7 +1025,9 @@ const styles = StyleSheet.create({
   itemCopy: {flex: 1, minWidth: 0},
   itemTitleRow: {flexDirection: 'row', alignItems: 'center', gap: 5},
   partNumber: {flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', letterSpacing: 0.1, color: palette.navy},
-  description: {marginTop: 3, fontSize: 11, lineHeight: 15, fontWeight: '500', color: palette.text},
+  descriptionRow: {flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3},
+  description: {flex: 1, minWidth: 0, fontSize: 11, lineHeight: 15, fontWeight: '500', color: palette.text},
+  categoryTag: {maxWidth: 128, overflow: 'hidden', borderRadius: 7, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#F0F3F6', fontSize: 9, lineHeight: 12, fontWeight: '700', color: palette.slate},
   quantityBadge: {minWidth: 52, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', columnGap: 4, paddingVertical: 4, paddingHorizontal: 6, borderRadius: 9, backgroundColor: '#E3F3E8'},
   quantityValue: {fontSize: 12, fontWeight: '800', color: '#21653A'},
   quantityCaption: {width: '100%', marginTop: 1, fontSize: 7, textAlign: 'center', fontWeight: '800', letterSpacing: 0.2, color: '#21653A'},
