@@ -9,7 +9,7 @@ const HISTORY_LIMIT = 20;
 
 function movementLabel(value: string): string {
   const labels: Record<string, string> = {
-    add: 'Stock received', remove: 'Stock count reduced', consume: 'Stock issued', transfer: 'Transfer',
+    add: 'Stock received', remove: 'Stock count reduced', consume: 'Stock consumed', transfer: 'Transfer',
     return: 'Transfer returned', adjustment: 'Stock count changed',
   };
   return labels[value] ?? value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toLocaleUpperCase());
