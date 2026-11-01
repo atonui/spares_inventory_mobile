@@ -20,6 +20,7 @@ import {useFocusEffect, useLocalSearchParams, useRouter} from 'expo-router';
 import * as Network from 'expo-network';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type InventoryRow, type MobilePairingCredential, type NativeUser} from '../api/client';
+import type {PartRecord} from '../api/transferContract';
 import {clearInventorySnapshot, getInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
 import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAccessibility';
@@ -114,6 +115,11 @@ export default function InventoryScreen() {
   const [draftInventoryFilter, setDraftInventoryFilter] = useState<InventoryFilter>('all');
   const [draftInventorySort, setDraftInventorySort] = useState<InventorySort>('default');
   const [draftStoreId, setDraftStoreId] = useState<number | null>(null);
+  const [partCategories, setPartCategories] = useState<Map<number, string>>(new Map());
+  const [partCategoriesLoading, setPartCategoriesLoading] = useState(false);
+  const [usingSavedPartCategories, setUsingSavedPartCategories] = useState(false);
+  const [selectedPartCategory, setSelectedPartCategory] = useState<string | null>(null);
+  const [draftPartCategory, setDraftPartCategory] = useState<string | null>(null);
   const stores = useMemo(() => summarizeStores(inventory), [inventory]);
   const totalParts = useMemo(() => new Set(inventory
     .filter(row => selectedStoreId === null || row.storeId === selectedStoreId)
@@ -192,6 +198,51 @@ export default function InventoryScreen() {
       setIsReady(true);
     }
   }, [loadInventory]);
+
+  useEffect(() => {
+    if (!hasSession || !user) return;
+    let active = true;
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setPartCategoriesLoading(true);
+      let cachedParts: PartRecord[] | null = null;
+      try { cachedParts = await offlineStockStore.loadPartCatalog(user.id); }
+      catch { /* A fresh catalog request can still succeed if local storage is unavailable. */ }
+      try {
+        const parts = await api.getParts();
+        try { await offlineStockStore.savePartCatalog(user.id, parts); }
+        catch { /* Category filtering remains available for the current session. */ }
+        if (!active) return;
+        const categories = new Map(parts.filter(part => part.category.trim()).map(part => [part.id, part.category.trim()]));
+        setPartCategories(categories);
+        setUsingSavedPartCategories(false);
+        setSelectedPartCategory(current => current && ![...categories.values()].includes(current) ? null : current);
+      } catch (reason) {
+        if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
+          if (active) {
+            setPartCategories(new Map());
+            setUsingSavedPartCategories(false);
+            setSelectedPartCategory(null);
+          }
+          if (active) void restoreSession();
+        } else if (reason instanceof TypeError || (reason instanceof ApiError && reason.status === 0)) {
+          if (active) {
+            const categories = new Map((cachedParts ?? []).filter(part => part.category.trim()).map(part => [part.id, part.category.trim()]));
+            setPartCategories(categories);
+            setUsingSavedPartCategories(cachedParts !== null);
+            setSelectedPartCategory(current => current && ![...categories.values()].includes(current) ? null : current);
+          }
+        } else if (active) {
+          setPartCategories(new Map());
+          setUsingSavedPartCategories(false);
+          setSelectedPartCategory(null);
+        }
+      } finally {
+        if (active) setPartCategoriesLoading(false);
+      }
+    });
+    return () => {active = false;};
+  }, [hasSession, user, restoreSession]);
 
   useEffect(() => {
     let active = true;
@@ -380,7 +431,12 @@ export default function InventoryScreen() {
 
   const queryTerms = useMemo(() => normalizeInventorySearchText(search.trim()).split(' ').filter(Boolean), [search]);
 
-  const getVisibleInventory = useCallback((filter: InventoryFilter) => {
+  const inventoryPartCategories = useMemo(() => [...new Set(inventory
+    .map(row => partCategories.get(row.partId))
+    .filter((category): category is string => Boolean(category)))].sort((first, second) =>
+    first.localeCompare(second, undefined, {numeric: true, sensitivity: 'base'})), [inventory, partCategories]);
+
+  const getVisibleInventory = useCallback((filter: InventoryFilter, category = selectedPartCategory) => {
     const query = search.trim();
     const filtered = searchableInventory
       .filter(({row, searchableText}) => {
@@ -391,16 +447,17 @@ export default function InventoryScreen() {
           (filter === 'lowStock' && row.quantity > 0 && row.quantity <= row.minThreshold) ||
           (filter === 'available' && !row.isAllocated) ||
           (filter === 'allocated' && row.isAllocated);
-        return matchesSearch && matchesFilter && (selectedStoreId === null || row.storeId === selectedStoreId);
+        const matchesCategory = category === null || partCategories.get(row.partId) === category;
+        return matchesSearch && matchesFilter && matchesCategory && (selectedStoreId === null || row.storeId === selectedStoreId);
       })
       .map(({row}) => row);
     return sortInventory(filtered, inventorySort);
-  }, [searchableInventory, search, queryTerms, inventorySort, selectedStoreId]);
+  }, [searchableInventory, search, queryTerms, inventorySort, selectedStoreId, partCategories, selectedPartCategory]);
 
   const visibleInventory = useMemo(() => getVisibleInventory(inventoryFilter), [getVisibleInventory, inventoryFilter]);
   const storeItemCount = inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length;
 
-  const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all';
+  const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all' || selectedPartCategory !== null;
   const isOffline = usingCachedInventory || networkConnected === false;
   const connectionUnknown = !usingCachedInventory && networkConnected === null;
   const connectionStatusTitle = isOffline
@@ -430,29 +487,33 @@ export default function InventoryScreen() {
     Keyboard.dismiss();
     router.setParams({filter: undefined, query: undefined});
     setInventorySort('default');
+    setSelectedPartCategory(null);
   }
 
   function openFilterSort() {
     setDraftStoreId(selectedStoreId);
     setDraftInventoryFilter(inventoryFilter);
     setDraftInventorySort(inventorySort);
+    setDraftPartCategory(selectedPartCategory);
     setFilterSortVisible(true);
   }
 
   function applyFilterSort() {
     router.setParams({storeId: draftStoreId === null ? undefined : String(draftStoreId)});
-    if (draftInventoryFilter !== inventoryFilter) {
-      const nextVisibleInventory = getVisibleInventory(draftInventoryFilter);
+    if (draftInventoryFilter !== inventoryFilter || draftPartCategory !== selectedPartCategory) {
+      const nextVisibleInventory = getVisibleInventory(draftInventoryFilter, draftPartCategory);
       announceInventoryResultCount(nextVisibleInventory.length, inventory.length, search, draftInventoryFilter);
     }
     router.setParams({filter: draftInventoryFilter === 'all' ? undefined : draftInventoryFilter});
     setInventorySort(draftInventorySort);
+    setSelectedPartCategory(draftPartCategory);
     setFilterSortVisible(false);
   }
 
   const activeFilterSortLabels = [
     selectedStoreId !== null ? stores.find(store => store.id === selectedStoreId)?.name ?? 'Selected store' : undefined,
     inventoryFilter !== 'all' ? inventoryFilterOptions.find(option => option.value === inventoryFilter)?.label : undefined,
+    selectedPartCategory ? `Category: ${selectedPartCategory}` : undefined,
     inventorySort !== 'default' ? inventorySortOptions.find(option => option.value === inventorySort)?.label : undefined,
   ].filter((label): label is string => Boolean(label));
   const filterSortButtonLabel = activeFilterSortLabels.length > 0
@@ -554,7 +615,7 @@ export default function InventoryScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Reset filters and sorting"
-                onPress={() => {router.setParams({filter: undefined, storeId: undefined}); setInventorySort('default');}}
+                onPress={() => {router.setParams({filter: undefined, storeId: undefined}); setInventorySort('default'); setSelectedPartCategory(null);}}
                 style={styles.resetControlsButton}
               >
                 <Text style={styles.resetControlsText}>Reset</Text>
@@ -686,6 +747,30 @@ export default function InventoryScreen() {
                     </Pressable>
                   ))}
                 </View>
+                <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Part category</Text>
+                <View accessibilityRole="radiogroup" accessibilityLabel="Filter by part category">
+                  <Pressable accessibilityRole="radio" accessibilityLabel={`All categories, ${inventory.length} items`}
+                    accessibilityState={{checked: draftPartCategory === null}} onPress={() => setDraftPartCategory(null)}
+                    style={[styles.filterSortOption, draftPartCategory === null && styles.filterSortOptionSelected]}>
+                    <View style={styles.optionRadio}>{draftPartCategory === null && <View style={styles.optionRadioSelected} />}</View>
+                    <Text style={[styles.filterSortOptionText, draftPartCategory === null && styles.filterSortOptionTextSelected]}>All categories</Text>
+                    <Text style={styles.filterSortOptionCount}>{inventory.length}</Text>
+                  </Pressable>
+                  {inventoryPartCategories.map(category => {
+                    const selected = draftPartCategory === category;
+                    const count = inventory.filter(row => partCategories.get(row.partId) === category).length;
+                    return <Pressable key={category} accessibilityRole="radio" accessibilityLabel={`${category}, ${count} ${count === 1 ? 'item' : 'items'}`}
+                      accessibilityState={{checked: selected}} onPress={() => setDraftPartCategory(category)}
+                      style={[styles.filterSortOption, selected && styles.filterSortOptionSelected]}>
+                      <View style={styles.optionRadio}>{selected && <View style={styles.optionRadioSelected} />}</View>
+                      <Text style={[styles.filterSortOptionText, selected && styles.filterSortOptionTextSelected]}>{category}</Text>
+                      <Text style={styles.filterSortOptionCount}>{count}</Text>
+                    </Pressable>;
+                  })}
+                </View>
+                {usingSavedPartCategories && <Text style={styles.filterSortHelp}>Offline · using categories from the saved parts catalog.</Text>}
+                {!usingSavedPartCategories && partCategoriesLoading && <Text style={styles.filterSortHelp}>Loading part categories…</Text>}
+                {!usingSavedPartCategories && !partCategoriesLoading && inventoryPartCategories.length === 0 && <Text style={styles.filterSortHelp}>No categories are available for these items.</Text>}
                 <Text accessibilityRole="header" style={styles.filterSortSectionTitle}>Stock status</Text>
                 <View accessibilityRole="radiogroup" accessibilityLabel="Filter inventory">
                   {inventoryFilterOptions.map(option => {
@@ -732,7 +817,7 @@ export default function InventoryScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Reset filters and sorting"
-                  onPress={() => {setDraftInventoryFilter('all'); setDraftInventorySort('default'); setDraftStoreId(null);}}
+                  onPress={() => {setDraftInventoryFilter('all'); setDraftInventorySort('default'); setDraftStoreId(null); setDraftPartCategory(null);}}
                   style={styles.filterSortResetButton}
                 >
                   <Text style={styles.filterSortResetText}>Reset</Text>
@@ -908,6 +993,7 @@ const styles = StyleSheet.create({
   sheetCloseButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12},
   filterSortOptions: {flexGrow: 0, flexShrink: 1, maxHeight: 480},
   filterSortSectionTitle: {marginTop: 9, marginBottom: 4, fontSize: 12, fontWeight: '800', letterSpacing: 0.3, color: palette.muted},
+  filterSortHelp: {marginHorizontal: 10, marginTop: 3, marginBottom: 4, fontSize: 12, lineHeight: 17, color: palette.muted},
   filterSortOption: {minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, borderRadius: 9},
   filterSortOptionSelected: {backgroundColor: '#FFF8EA'},
   optionRadio: {width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: palette.slate, borderRadius: 10},
