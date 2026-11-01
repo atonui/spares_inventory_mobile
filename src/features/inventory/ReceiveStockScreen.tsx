@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {api, isMockMode} from '../../api/runtime';
@@ -170,7 +170,7 @@ export function ReceiveStockScreen() {
         <Text style={styles.body}>Add a part to a store, including a new stock line. Connection required.</Text>
         {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
         {!!notice && <Text accessibilityRole="alert" style={styles.success}>{notice}</Text>}
-        {loading ? <View style={styles.loading}><ActivityIndicator color={palette.navy} /><Text style={styles.body}>Loading parts and stores…</Text></View> : finished ? <View style={styles.card}>
+        {loading ? <ReceiveStockSkeleton /> : finished ? <View style={styles.card}>
           <Text style={styles.heading}>{error ? 'Check before retrying' : 'Receipt complete'}</Text>
           <Text style={styles.body}>{selectedPart?.partNumber} · {selectedPart?.description}</Text>
           <Text style={styles.body}>{selectedStore?.name} · {quantity} units</Text>
@@ -230,6 +230,21 @@ export function ReceiveStockScreen() {
   </KeyboardAvoidingView></SafeAreaView>;
 }
 
+function ReceiveStockSkeleton() {
+  return <View accessibilityRole="progressbar" accessibilityLabel="Loading parts and stores" style={styles.loadingSkeleton}>
+    {[0, 1].map(index => <View key={index} style={styles.skeletonSection}>
+      <View style={[styles.skeletonLine, styles.skeletonHeading]} />
+      <View style={[styles.skeletonLine, styles.skeletonInput]} />
+      <View style={[styles.skeletonLine, styles.skeletonOption]} />
+      <View style={[styles.skeletonLine, styles.skeletonOptionShort]} />
+    </View>)}
+    <View style={styles.skeletonSection}>
+      <View style={[styles.skeletonLine, styles.skeletonHeadingShort]} />
+      <View style={[styles.skeletonLine, styles.skeletonInput]} />
+    </View>
+  </View>;
+}
+
 const styles = StyleSheet.create({
   safe: {flex: 1, backgroundColor: palette.background}, screen: {flex: 1}, content: {paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 12},
   title: {fontSize: 25, lineHeight: 32, fontWeight: '800', color: palette.navy}, heading: {fontSize: 19, lineHeight: 25, fontWeight: '800', color: palette.navy},
@@ -238,7 +253,10 @@ const styles = StyleSheet.create({
   input: {minHeight: 50, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 10, color: palette.navy, fontSize: 16},
   quantity: {fontSize: 24, fontWeight: '700'}, option: {minHeight: 54, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9, backgroundColor: palette.background, gap: 2},
   optionTitle: {fontSize: 14, fontWeight: '700', color: palette.navy}, optionBody: {fontSize: 13, lineHeight: 18, color: palette.slate},
-  hint: {fontSize: 12, lineHeight: 17, color: palette.slate}, loading: {minHeight: 160, justifyContent: 'center', alignItems: 'center', gap: 10},
+  hint: {fontSize: 12, lineHeight: 17, color: palette.slate},
+  loadingSkeleton: {gap: 10}, skeletonSection: {gap: 10, padding: 14, backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 14},
+  skeletonLine: {borderRadius: 6, backgroundColor: '#E8EDF2'}, skeletonHeading: {width: '48%', height: 16}, skeletonHeadingShort: {width: '61%', height: 16},
+  skeletonInput: {height: 50, borderRadius: 10}, skeletonOption: {height: 48, borderRadius: 9}, skeletonOptionShort: {width: '82%', height: 48, borderRadius: 9},
   card: {padding: 16, gap: 10, backgroundColor: palette.white, borderColor: palette.border, borderWidth: 1, borderRadius: 14},
   primary: {minHeight: 52, justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 12, backgroundColor: palette.amber}, primaryText: {fontSize: 16, fontWeight: '800', color: palette.navy},
   secondary: {minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 11, borderRadius: 11, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white}, secondaryText: {fontSize: 15, fontWeight: '700', color: palette.navy},
