@@ -32,10 +32,10 @@ it('dispatches only after reviewing a different active destination', async () =>
 
 it('requires a work order and confirmation before issuing stock', async () => {
   await render(<StockOperations item={item} userId={7} onRefresh={jest.fn().mockResolvedValue(3)} />);
-  await fireEvent.press(screen.getByText('Issue stock'));
+  await fireEvent.press(screen.getByText('Consume stock'));
   await fireEvent.changeText(screen.getByLabelText('Movement quantity'), '2');
   await fireEvent.press(screen.getByText('Review movement'));
-  expect(screen.getByText('Enter the work order for this issue.')).toBeTruthy();
+  expect(screen.getByText('Enter the work order for this stock consumption.')).toBeTruthy();
   await fireEvent.changeText(screen.getByLabelText('Work order'), 'WO-42');
   await fireEvent.press(screen.getByText('Review movement'));
   await waitFor(() => expect(screen.getByText('Confirm movement')).toBeTruthy());
