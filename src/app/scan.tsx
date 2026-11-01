@@ -7,6 +7,7 @@ import {StatusBar} from 'expo-status-bar';
 import {AccessibilityInfo, ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useLocalSearchParams, useRouter} from 'expo-router';
+import * as Network from 'expo-network';
 import {api} from '../api/runtime';
 import {ApiError} from '../api/client';
 import type {PartRecord} from '../api/transferContract';
@@ -14,6 +15,7 @@ import type {InventoryItem} from '../features/inventory/inventoryRepository';
 import {getInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {applyQueuedStockCounts} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
+import {getConnectivityStatus} from '../features/network/connectivity';
 import {extractScannedPartNumber, findInventoryMatches} from '../features/inventory/scanLookup';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
@@ -30,6 +32,7 @@ export default function InventoryScanScreen() {
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [inventory, setInventory] = useState<InventoryItem[] | null>(null);
   const [inventoryState, setInventoryState] = useState<InventoryState>('loading');
+  const [networkConnected, setNetworkConnected] = useState<boolean | null>(null);
   const [signedInUserId, setSignedInUserId] = useState<number | null>(null);
   const [scannedValue, setScannedValue] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
@@ -84,6 +87,19 @@ export default function InventoryScanScreen() {
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    let networkListenerReportedState = false;
+    const updateNetworkStatus = (isConnected?: boolean | null, isInternetReachable?: boolean | null) => {
+      if (!active) return;
+      const status = getConnectivityStatus(isConnected, isInternetReachable);
+      setNetworkConnected(status === 'checking' ? null : status === 'online');
+    };
+    void Network.getNetworkStateAsync().then(state => {
+      if (active && !networkListenerReportedState) updateNetworkStatus(state.isConnected, state.isInternetReachable);
+    }).catch(() => undefined);
+    const networkSubscription = Network.addNetworkStateListener(state => {
+      networkListenerReportedState = true;
+      updateNetworkStatus(state.isConnected, state.isInternetReachable);
+    });
     setScreenFocused(true);
     if (scanned.current) {
       scanned.current = false;
@@ -144,6 +160,7 @@ export default function InventoryScanScreen() {
     void loadInventory();
     return () => {
       active = false;
+      networkSubscription.remove();
       setScreenFocused(false);
       setTorchEnabled(false);
     };
@@ -368,6 +385,16 @@ export default function InventoryScanScreen() {
           <Text style={styles.intro}>{hasScanned ? scannedValue : 'Align a barcode inside the frame or look up a part number.'}</Text>
         </View>
 
+        {networkConnected === false && inventoryState === 'ready' && (
+          <View accessibilityRole="summary" style={styles.offlineNotice}>
+            <View style={styles.offlineDot} />
+            <View style={styles.offlineCopy}>
+              <Text style={styles.offlineTitle}>Offline · using saved data</Text>
+              <Text style={styles.offlineDetail}>Recent stock or part changes may be missing. Stock movements need a connection.</Text>
+            </View>
+          </View>
+        )}
+
         {inventoryState === 'loading' && (
           <View style={styles.messageState}>
             <ActivityIndicator size="large" color={palette.navy} />
@@ -575,6 +602,11 @@ const styles = StyleSheet.create({
   scanHeading: {marginTop: 12},
   scanTitle: {fontSize: 21, lineHeight: 27, fontWeight: '800', color: palette.white},
   intro: {marginTop: 3, fontSize: 13, lineHeight: 19, color: '#C4D0DC'},
+  offlineNotice: {flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 9, padding: 10, borderRadius: 10, backgroundColor: '#423722'},
+  offlineDot: {width: 8, height: 8, marginTop: 4, borderRadius: 4, backgroundColor: palette.amber},
+  offlineCopy: {flex: 1},
+  offlineTitle: {fontSize: 12, lineHeight: 16, fontWeight: '800', color: '#FFE4A3'},
+  offlineDetail: {marginTop: 2, fontSize: 11, lineHeight: 15, color: '#F5E7C4'},
   emptyInventoryHint: {marginTop: 10, padding: 11, borderRadius: 10, backgroundColor: '#243B55', fontSize: 13, lineHeight: 18, color: '#E2E8F0'},
   scanContent: {flex: 1, marginTop: 11},
   scanContentInner: {paddingBottom: 14},
