@@ -100,7 +100,7 @@ export function StockMovementHistory({item, userId, refreshKey = 0}: {item: Inve
         <Text style={styles.refreshText}>{loading ? 'Loading' : 'Refresh'}</Text>
       </Pressable>
     </View>
-    {loading && rows.length === 0 ? <Text style={styles.body}>Loading activity…</Text> : null}
+    {loading && rows.length === 0 ? <MovementSkeleton /> : null}
     {!!error && <Text accessibilityRole="alert" style={showingSaved ? styles.offlineMessage : styles.error}>{error}</Text>}
     {!loading && !error && rows.length === 0 && <Text style={styles.body}>No stock movements recorded for this item and store yet.</Text>}
     {rows.map((movement, index) => <View key={movement.id} style={[styles.entry, index === 0 && styles.firstEntry]}>
@@ -118,6 +118,19 @@ export function StockMovementHistory({item, userId, refreshKey = 0}: {item: Inve
   </View>;
 }
 
+function MovementSkeleton() {
+  return <View accessibilityRole="progressbar" accessibilityLabel="Loading recent stock activity" style={styles.skeletonList}>
+    {[0, 1, 2].map(index => <View key={index} style={styles.skeletonEntry}>
+      <View style={styles.skeletonHeading}>
+        <View style={[styles.skeletonLine, styles.skeletonMovement]} />
+        <View style={[styles.skeletonLine, styles.skeletonQuantity]} />
+      </View>
+      <View style={[styles.skeletonLine, styles.skeletonDate]} />
+      <View style={[styles.skeletonLine, styles.skeletonContext]} />
+    </View>)}
+  </View>;
+}
+
 const styles = StyleSheet.create({
   card: {padding: 16, gap: 10, borderRadius: 15, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   header: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12}, headerCopy: {flex: 1},
@@ -125,6 +138,11 @@ const styles = StyleSheet.create({
   refresh: {minHeight: 40, minWidth: 66, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1, borderColor: palette.border, borderRadius: 9},
   refreshText: {fontSize: 13, fontWeight: '700', color: palette.navy},
   entry: {paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E8EDF2', gap: 4}, firstEntry: {marginTop: 2},
+  skeletonList: {gap: 12}, skeletonEntry: {gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E8EDF2'},
+  skeletonHeading: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
+  skeletonLine: {height: 11, borderRadius: 6, backgroundColor: '#E8EDF2'},
+  skeletonMovement: {width: '47%', height: 15}, skeletonQuantity: {width: 58, height: 15},
+  skeletonDate: {width: '68%'}, skeletonContext: {width: '39%'},
   entryHeading: {flexDirection: 'row', justifyContent: 'space-between', gap: 10}, entryTitle: {flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '700', color: palette.navy},
   quantity: {fontSize: 14, lineHeight: 20, fontWeight: '800', color: palette.navy},
   body: {fontSize: 12, lineHeight: 17, color: palette.slate}, status: {fontSize: 12, lineHeight: 17, fontWeight: '700', color: palette.navy},
