@@ -1,5 +1,5 @@
 import {useCallback, useMemo, useState} from 'react';
-import {FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View} from 'react-native';
+import {FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useRouter} from 'expo-router';
 import {api, isMockMode} from '../../api/runtime';
@@ -70,6 +70,8 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
   const router = useRouter();
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categorySheetVisible, setCategorySheetVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -172,10 +174,18 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
   }, [kind]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+  const categories = useMemo(() => [...new Set(rows.map(row => row.meta).filter(Boolean))]
+    .sort((first, second) => first.localeCompare(second, undefined, {numeric: true, sensitivity: 'base'})), [rows]);
+
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return query ? rows.filter(row => `${row.title} ${row.detail} ${row.meta}`.toLocaleLowerCase().includes(query)) : rows;
-  }, [rows, search]);
+    return rows
+      .filter(row => selectedCategory === null || row.meta === selectedCategory)
+      .filter(row => !query || `${row.title} ${row.detail} ${row.meta}`.toLocaleLowerCase().includes(query))
+      .sort((first, second) => kind === 'parts'
+        ? first.title.localeCompare(second.title, undefined, {numeric: true, sensitivity: 'base'})
+        : 0);
+  }, [rows, search, selectedCategory, kind]);
 
   const openRow = (row: RecordRow) => {
     if (row.storeId !== undefined) router.push({pathname: '/', params: {storeId: String(row.storeId), view: undefined, query: undefined, filter: undefined}});
@@ -208,6 +218,16 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
                   placeholder={`Search ${heading.title.toLocaleLowerCase()}`} placeholderTextColor={palette.slate}
                   autoCapitalize="none" autoCorrect={false} returnKeyType="search" style={styles.searchInput} />
               </View>
+              {kind === 'parts' && categories.length > 1 && <Pressable accessibilityRole="button"
+                accessibilityLabel={`Filter by category${selectedCategory ? `, selected ${selectedCategory}` : ''}`}
+                accessibilityHint="Opens a list of part categories"
+                onPress={() => setCategorySheetVisible(true)} style={[styles.categoryButton, selectedCategory !== null && styles.categoryButtonActive]}>
+                <AppIcon name="filter" color={selectedCategory !== null ? palette.navy : palette.slate} size={16} />
+                <Text numberOfLines={1} style={[styles.categoryButtonText, selectedCategory !== null && styles.categoryButtonTextActive]}>
+                  {selectedCategory ?? 'All categories'}
+                </Text>
+                <AppIcon name="chevronRight" color={palette.slate} size={15} />
+              </Pressable>}
               {!loading && !error && <Text accessibilityRole="text" style={styles.resultCount}>{filtered.length} {filtered.length === 1 ? 'record' : 'records'}{offlineNotice ? ' · saved on this device' : ''}</Text>}
             </View>
           )}
@@ -222,8 +242,8 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>{search.trim() ? 'No matching records' : heading.empty}</Text>
-              {search.trim() && <Text style={styles.description}>Try a different part number or name.</Text>}
+              <Text style={styles.emptyTitle}>{search.trim() || selectedCategory ? 'No matching records' : heading.empty}</Text>
+              {(search.trim() || selectedCategory) && <Text style={styles.description}>Try another search or category.</Text>}
             </View>
           )}
           renderItem={({item}) => (
@@ -243,6 +263,31 @@ export function RecordsScreen({kind}: {kind: DirectoryKind}) {
         />
       </View>
       <AppBottomNavigation active="inventory" />
+      <Modal transparent visible={categorySheetVisible} animationType="fade" onRequestClose={() => setCategorySheetVisible(false)}>
+        <View style={styles.categoryBackdrop}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close category filter" onPress={() => setCategorySheetVisible(false)} style={StyleSheet.absoluteFill} />
+          <View style={styles.categorySheet}>
+            <View style={styles.categorySheetHeader}>
+              <View><Text accessibilityRole="header" style={styles.categorySheetTitle}>Part category</Text><Text style={styles.categorySheetSubtitle}>Narrow the catalog list.</Text></View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close category filter" onPress={() => setCategorySheetVisible(false)} style={styles.categoryClose}>
+                <AppIcon name="close" color={palette.slate} size={19} />
+              </Pressable>
+            </View>
+            <FlatList data={[null, ...categories]} keyExtractor={category => category ?? 'all-categories'}
+              renderItem={({item: category}) => {
+                const selected = category === selectedCategory;
+                const count = category === null ? rows.length : rows.filter(row => row.meta === category).length;
+                return <Pressable accessibilityRole="radio" accessibilityLabel={`${category ?? 'All categories'}, ${count} parts`}
+                  accessibilityState={{checked: selected}} onPress={() => {setSelectedCategory(category); setCategorySheetVisible(false);}}
+                  style={[styles.categoryOption, selected && styles.categoryOptionSelected]}>
+                  <View style={[styles.categoryRadio, selected && styles.categoryRadioSelected]}>{selected && <View style={styles.categoryRadioDot} />}</View>
+                  <Text style={[styles.categoryOptionText, selected && styles.categoryOptionTextSelected]}>{category ?? 'All categories'}</Text>
+                  <Text style={styles.categoryCount}>{count}</Text>
+                </Pressable>;
+              }} />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -256,6 +301,24 @@ const styles = StyleSheet.create({
   offlineNotice: {marginTop: 10, padding: 11, borderRadius: 11, backgroundColor: '#FFF4DB'}, offlineNoticeText: {fontSize: 12, lineHeight: 17, color: '#8A5A0A'},
   searchBox: {minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   searchInput: {flex: 1, paddingVertical: 8, fontSize: 14, color: palette.navy}, resultCount: {marginTop: 12, fontSize: 11, fontWeight: '700', color: palette.slate},
+  categoryButton: {minHeight: 42, maxWidth: '100%', flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8, marginTop: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: palette.border, borderRadius: 10, backgroundColor: palette.white},
+  categoryButtonActive: {borderColor: '#A8B7C8', backgroundColor: '#EDF2F7'},
+  categoryButtonText: {maxWidth: 220, fontSize: 13, fontWeight: '700', color: palette.slate},
+  categoryButtonTextActive: {color: palette.navy},
+  categoryBackdrop: {flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(21,38,59,0.38)'},
+  categorySheet: {maxHeight: '78%', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: palette.white},
+  categorySheetHeader: {minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8},
+  categorySheetTitle: {fontSize: 18, fontWeight: '800', color: palette.navy},
+  categorySheetSubtitle: {marginTop: 3, fontSize: 13, color: palette.slate},
+  categoryClose: {width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: palette.background},
+  categoryOption: {minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 8, borderRadius: 10},
+  categoryOptionSelected: {backgroundColor: '#FFF8EA'},
+  categoryRadio: {width: 19, height: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: palette.slate, borderRadius: 10},
+  categoryRadioSelected: {borderColor: palette.navy},
+  categoryRadioDot: {width: 9, height: 9, borderRadius: 5, backgroundColor: palette.navy},
+  categoryOptionText: {flex: 1, fontSize: 14, fontWeight: '600', color: palette.muted},
+  categoryOptionTextSelected: {fontWeight: '800', color: palette.navy},
+  categoryCount: {minWidth: 28, fontSize: 12, textAlign: 'right', color: palette.slate},
   recordCard: {minHeight: 84, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 13, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.white},
   recordPressed: {opacity: 0.72}, recordIcon: {width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#F0F3F7'},
   recordCopy: {flex: 1}, recordTitle: {fontSize: 14, fontWeight: '800', color: palette.navy}, recordDetail: {marginTop: 3, fontSize: 12, lineHeight: 17, color: palette.muted}, recordMeta: {marginTop: 4, fontSize: 11, color: palette.slate},
