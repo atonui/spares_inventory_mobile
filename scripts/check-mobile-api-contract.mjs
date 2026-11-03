@@ -8,6 +8,7 @@ const requiredRoutes = [
   ['POST', '/api/v1/auth/mobile-pairing/complete', false],
   ['GET', '/api/v1/me', true],
   ['GET', '/api/v1/inventory', true],
+  ['GET', '/api/v1/parts', true],
   ['GET', '/api/v1/stores', true],
   ['GET', '/api/v1/inventory/transfers', true],
   ['POST', '/api/v1/inventory/adjustments', true],
@@ -25,7 +26,7 @@ function isRecord(value) {
 }
 
 export async function checkMobileApiContract({baseUrl, fetchImpl = fetch}) {
-  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\\/+$/, '') : '';
+  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
   if (!base) throw new Error('Set SAAS_API_BASE_URL to the HTTPS base URL for a SaaS/PostgreSQL environment.');
 
   let parsedBase;
