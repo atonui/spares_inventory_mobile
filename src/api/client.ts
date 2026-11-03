@@ -364,10 +364,20 @@ export function createApiClient({
     },
     getParts(): Promise<PartRecord[]> {
       return authenticated(async token => {
-        const result = await request<unknown>('/api/parts', {token});
-        if (!Array.isArray(result)) throw new ApiError('The server returned an invalid parts response.', 0);
-        try { return result.map(parsePart); }
-        catch { throw new ApiError('The server returned an invalid parts response.', 0); }
+        try {
+          return await readNativePages(
+            cursor => {
+              const query = cursor === null
+                ? '?limit=100'
+                : `?limit=100&cursor=${encodeURIComponent(cursor)}`;
+              return request<unknown>(`/api/v1/parts${query}`, {token});
+            },
+            parsePart,
+          );
+        } catch (reason) {
+          if (reason instanceof ApiError) throw reason;
+          throw new ApiError('The server returned an invalid parts response.', 0);
+        }
       });
     },
     getEquipment(): Promise<EquipmentRecord[]> {
