@@ -38,11 +38,11 @@ Reports and company administration remain desktop workflows. There are no mobile
 
 ## Validation status and next work
 
-The repository checker validates routes and bearer declarations in the generated OpenAPI document. It requires `SAAS_API_BASE_URL` pointing to a non-production SaaS/PostgreSQL environment and must be run after the backend OpenAPI bearer-auth correction is merged and deployed. It does not send credentials or call data endpoints.
+The repository checker validates routes and bearer declarations in the generated OpenAPI document. It requires `SAAS_API_BASE_URL` pointing to a non-production SaaS/PostgreSQL environment and must be run after the updated backend contract is deployed to that environment. It does not send credentials or call data endpoints.
 
 Remaining integration work:
 
-1. Version overview, equipment, and movement-history reads, then switch the mobile client from the three remaining legacy routes above.
+1. Version overview, equipment, and movement-history reads, then migrate the four remaining legacy read calls above.
 2. Add server-side inventory search/filter parameters and barcode identifiers to the versioned inventory contract, then update client search and scan lookup.
 3. Run the live OpenAPI contract check against staging and complete an authorized iOS and Android device review for pairing, scanning, counts, offline recovery, and sign-out.
 4. Define API scope and permissions before implementing reports or administration in the app.
