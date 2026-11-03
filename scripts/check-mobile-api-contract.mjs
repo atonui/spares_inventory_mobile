@@ -26,7 +26,7 @@ function isRecord(value) {
 }
 
 export async function checkMobileApiContract({baseUrl, fetchImpl = fetch}) {
-  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\\/+$/, '') : '';
+  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
   if (!base) throw new Error('Set SAAS_API_BASE_URL to the HTTPS base URL for a SaaS/PostgreSQL environment.');
 
   let parsedBase;
