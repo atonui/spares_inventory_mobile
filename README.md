@@ -2,11 +2,11 @@
 
 The approved Spares Tracker SVG logo and mark variants are in `assets/branding/`. Expo uses the supplied icon and Android adaptive icon files in `assets/`.
 
-React Native and Expo client for inventory staff and field-service engineers. It supports desktop-approved pairing, secure session restore/logout, searchable inventory, stock counts, offline stock changes that sync when connectivity returns, and QR/barcode lookup against saved inventory.
+React Native and Expo client for inventory staff and field-service engineers. It supports desktop-approved pairing, secure session restore/logout, searchable inventory, store and transfer workflows, online receiving and consumption, stock counts, offline stock changes that sync when connectivity returns, and QR/barcode lookup against saved inventory.
 
 Company role behavior follows the backend: owners and admins may adjust unallocated stock in any store; managers and engineers may adjust central or personally assigned stock. The app hides adjustment controls where the server would deny access, while the API remains authoritative. Platform-admin access does not grant tenant inventory access.
 
-The scanner accepts part numbers directly or from QR URLs using `part_number`, `partNumber`, `sku`, or `code` query parameters. The current generated v1 API has no barcode field, so other desktop workflows (parts, stores, equipment, transfers, reports, and company administration) still need versioned mobile endpoints before they can be added safely.
+The scanner accepts part numbers directly or from QR URLs using `part_number`, `partNumber`, `sku`, or `code` query parameters. The current generated v1 inventory API has no barcode field or server-side search query, so scan lookup is by part number and inventory search currently runs over all fetched pages. Stores and transfers already have v1 endpoints. Parts, equipment, overview totals, and movement history still use legacy unversioned routes; reports and company administration have no mobile API workflows yet. See [mobile API coverage](docs/design/mobile-api-coverage.md) for the route inventory and remaining integration work.
 
 ## Backend environments
 
@@ -23,6 +23,12 @@ npm test
 npm run test:api
 npm run typecheck
 npm run bundle:native
+```
+
+The generated API contract check reads only `/api/v1/openapi.json`, without credentials or data requests. Run it against a non-production SaaS/PostgreSQL deployment after the backend contract is deployed:
+
+```sh
+SAAS_API_BASE_URL="https://your-staging-api.example" npm run check:mobile-api-contract
 ```
 
 See `docs/superpowers/specs/2026-10-17-expo-mobile-client-design.md` for the original API and session design, `docs/superpowers/specs/2026-10-23-offline-stock-adjustments.md` for stock editing and offline sync behavior, and `docs/superpowers/specs/2026-10-23-mobile-roles-and-stock-scanning.md` for role and scanner behavior.
