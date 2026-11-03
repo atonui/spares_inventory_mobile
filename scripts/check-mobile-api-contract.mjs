@@ -1,14 +1,23 @@
 import {pathToFileURL} from 'node:url';
 
 const requiredRoutes = [
-  ['GET', '/api/v1/csrf-token'],
-  ['POST', '/api/v1/auth/native/refresh'],
-  ['POST', '/api/v1/auth/mobile-pairing/claim'],
-  ['POST', '/api/v1/auth/mobile-pairing/complete'],
-  ['GET', '/api/v1/me'],
-  ['GET', '/api/v1/inventory'],
-  ['POST', '/api/v1/inventory/adjustments'],
-  ['POST', '/api/v1/auth/logout'],
+  ['GET', '/api/v1/csrf-token', false],
+  ['POST', '/api/v1/auth/native/login', false],
+  ['POST', '/api/v1/auth/native/refresh', false],
+  ['POST', '/api/v1/auth/mobile-pairing/claim', false],
+  ['POST', '/api/v1/auth/mobile-pairing/complete', false],
+  ['GET', '/api/v1/me', true],
+  ['GET', '/api/v1/inventory', true],
+  ['GET', '/api/v1/stores', true],
+  ['GET', '/api/v1/inventory/transfers', true],
+  ['POST', '/api/v1/inventory/adjustments', true],
+  ['POST', '/api/v1/inventory/add', true],
+  ['POST', '/api/v1/inventory/consume', true],
+  ['POST', '/api/v1/inventory/transfer', true],
+  ['POST', '/api/v1/inventory/transfers/{transfer_id}/receive', true],
+  ['POST', '/api/v1/inventory/transfers/{transfer_id}/return', true],
+  ['POST', '/api/v1/auth/logout', true],
+  ['POST', '/api/v1/auth/email-change/confirm', false],
 ];
 
 function isRecord(value) {
@@ -16,7 +25,7 @@ function isRecord(value) {
 }
 
 export async function checkMobileApiContract({baseUrl, fetchImpl = fetch}) {
-  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
+  const base = typeof baseUrl === 'string' ? baseUrl.trim().replace(/\\/+$/, '') : '';
   if (!base) throw new Error('Set SAAS_API_BASE_URL to the HTTPS base URL for a SaaS/PostgreSQL environment.');
 
   let parsedBase;
@@ -55,13 +64,30 @@ export async function checkMobileApiContract({baseUrl, fetchImpl = fetch}) {
     throw new Error(`The generated contract is missing mobile routes: ${missingRoutes.map(([method, path]) => `${method} ${path}`).join(', ')}.`);
   }
 
+  const bearerScheme = contract.components?.securitySchemes?.BearerAuth;
+  if (!isRecord(bearerScheme) || bearerScheme.type !== 'http' || bearerScheme.scheme !== 'bearer') {
+    throw new Error('The generated contract is missing the BearerAuth HTTP bearer security scheme.');
+  }
+
+  const incorrectSecurity = requiredRoutes.filter(([method, path, requiresBearer]) => {
+    const operation = contract.paths[path][method.toLowerCase()];
+    const security = operation.security;
+    if (!requiresBearer) return !Array.isArray(security) || security.length !== 0;
+    return !Array.isArray(security) || !security.some(requirement =>
+      isRecord(requirement) && Array.isArray(requirement.BearerAuth),
+    );
+  });
+  if (incorrectSecurity.length) {
+    throw new Error(`The generated contract has incorrect bearer-auth declarations for: ${incorrectSecurity.map(([method, path]) => `${method} ${path}`).join(', ')}.`);
+  }
+
   return {openApiUrl, checkedRoutes: requiredRoutes.length};
 }
 
 async function main() {
   try {
     const result = await checkMobileApiContract({baseUrl: process.env.SAAS_API_BASE_URL ?? process.argv[2]});
-    console.log(`Verified ${result.checkedRoutes} mobile routes from ${result.openApiUrl}`);
+    console.log(`Verified ${result.checkedRoutes} mobile routes and bearer-auth declarations from ${result.openApiUrl}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Could not verify the mobile API contract.');
     process.exitCode = 1;
