@@ -7,7 +7,7 @@ This document reflects the client and versioned API surface as of 2026-11-05. Th
 | Capability | Route(s) | Current behavior |
 |---|---|---|
 | Sign in and pair | `GET /api/v1/csrf-token`, `POST /api/v1/auth/native/login`, `POST /api/v1/auth/native/refresh`, `POST /api/v1/auth/mobile-pairing/claim`, `POST /api/v1/auth/mobile-pairing/complete`, `GET /api/v1/me`, `POST /api/v1/auth/logout` | Session credentials are managed by the mobile API client and secure session storage. |
-| Browse inventory | `GET /api/v1/inventory` | Cursor-paginated tenant inventory; client follows all pages and searches the loaded dataset locally. |
+| Browse inventory | `GET /api/v1/inventory` | Cursor-paginated tenant inventory with optional server-side `search` (part number, description, store name/type, and work order) and exact `store_id` filter. The app submits search on keyboard action and applies the store filter from its filter sheet; local search remains available against the saved snapshot offline. |
 | Browse parts | `GET /api/v1/parts` | Cursor-paginated active parts directory with the fields needed by mobile workflows. |
 | Home totals | `GET /api/v1/overview` | Company-scoped totals for active parts and stores, plus the current user's assigned equipment and parts. |
 | Browse equipment | `GET /api/v1/equipment` | Cursor-paginated active equipment; owners/admins see company equipment, other roles see their assignments. |
@@ -24,7 +24,7 @@ The mobile client no longer uses legacy unversioned endpoints for inventory, par
 
 ## Search, scanning, and scale
 
-- Inventory supports cursor pagination but the v1 route has no server-side search query. The client loads every page, then searches locally. This is correct for complete results but increases startup time and data transfer as tenant inventories grow.
+- The app still loads every inventory page during initial refresh to maintain a complete offline snapshot. Submitted searches and store filters are also sent to the server, but startup transfer will continue to grow with tenant inventory until snapshot refresh becomes incremental or demand-paginated.
 - The current inventory response has no barcode/UPC field. Scan lookup decodes supported part-number values from QR payloads and matches part numbers in the loaded inventory. Barcode-only identifiers cannot resolve reliably until the backend contract exposes them.
 - Search by supplier, serial number, or location is not supported unless those fields are added to the API response and made searchable.
 - Large-list loading and offline snapshots are client-managed; the API does not currently provide server-side filtering or alert-specific result pages.
@@ -39,6 +39,6 @@ The repository checker validates routes and bearer declarations in the generated
 
 Remaining integration work:
 
-1. Add server-side inventory search/filter parameters and barcode identifiers to the versioned inventory contract, then update client search and scan lookup.
+1. Add a barcode/UPC identifier to the versioned inventory contract and update scan lookup to resolve it.
 2. Run the live OpenAPI contract check against staging and complete an authorized iOS and Android device review for pairing, scanning, counts, offline recovery, and sign-out.
 3. Define API scope and permissions before implementing reports or administration in the app.
