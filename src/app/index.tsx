@@ -97,6 +97,9 @@ export default function InventoryScreen() {
   const [hasSession, setHasSession] = useState(false);
   const [user, setUser] = useState<NativeUser | null>(null);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
+  const [serverFilteredInventory, setServerFilteredInventory] = useState<InventoryRow[] | null>(null);
+  const [serverFilterCriteria, setServerFilterCriteria] = useState<{search: string; storeId: number | null} | null>(null);
+  const [serverFiltering, setServerFiltering] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,6 +112,7 @@ export default function InventoryScreen() {
   const [signOutError, setSignOutError] = useState('');
   const pairingCancelledRef = useRef(false);
   const syncInFlightRef = useRef<Promise<unknown> | null>(null);
+  const serverFilterRequestRef = useRef(0);
   const inventoryFilter = parseInventoryFilter(routeFilterValue);
   const [inventorySort, setInventorySort] = useState<InventorySort>('default');
   const [filterSortVisible, setFilterSortVisible] = useState(false);
@@ -149,6 +153,8 @@ export default function InventoryScreen() {
     const rows = applyQueuedStockCounts(baseRows, queue);
     setInventory(rows);
     setInventorySnapshot(rows);
+    setServerFilteredInventory(null);
+    setServerFilterCriteria(null);
     setSnapshotStatus({savedAt: await offlineStockStore.getInventorySnapshotSavedAt(userId),
       queued: queue.filter(item => item.status === 'queued').length,
       conflicts: queue.filter(item => item.status === 'conflict').length});
@@ -422,12 +428,62 @@ export default function InventoryScreen() {
     }
   }
 
-  const searchableInventory = useMemo(() => inventory.map(row => ({
+  async function refreshServerFilter(searchText: string, storeId: number | null) {
+    const requestId = ++serverFilterRequestRef.current;
+    if (!user || isOffline) {
+      setServerFilteredInventory(null);
+      setServerFilterCriteria(null);
+      return;
+    }
+    setServerFiltering(true);
+    setError('');
+    try {
+      const rows = await api.getInventory({search: searchText.trim() || undefined, storeId: storeId ?? undefined});
+      const queue = await offlineStockStore.list(user.id);
+      if (requestId === serverFilterRequestRef.current) {
+        setServerFilteredInventory(applyQueuedStockCounts(rows, queue));
+        setServerFilterCriteria({search: searchText.trim(), storeId});
+      }
+    } catch (reason) {
+      if (requestId === serverFilterRequestRef.current) {
+        if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
+          await restoreSession();
+        } else {
+          setError(responseMessage(reason));
+        }
+      }
+    } finally {
+      if (requestId === serverFilterRequestRef.current) setServerFiltering(false);
+    }
+  }
+
+  const serverFilterIsCurrent = serverFilterCriteria?.search === search.trim() &&
+    serverFilterCriteria?.storeId === selectedStoreId;
+  const searchSourceInventory = useMemo(() => {
+    if (!serverFilteredInventory || !serverFilterIsCurrent) return inventory;
+    // Preserve the existing category search, which is enriched from the local
+    // parts directory and is not part of the server inventory response yet.
+    const terms = normalizeInventorySearchText(search.trim()).split(' ').filter(Boolean);
+    const seen = new Set(serverFilteredInventory.map(row => row.id));
+    const categoryOnlyMatches = terms.length === 0 ? [] : inventory.filter(row => {
+      if (seen.has(row.id) || (selectedStoreId !== null && row.storeId !== selectedStoreId)) return false;
+      const withCategory = normalizeInventorySearchText(
+        `${row.partNumber} ${row.description} ${partCategories.get(row.partId) ?? ''} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
+      );
+      const withoutCategory = normalizeInventorySearchText(
+        `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
+      );
+      return terms.every(term => withCategory.includes(term)) && !terms.every(term => withoutCategory.includes(term));
+    });
+    return [...serverFilteredInventory, ...categoryOnlyMatches];
+  }, [inventory, serverFilteredInventory, serverFilterIsCurrent, search, selectedStoreId, partCategories]);
+
+  const searchableInventory = useMemo(() => searchSourceInventory.map(row => ({
     row,
     searchableText: normalizeInventorySearchText(
       `${row.partNumber} ${row.description} ${partCategories.get(row.partId) ?? ''} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`,
     ),
-  })), [inventory, partCategories]);
+  })), [searchSourceInventory, partCategories]);
 
   const queryTerms = useMemo(() => normalizeInventorySearchText(search.trim()).split(' ').filter(Boolean), [search]);
 
@@ -459,7 +515,8 @@ export default function InventoryScreen() {
     [getVisibleInventory, draftInventoryFilter, draftStoreId]);
   const storeItemCount = inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length;
 
-  const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all' || selectedPartCategory !== null;
+  const hasInventoryCriteria = search.trim().length > 0 || inventoryFilter !== 'all' ||
+    selectedPartCategory !== null || selectedStoreId !== null;
   const isOffline = usingCachedInventory || networkConnected === false;
   const connectionUnknown = !usingCachedInventory && networkConnected === null;
   const connectionStatusTitle = isOffline
@@ -488,9 +545,12 @@ export default function InventoryScreen() {
 
   function clearInventoryCriteria() {
     Keyboard.dismiss();
-    router.setParams({filter: undefined, query: undefined});
+    router.setParams({filter: undefined, query: undefined, storeId: undefined});
     setInventorySort('default');
     setSelectedPartCategory(null);
+    setServerFilteredInventory(null);
+    setServerFilterCriteria(null);
+    void refreshServerFilter('', null);
   }
 
   function openFilterSort() {
@@ -511,6 +571,7 @@ export default function InventoryScreen() {
     setInventorySort(draftInventorySort);
     setSelectedPartCategory(draftPartCategory);
     setFilterSortVisible(false);
+    void refreshServerFilter(search, draftStoreId);
   }
 
   const activeFilterSortLabels = [
@@ -588,10 +649,19 @@ export default function InventoryScreen() {
                   : 'Searches part numbers, descriptions, categories, store names and types, and work-order numbers.'}
                 autoCapitalize="none" autoCorrect={false}
                 style={styles.searchInput} returnKeyType="search"
-                onSubmitEditing={() => {Keyboard.dismiss(); announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);}} />
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  if (!showingStores) void refreshServerFilter(search, selectedStoreId);
+                  announceInventoryResultCount(visibleInventory.length, inventory.length, search, inventoryFilter);
+                }} />
               {search.length > 0 && (
                 <Pressable accessibilityRole="button" accessibilityLabel="Clear search" accessibilityHint="Clears the inventory search"
-                  onPress={() => router.setParams({query: undefined})} style={styles.clearSearchButton} hitSlop={4}>
+                  onPress={() => {
+                    router.setParams({query: undefined});
+                    setServerFilteredInventory(null);
+                    setServerFilterCriteria(null);
+                    if (!showingStores) void refreshServerFilter('', selectedStoreId);
+                  }} style={styles.clearSearchButton} hitSlop={4}>
                   <Text style={styles.clearSearchText}>×</Text>
                 </Pressable>
               )}
@@ -620,7 +690,12 @@ export default function InventoryScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Reset filters and sorting"
-                onPress={() => {router.setParams({filter: undefined, storeId: undefined}); setInventorySort('default'); setSelectedPartCategory(null);}}
+              onPress={() => {
+                router.setParams({filter: undefined, storeId: undefined});
+                setInventorySort('default');
+                setSelectedPartCategory(null);
+                void refreshServerFilter(search, null);
+              }}
                 style={styles.resetControlsButton}
               >
                 <Text style={styles.resetControlsText}>Reset</Text>
@@ -632,7 +707,10 @@ export default function InventoryScreen() {
           {!!error && <ErrorNotice message={error} onRetry={refresh} />}
 
           {showingStores ? <StoresDirectory items={inventory} search={search} refreshing={refreshing} onRefresh={refresh}
-            onSelect={id => router.setParams({view: undefined, storeId: String(id), query: undefined, filter: undefined})} /> : <FlatList
+            onSelect={id => {
+              router.setParams({view: undefined, storeId: String(id), query: undefined, filter: undefined});
+              void refreshServerFilter('', id);
+            }} /> : <FlatList
             data={visibleInventory}
             keyExtractor={row => String(row.id)}
             contentContainerStyle={styles.listContent}
@@ -640,12 +718,12 @@ export default function InventoryScreen() {
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={visibleInventory.length > 0 ? (
               <Text accessibilityRole="text" style={styles.resultsSummary}>
-                {hasInventoryCriteria
+                {serverFiltering ? 'Searching inventory…' : hasInventoryCriteria
                   ? `Showing ${visibleInventory.length} of ${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'}`
                   : `${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
               </Text>
             ) : undefined}
-            ListEmptyComponent={loading && !error ? <InventorySkeleton /> : error ? <></> : (
+            ListEmptyComponent={(loading || serverFiltering) && !error ? <InventorySkeleton /> : error ? <></> : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>
