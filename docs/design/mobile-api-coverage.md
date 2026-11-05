@@ -1,6 +1,6 @@
 # Mobile API coverage
 
-This document reflects the client and versioned API surface as of 2026-11-03. The backend's generated `/api/v1/openapi.json` remains authoritative for live route availability and schemas. The original first-scope design document is historical; this page records the expanded implementation.
+This document reflects the client and versioned API surface as of 2026-11-05. The backend's generated `/api/v1/openapi.json` remains authoritative for live route availability and schemas. The original first-scope design document is historical; this page records the expanded implementation.
 
 ## Versioned routes used by the app
 
@@ -9,21 +9,18 @@ This document reflects the client and versioned API surface as of 2026-11-03. Th
 | Sign in and pair | `GET /api/v1/csrf-token`, `POST /api/v1/auth/native/login`, `POST /api/v1/auth/native/refresh`, `POST /api/v1/auth/mobile-pairing/claim`, `POST /api/v1/auth/mobile-pairing/complete`, `GET /api/v1/me`, `POST /api/v1/auth/logout` | Session credentials are managed by the mobile API client and secure session storage. |
 | Browse inventory | `GET /api/v1/inventory` | Cursor-paginated tenant inventory; client follows all pages and searches the loaded dataset locally. |
 | Browse parts | `GET /api/v1/parts` | Cursor-paginated active parts directory with the fields needed by mobile workflows. |
+| Home totals | `GET /api/v1/overview` | Company-scoped totals for active parts and stores, plus the current user's assigned equipment and parts. |
+| Browse equipment | `GET /api/v1/equipment` | Cursor-paginated active equipment; owners/admins see company equipment, other roles see their assignments. |
+| View movement history | `GET /api/v1/inventory/movements` | Cursor-paginated movements filtered by part and store. |
 | Browse stores and transfers | `GET /api/v1/stores`, `GET /api/v1/inventory/transfers` | Cursor-paginated store directory and pending transfers. |
 | Count and adjust | `POST /api/v1/inventory/adjustments` | Supports expected-quantity conflict checks and stable operation IDs for retries; queued adjustments can be saved offline and synced later. |
 | Receive, consume, and transfer stock | `POST /api/v1/inventory/add`, `POST /api/v1/inventory/consume`, `POST /api/v1/inventory/transfer`, `POST /api/v1/inventory/transfers/{transfer_id}/receive`, `POST /api/v1/inventory/transfers/{transfer_id}/return` | Online workflows; these operations are not part of the offline adjustment queue. |
 
 The versioned contract also advertises `POST /api/v1/auth/email-change/confirm`; the mobile app does not currently call it.
 
-## Legacy routes still called by the mobile client
+## Legacy API usage
 
-| Capability | Current route(s) | Gap |
-|---|---|---|
-| Overview totals | `GET /api/stats`, `GET /api/equipment/statistics` | Not under `/api/v1`; should move to a documented, versioned overview contract. |
-| Equipment directory | `GET /api/equipment` | Not under `/api/v1`; no versioned mobile equipment directory contract. |
-| Movement history | `GET /api/movements` | Not under `/api/v1`; no versioned mobile movement-history contract. |
-
-These calls currently rely on authenticated legacy routes and client-side response parsing. They work in the current deployment, but remain outside the generated native API contract and should be migrated before contract-only tooling can validate them.
+The mobile client no longer uses legacy unversioned endpoints for inventory, parts, stores, transfers, overview totals, equipment, or movement history. The generated v1 contract covers those reads and the native stock workflows.
 
 ## Search, scanning, and scale
 
@@ -42,7 +39,6 @@ The repository checker validates routes and bearer declarations in the generated
 
 Remaining integration work:
 
-1. Version overview, equipment, and movement-history reads, then migrate the four remaining legacy read calls above.
-2. Add server-side inventory search/filter parameters and barcode identifiers to the versioned inventory contract, then update client search and scan lookup.
-3. Run the live OpenAPI contract check against staging and complete an authorized iOS and Android device review for pairing, scanning, counts, offline recovery, and sign-out.
-4. Define API scope and permissions before implementing reports or administration in the app.
+1. Add server-side inventory search/filter parameters and barcode identifiers to the versioned inventory contract, then update client search and scan lookup.
+2. Run the live OpenAPI contract check against staging and complete an authorized iOS and Android device review for pairing, scanning, counts, offline recovery, and sign-out.
+3. Define API scope and permissions before implementing reports or administration in the app.
