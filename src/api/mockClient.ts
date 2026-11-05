@@ -93,7 +93,15 @@ export function createMockApiClient(): MobileApi {
     },
     async getParts() {return parts.map(part => ({...part}));},
     async getEquipment() {return equipment.map(item => ({...item}));},
-    async getInventory() { return previewInventory.map(row => ({...row})); },
+    async getInventory(filters = {}) {
+      const query = filters.search?.trim().toLocaleLowerCase();
+      return previewInventory
+        .filter(row => filters.storeId === undefined || row.storeId === filters.storeId)
+        .filter(row => !query || query.split(/\s+/).every(term =>
+          `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`
+            .toLocaleLowerCase().includes(term)))
+        .map(row => ({...row}));
+    },
     async adjustStock(adjustment: QueuedStockAdjustment) {
       const item = previewInventory.find(row => row.id === adjustment.inventoryId);
       if (!item) throw new Error('Inventory item not found.');
