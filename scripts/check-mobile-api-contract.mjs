@@ -68,6 +68,13 @@ export async function checkMobileApiContract({baseUrl, fetchImpl = fetch}) {
     throw new Error(`The generated contract is missing mobile routes: ${missingRoutes.map(([method, path]) => `${method} ${path}`).join(', ')}.`);
   }
 
+  const inventoryParameters = contract.paths['/api/v1/inventory'].get.parameters;
+  if (!Array.isArray(inventoryParameters) || !['search', 'store_id'].every(name =>
+    inventoryParameters.some(parameter => isRecord(parameter) && parameter.name === name && parameter.in === 'query'),
+  )) {
+    throw new Error('The generated inventory contract is missing the search or store_id query parameter.');
+  }
+
   const bearerScheme = contract.components?.securitySchemes?.BearerAuth;
   if (!isRecord(bearerScheme) || bearerScheme.type !== 'http' || bearerScheme.scheme !== 'bearer') {
     throw new Error('The generated contract is missing the BearerAuth HTTP bearer security scheme.');
