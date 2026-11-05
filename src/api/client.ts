@@ -344,21 +344,20 @@ export function createApiClient({
     },
     getOverviewStats(): Promise<OverviewStats> {
       return authenticated(async token => {
-        const [inventory, equipment] = await Promise.all([
-          request<unknown>('/api/stats', {token}),
-          request<unknown>('/api/equipment/statistics', {token}),
-        ]);
-        if (!isRecord(inventory) || !isRecord(equipment)) throw new ApiError('The server returned invalid overview totals.', 0);
-        const count = (record: Record<string, unknown>, key: string) => {
-          const value = record[key];
-          if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new ApiError('The server returned invalid overview totals.', 0);
+        const overview = await request<unknown>('/api/v1/overview', {token});
+        if (!isRecord(overview)) throw new ApiError('The server returned invalid overview totals.', 0);
+        const count = (key: string) => {
+          const value = overview[key];
+          if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+            throw new ApiError('The server returned invalid overview totals.', 0);
+          }
           return value;
         };
         return {
-          totalParts: count(inventory, 'total_parts'),
-          activeStores: count(inventory, 'total_stores'),
-          myEquipment: count(equipment, 'my_equipment'),
-          myParts: count(inventory, 'my_parts'),
+          totalParts: count('total_parts'),
+          activeStores: count('total_stores'),
+          myEquipment: count('my_equipment'),
+          myParts: count('my_parts'),
         };
       });
     },
@@ -382,10 +381,20 @@ export function createApiClient({
     },
     getEquipment(): Promise<EquipmentRecord[]> {
       return authenticated(async token => {
-        const result = await request<unknown>('/api/equipment', {token});
-        if (!Array.isArray(result)) throw new ApiError('The server returned an invalid equipment response.', 0);
-        try { return result.map(parseEquipment); }
-        catch { throw new ApiError('The server returned an invalid equipment response.', 0); }
+        try {
+          return await readNativePages(
+            cursor => {
+              const query = cursor === null
+                ? '?limit=100'
+                : `?limit=100&cursor=${encodeURIComponent(cursor)}`;
+              return request<unknown>(`/api/v1/equipment${query}`, {token});
+            },
+            parseEquipment,
+          );
+        } catch (reason) {
+          if (reason instanceof ApiError) throw reason;
+          throw new ApiError('The server returned an invalid equipment response.', 0);
+        }
       });
     },
     async getInventory(): Promise<InventoryRow[]> {
@@ -409,9 +418,14 @@ export function createApiClient({
           !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ApiError('Invalid movement history request.', 400);
       return authenticated(async token => {
         const query = `?part_id=${input.partId}&store_id=${input.storeId}&limit=${limit}`;
-        const result = await request<unknown>(`/api/movements${query}`, {token});
-        if (!Array.isArray(result)) throw new ApiError('The server returned invalid movement history.', 0);
-        try { return result.map(parseStockMovement); }
+        const result = await request<unknown>(`/api/v1/inventory/movements${query}`, {token});
+        if (!isRecord(result) || !Array.isArray(result.items) || !isRecord(result.page) ||
+            result.page.limit !== limit ||
+            !(result.page.next_cursor === null ||
+              (typeof result.page.next_cursor === 'string' && result.page.next_cursor.length > 0))) {
+          throw new ApiError('The server returned invalid movement history.', 0);
+        }
+        try { return result.items.map(parseStockMovement); }
         catch (reason) {
           if (reason instanceof ApiError) throw reason;
           throw new ApiError('The server returned invalid movement history.', 0);

@@ -6,7 +6,7 @@ React Native and Expo client for inventory staff and field-service engineers. It
 
 Company role behavior follows the backend: owners and admins may adjust unallocated stock in any store; managers and engineers may adjust central or personally assigned stock. The app hides adjustment controls where the server would deny access, while the API remains authoritative. Platform-admin access does not grant tenant inventory access.
 
-The scanner accepts part numbers directly or from QR URLs using `part_number`, `partNumber`, `sku`, or `code` query parameters. The current generated v1 inventory API has no barcode field or server-side search query, so scan lookup is by part number and inventory search currently runs over all fetched pages. Inventory, parts, stores, and transfers use v1 endpoints. Equipment, overview totals, and movement history still use legacy unversioned routes; reports and company administration have no mobile API workflows yet. See [mobile API coverage](docs/design/mobile-api-coverage.md) for the route inventory and remaining integration work.
+The scanner accepts part numbers directly or from QR URLs using `part_number`, `partNumber`, `sku`, or `code` query parameters. The current generated v1 inventory API has no barcode field or server-side search query, so scan lookup is by part number and inventory search currently runs over all fetched pages. Inventory, parts, stores, transfers, overview totals, equipment, and movement history use versioned v1 endpoints. Reports and company administration have no mobile API workflows yet. See [mobile API coverage](docs/design/mobile-api-coverage.md) for the route inventory and remaining integration work.
 
 ## Backend environments
 
