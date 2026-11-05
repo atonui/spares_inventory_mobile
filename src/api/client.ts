@@ -17,6 +17,7 @@ export type NativeUser = {
 };
 
 export type InventoryRow = InventoryItem;
+export type InventoryFilters = {search?: string; storeId?: number};
 export type OverviewStats = {totalParts: number; activeStores: number; myEquipment: number; myParts: number};
 export type StockMovement = {
   id: number; fromStoreName: string | null; toStoreName: string | null; partNumber: string; quantity: number;
@@ -397,12 +398,14 @@ export function createApiClient({
         }
       });
     },
-    async getInventory(): Promise<InventoryRow[]> {
+    async getInventory(filters: InventoryFilters = {}): Promise<InventoryRow[]> {
       return authenticated(token => fetchAllInventory({
-        async fetchPage({limit, cursor}) {
-          const query = cursor === null
-            ? `?limit=${limit}`
-            : `?limit=${limit}&cursor=${encodeURIComponent(cursor)}`;
+        async fetchPage({limit, cursor, search, storeId}) {
+          const params = [`limit=${limit}`];
+          if (cursor !== null) params.push(`cursor=${encodeURIComponent(cursor)}`);
+          if (search) params.push(`search=${encodeURIComponent(search)}`);
+          if (storeId !== undefined) params.push(`store_id=${storeId}`);
+          const query = `?${params.join('&')}`;
           const response = await request<unknown>(`/api/v1/inventory${query}`, {token});
           try {
             return parseInventoryPage(response);
@@ -410,7 +413,7 @@ export function createApiClient({
             throw new ApiError('The server returned an invalid inventory response.', 0);
           }
         },
-      }));
+      }, 50, filters));
     },
     getMovements(input: {partId: number; storeId: number; limit?: number}): Promise<StockMovement[]> {
       const limit = input.limit ?? 20;
