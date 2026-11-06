@@ -19,12 +19,13 @@ export type InventoryPage = {
 };
 
 export type InventoryPageSource = {
-  fetchPage(args: { limit: number; cursor: string | null }): Promise<InventoryPage>;
+  fetchPage(args: { limit: number; cursor: string | null; search?: string; storeId?: number }): Promise<InventoryPage>;
 };
 
 export async function fetchAllInventory(
   source: InventoryPageSource,
   limit = 50,
+  filters: {search?: string; storeId?: number} = {},
 ): Promise<InventoryItem[]> {
   const items: InventoryItem[] = [];
   const seenCursors = new Set<string>();
@@ -33,7 +34,7 @@ export async function fetchAllInventory(
 
   do {
     if (pages >= 1000) throw new Error('Inventory page limit exceeded');
-    const result = await source.fetchPage({ limit, cursor });
+    const result = await source.fetchPage({ limit, cursor, ...filters });
     if (!result || !Array.isArray(result.items) ||
         !(result.nextCursor === null || typeof result.nextCursor === 'string')) {
       throw new Error('Invalid inventory page response');
