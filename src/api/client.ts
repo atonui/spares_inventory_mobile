@@ -2,6 +2,7 @@ import {
   fetchAllInventory,
   parseInventoryPage,
   type InventoryItem,
+  type InventoryFetchOptions,
 } from '../features/inventory/inventoryRepository.ts';
 import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
 import {parseEquipment, parsePart, parseStore, parseTransfer, readNativePages, type EquipmentRecord, type PartRecord} from './transferContract.ts';
@@ -398,7 +399,7 @@ export function createApiClient({
         }
       });
     },
-    async getInventory(filters: InventoryFilters = {}): Promise<InventoryRow[]> {
+    async getInventory(filters: InventoryFilters = {}, options: InventoryFetchOptions = {}): Promise<InventoryRow[]> {
       return authenticated(token => fetchAllInventory({
         async fetchPage({limit, cursor, search, storeId}) {
           const params = [`limit=${limit}`];
@@ -413,7 +414,7 @@ export function createApiClient({
             throw new ApiError('The server returned an invalid inventory response.', 0);
           }
         },
-      }, 50, filters));
+      }, 50, filters, options));
     },
     getMovements(input: {partId: number; storeId: number; limit?: number}): Promise<StockMovement[]> {
       const limit = input.limit ?? 20;
