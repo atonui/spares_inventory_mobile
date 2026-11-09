@@ -93,14 +93,16 @@ export function createMockApiClient(): MobileApi {
     },
     async getParts() {return parts.map(part => ({...part}));},
     async getEquipment() {return equipment.map(item => ({...item}));},
-    async getInventory(filters = {}) {
+    async getInventory(filters = {}, options = {}) {
       const query = filters.search?.trim().toLocaleLowerCase();
-      return previewInventory
+      const rows = previewInventory
         .filter(row => filters.storeId === undefined || row.storeId === filters.storeId)
         .filter(row => !query || query.split(/\s+/).every(term =>
           `${row.partNumber} ${row.description} ${row.storeName} ${row.storeType} ${row.workOrder ?? ''}`
             .toLocaleLowerCase().includes(term)))
         .map(row => ({...row}));
+      options.onPage?.(rows, false);
+      return rows;
     },
     async adjustStock(adjustment: QueuedStockAdjustment) {
       const item = previewInventory.find(row => row.id === adjustment.inventoryId);
