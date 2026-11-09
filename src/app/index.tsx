@@ -185,6 +185,22 @@ export default function InventoryScreen() {
         setError('Offline mode · showing the last saved inventory. Stock changes stay on this device until synced.');
       }
       setUser(currentUser);
+      try {
+        const savedInventory = await offlineStockStore.loadInventorySnapshot(currentUser.id);
+        if (savedInventory) {
+          const queuedAdjustments = await offlineStockStore.list(currentUser.id);
+          const cachedRows = applyQueuedStockCounts(savedInventory, queuedAdjustments);
+          setInventory(cachedRows);
+          setInventorySnapshot(cachedRows);
+          setSnapshotStatus({
+            savedAt: await offlineStockStore.getInventorySnapshotSavedAt(currentUser.id),
+            queued: queuedAdjustments.filter(item => item.status === 'queued').length,
+            conflicts: queuedAdjustments.filter(item => item.status === 'conflict').length,
+          });
+        }
+      } catch {
+        // A cache read must not prevent the authenticated server refresh.
+      }
       await loadInventory(currentUser.id);
     } catch (reason) {
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
