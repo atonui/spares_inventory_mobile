@@ -22,10 +22,15 @@ export type InventoryPageSource = {
   fetchPage(args: { limit: number; cursor: string | null; search?: string; storeId?: number }): Promise<InventoryPage>;
 };
 
+export type InventoryFetchOptions = {
+  onPage?: (items: InventoryItem[], hasMore: boolean) => void;
+};
+
 export async function fetchAllInventory(
   source: InventoryPageSource,
   limit = 50,
   filters: {search?: string; storeId?: number} = {},
+  options: InventoryFetchOptions = {},
 ): Promise<InventoryItem[]> {
   const items: InventoryItem[] = [];
   const seenCursors = new Set<string>();
@@ -42,6 +47,7 @@ export async function fetchAllInventory(
     items.push(...result.items);
     cursor = result.nextCursor;
     pages += 1;
+    options.onPage?.([...items], cursor !== null);
     if (cursor !== null) {
       if (seenCursors.has(cursor)) throw new Error('Inventory cursor repeated');
       seenCursors.add(cursor);

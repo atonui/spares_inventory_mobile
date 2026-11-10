@@ -97,6 +97,7 @@ export default function InventoryScreen() {
   const [hasSession, setHasSession] = useState(false);
   const [user, setUser] = useState<NativeUser | null>(null);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
+  const [inventoryPagesLoading, setInventoryPagesLoading] = useState(false);
   const [serverFilteredInventory, setServerFilteredInventory] = useState<InventoryRow[] | null>(null);
   const [serverFilterCriteria, setServerFilterCriteria] = useState<{search: string; storeId: number | null} | null>(null);
   const [serverFiltering, setServerFiltering] = useState(false);
@@ -112,6 +113,7 @@ export default function InventoryScreen() {
   const [signOutError, setSignOutError] = useState('');
   const pairingCancelledRef = useRef(false);
   const syncInFlightRef = useRef<Promise<unknown> | null>(null);
+  const hasInventorySnapshotRef = useRef(false);
   const serverFilterRequestRef = useRef(0);
   const inventoryFilter = parseInventoryFilter(routeFilterValue);
   const [inventorySort, setInventorySort] = useState<InventorySort>('default');
@@ -137,14 +139,31 @@ export default function InventoryScreen() {
     await syncInFlightRef.current;
     let baseRows: InventoryRow[];
     try {
-      baseRows = await api.getInventory();
+      const queuedBeforeRefresh = await offlineStockStore.list(userId);
+      setInventoryPagesLoading(true);
+      baseRows = await api.getInventory({}, {
+        onPage: (partialRows, hasMore) => {
+          if (!hasInventorySnapshotRef.current) {
+            setInventory(applyQueuedStockCounts(partialRows, queuedBeforeRefresh));
+            setServerFilteredInventory(null);
+            setServerFilterCriteria(null);
+          }
+          setInventoryPagesLoading(hasMore);
+        },
+      });
       await offlineStockStore.saveInventorySnapshot(userId, baseRows);
       setUsingCachedInventory(false);
       setError(current => current.startsWith('Offline mode ·') ? '' : current);
     } catch (reason) {
-      if (reason instanceof ApiError && [401, 403].includes(reason.status)) throw reason;
+      if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
+        setInventoryPagesLoading(false);
+        throw reason;
+      }
       const cachedRows = await offlineStockStore.loadInventorySnapshot(userId);
-      if (!cachedRows) throw reason;
+      if (!cachedRows) {
+        setInventoryPagesLoading(false);
+        throw reason;
+      }
       baseRows = cachedRows;
       setUsingCachedInventory(true);
       setError('Offline mode · showing the last saved inventory. Stock changes stay on this device until synced.');
@@ -152,12 +171,14 @@ export default function InventoryScreen() {
     const queue = await offlineStockStore.list(userId);
     const rows = applyQueuedStockCounts(baseRows, queue);
     setInventory(rows);
+    hasInventorySnapshotRef.current = true;
     setInventorySnapshot(rows);
     setServerFilteredInventory(null);
     setServerFilterCriteria(null);
     setSnapshotStatus({savedAt: await offlineStockStore.getInventorySnapshotSavedAt(userId),
       queued: queue.filter(item => item.status === 'queued').length,
       conflicts: queue.filter(item => item.status === 'conflict').length});
+    setInventoryPagesLoading(false);
   }, []);
 
   const restoreSession = useCallback(async () => {
@@ -188,6 +209,7 @@ export default function InventoryScreen() {
       try {
         const savedInventory = await offlineStockStore.loadInventorySnapshot(currentUser.id);
         if (savedInventory) {
+          hasInventorySnapshotRef.current = true;
           const queuedAdjustments = await offlineStockStore.list(currentUser.id);
           const cachedRows = applyQueuedStockCounts(savedInventory, queuedAdjustments);
           setInventory(cachedRows);
@@ -544,9 +566,11 @@ export default function InventoryScreen() {
       : snapshotStatus.savedAt === null
         ? 'Online · Stock refresh time unavailable'
         : `Online · ${formatSnapshotTime(snapshotStatus.savedAt)}`;
-  const connectionStatusDetail = isOffline && snapshotStatus.savedAt !== null
-    ? 'Changes sync when you’re back online.'
-    : '';
+  const connectionStatusDetail = inventoryPagesLoading
+    ? 'Loading remaining stock · counts may change as pages arrive.'
+    : isOffline && snapshotStatus.savedAt !== null
+      ? 'Changes sync when you’re back online.'
+      : '';
 
   const inventoryFilterCounts = useMemo(() => getVisibleInventory('all', draftPartCategory, draftStoreId).reduce((counts, row) => {
     counts.all += 1;
@@ -631,11 +655,13 @@ export default function InventoryScreen() {
                 <Text style={styles.welcome}>{showingStores ? 'Find a store' : 'Stock on hand'}</Text>
                 <Text style={styles.headerSubline}>{showingStores
                   ? `${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`
-                  : `${totalParts} total parts · ${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`}</Text>
+                  : `${totalParts} ${inventoryPagesLoading ? 'parts loaded' : 'total parts'} · ${user.role.replaceAll('_', ' ')} · ${isMockMode ? 'preview data' : 'live inventory'}`}</Text>
               </View>
               <View style={styles.totalBadge}>
                 <Text style={styles.totalNumber}>{showingStores ? new Set(inventory.map(row => row.storeId)).size : inventory.filter(row => selectedStoreId === null || row.storeId === selectedStoreId).length}</Text>
-                <Text style={styles.totalLabel}>{showingStores ? 'STORES' : 'STOCK ENTRIES'}</Text>
+                <Text style={styles.totalLabel}>{showingStores
+                  ? inventoryPagesLoading ? 'STORES LOADED' : 'STORES'
+                  : inventoryPagesLoading ? 'ENTRIES LOADED' : 'STOCK ENTRIES'}</Text>
               </View>
             </View>
 
@@ -739,7 +765,7 @@ export default function InventoryScreen() {
                   : `${storeItemCount} ${storeItemCount === 1 ? 'item' : 'items'} · ${formatSnapshotTime(snapshotStatus.savedAt)}`}
               </Text>
             ) : undefined}
-            ListEmptyComponent={(loading || serverFiltering) && !error ? <InventorySkeleton /> : error ? <></> : (
+            ListEmptyComponent={(loading || serverFiltering || inventoryPagesLoading) && !error ? <InventorySkeleton /> : error ? <></> : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{hasInventoryCriteria ? 'No matching stock' : 'No stock to show'}</Text>
                 <Text style={styles.muted}>
