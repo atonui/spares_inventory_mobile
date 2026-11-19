@@ -74,7 +74,7 @@ test('mobile pairing claim sends only the scanned pairing data and generic devic
     },
   });
 
-  const claim = await client.claimMobilePairing('sparesflow://pair?token=one-time-token', 'Android phone');
+  const claim = await client.claimMobilePairing({qrData: 'sparesflow://pair?token=one-time-token'}, 'Android phone');
 
   assert.equal(call.url, 'https://inventory.example/api/v1/auth/mobile-pairing/claim');
   assert.equal(call.options.method, 'POST');

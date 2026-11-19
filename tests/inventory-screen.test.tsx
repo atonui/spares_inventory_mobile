@@ -1,4 +1,4 @@
-import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor, within} from '@testing-library/react-native';
 import {AccessibilityInfo, Keyboard, StyleSheet} from 'react-native';
 import {ApiError} from '../src/api/client';
 import {api} from '../src/api/runtime';
@@ -10,7 +10,7 @@ import {clearInventorySnapshot, getCachedInventoryItem} from '../src/features/in
 async function pairFromPreview(screen: ReturnType<typeof render>) {
   await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
   await fireEvent.press(screen.getByRole('button', {name: 'Try preview pairing'}));
-  await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy(), {timeout: 5000});
+  await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy(), {timeout: 5000});
 }
 
 async function openSignOut(screen: ReturnType<typeof render>) {
@@ -77,9 +77,9 @@ describe('inventory device-pairing flow', () => {
 
     const screen = await render(<InventoryScreen />);
 
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
     expect(getMe).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Good to see you, Preview')).toBeTruthy();
+    expect(screen.getByText('Stock on hand')).toBeTruthy();
     expect(screen.getByText('Online · Updated just now')).toBeTruthy();
     expect(screen.getByText('4 items · Updated just now')).toBeTruthy();
     expect(screen.queryByText('Pair with your desktop')).toBeNull();
@@ -95,7 +95,7 @@ describe('inventory device-pairing flow', () => {
 
     await waitFor(() => expect(screen.getByText('Your session expired. Please sign in again.')).toBeTruthy());
     expect(await api.getSession()).toBeNull();
-    expect(screen.queryByText('Inventory')).toBeNull();
+    expect(screen.queryByRole('header', {name: 'Inventory'})).toBeNull();
     getMe.mockRestore();
   });
 
@@ -113,7 +113,10 @@ describe('inventory device-pairing flow', () => {
 
     await waitFor(() => expect(screen.getByText(message)).toBeTruthy());
     expect(await api.getSession()).toBeNull();
-    expect(loadSnapshot).not.toHaveBeenCalled();
+    // Startup shows the saved snapshot only after /me confirms the session; a 401/403 from the
+    // inventory refresh must still sign out and remove every cached row from the screen.
+    expect(loadSnapshot).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('header', {name: 'Inventory'})).toBeNull();
     expect(screen.queryByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeNull();
   });
 
@@ -152,7 +155,7 @@ describe('inventory device-pairing flow', () => {
     expect(await api.getSession()).not.toBeNull();
     await fireEvent.press(screen.getByRole('button', {name: 'Retry'}));
 
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
     expect(getMe).toHaveBeenCalledTimes(2);
     expect(await api.getSession()).not.toBeNull();
     getMe.mockRestore();
@@ -167,14 +170,14 @@ describe('inventory device-pairing flow', () => {
 
     await waitFor(() => expect(screen.getByText('This QR code is invalid or has expired.')).toBeTruthy());
     expect(screen.getByRole('button', {name: 'Use preview QR'})).toBeTruthy();
-    expect(screen.queryByText('Inventory')).toBeNull();
+    expect(screen.queryByRole('header', {name: 'Inventory'})).toBeNull();
   });
 
   it('opens the camera permission step from pairing instructions', async () => {
     const screen = await render(<InventoryScreen />);
 
     await waitFor(() => expect(screen.getByText('Pair with your desktop')).toBeTruthy());
-    await fireEvent.press(screen.getByRole('button', {name: 'Scan QR code'}));
+    await fireEvent.press(screen.getByRole('button', {name: 'Scan pairing QR'}));
     expect(screen.getByText('Camera access is needed to scan your QR code')).toBeTruthy();
     expect(screen.getByRole('button', {name: 'Allow camera'})).toBeTruthy();
   });
@@ -194,11 +197,11 @@ describe('inventory device-pairing flow', () => {
 
     await pairFromPreview(screen);
 
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
     expect(screen.getByText('Spares Tracker')).toBeTruthy();
     expect(screen.getByText('6190901970')).toBeTruthy();
     expect(getCachedInventoryItem(2)?.partNumber).toBe('110245012');
-    expect(screen.getAllByText('LOW STOCK').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Low').length).toBeGreaterThan(0);
     expect(screen.queryByText('Adjust stock')).toBeNull();
 
     await openSignOut(screen);
@@ -223,7 +226,7 @@ describe('inventory device-pairing flow', () => {
     await waitFor(() => expect(screen.getByText(/2 unsynced stock changes are saved on this device/)).toBeTruthy());
     expect(logout).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', {name: 'Stay signed in'}));
-    expect(screen.getByText('Inventory')).toBeTruthy();
+    expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy();
     expect(logout).not.toHaveBeenCalled();
 
     await openSignOut(screen);
@@ -279,7 +282,7 @@ describe('inventory device-pairing flow', () => {
 
     await pairFromPreview(screen);
 
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), '110245012');
     await fireEvent.press(screen.getByRole('button', {name: /View 110245012, PCB THYRATRON GRID CONTROL/}));
 
@@ -293,9 +296,10 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
     await pairFromPreview(screen);
 
-    await fireEvent.press(screen.getByRole('button', {name: 'Scan barcode or QR code'}));
+    await fireEvent.press(screen.getByRole('button', {name: 'Scan tab'}));
 
-    expect(mockPush).toHaveBeenCalledWith({pathname: '/scan', params: {userId: '1'}});
+    // The scan screen resolves the signed-in user from the active offline user.
+    expect(mockPush).toHaveBeenCalledWith('/scan');
   });
 
   it('shows inventory-shaped skeleton rows during the first inventory load', async () => {
@@ -308,7 +312,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await waitFor(() => expect(screen.getByLabelText('Loading inventory')).toBeTruthy());
-    expect(screen.getByRole('button', {name: 'Scan barcode or QR code'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Scan tab'})).toBeTruthy();
     resolveInventory?.(rows);
     await waitFor(() => expect(screen.getByRole('button', {name: /View 6190901970, THYRATRON CX1140LG/})).toBeTruthy());
   });
@@ -317,7 +321,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss');
     const searchInput = screen.getByLabelText('Search inventory');
@@ -339,7 +343,7 @@ describe('inventory device-pairing flow', () => {
 
     await pairFromPreview(screen);
 
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
     await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));
     await applyFilterSort(screen);
@@ -377,14 +381,14 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     await openFilterSort(screen);
-    expect(screen.getByRole('radio', {name: 'All'})).toHaveTextContent('All · 4');
-    expect(screen.getByRole('radio', {name: 'Low stock'})).toHaveTextContent('Low stock · 1');
-    expect(screen.getByRole('radio', {name: 'Out of stock'})).toHaveTextContent('Out of stock · 1');
-    expect(screen.getByRole('radio', {name: 'Available'})).toHaveTextContent('Available · 3');
-    expect(screen.getByRole('radio', {name: 'Allocated'})).toHaveTextContent('Allocated · 1');
+    for (const [name, count] of [['All', 4], ['Low stock', 1], ['Out of stock', 1], ['Available', 3], ['Allocated', 1]] as const) {
+      const option = screen.getByRole('radio', {name});
+      expect(within(option).getByText(String(count))).toBeTruthy();
+      expect(option.props.accessibilityHint).toBe(`${count} ${count === 1 ? 'item' : 'items'}`);
+    }
     await fireEvent.press(screen.getByRole('radio', {name: 'Out of stock'}));
     await applyFilterSort(screen);
     expect(screen.getByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeTruthy();
@@ -408,7 +412,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'wo-004537370');
 
@@ -421,7 +425,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), 'CUSTOMER SITE');
     expect(screen.getByRole('button', {name: /View D-008214, Cooling fan assembly/})).toBeTruthy();
@@ -443,7 +447,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     const search = screen.getByLabelText('Search inventory');
     await fireEvent.changeText(search, 'coast cooling');
@@ -461,7 +465,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Lowest stock'}));
@@ -495,7 +499,7 @@ describe('inventory device-pairing flow', () => {
 
     await pairFromPreview(screen);
 
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
     await fireEvent.changeText(screen.getByLabelText('Search inventory'), '6190901970');
 
     expect(screen.getByRole('button', {name: 'Clear search'})).toBeTruthy();
@@ -532,7 +536,7 @@ describe('inventory device-pairing flow', () => {
     const screen = await render(<InventoryScreen />);
 
     await pairFromPreview(screen);
-    await waitFor(() => expect(screen.getByText('Inventory')).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Inventory'})).toBeTruthy());
 
     await openFilterSort(screen);
     await fireEvent.press(screen.getByRole('radio', {name: 'Low stock'}));

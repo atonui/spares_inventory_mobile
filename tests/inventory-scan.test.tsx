@@ -45,11 +45,23 @@ jest.mock('expo-haptics', () => ({
   notificationAsync: (...args: unknown[]) => mockNotificationAsync(...args),
 }));
 
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: async () => ({isConnected: true, isInternetReachable: true}),
+  addNetworkStateListener: () => ({remove: jest.fn()}),
+}));
+
+jest.mock('../src/api/runtime', () => ({
+  api: {getParts: jest.fn(async () => []), clearSession: jest.fn(async () => undefined)},
+}));
+
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     getActiveUserId: async () => 7,
     getScanHapticsEnabled: async () => true,
+    getScanSoundsEnabled: async () => false,
     loadInventorySnapshot: async () => null,
+    loadPartCatalog: async () => [],
+    savePartCatalog: async () => undefined,
     list: async () => [],
   },
 }));

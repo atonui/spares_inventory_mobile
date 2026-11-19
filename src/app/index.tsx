@@ -1110,7 +1110,7 @@ const styles = StyleSheet.create({
   clearSearchButton: {width: 44, height: 44, alignItems: 'center', justifyContent: 'center'},
   clearSearchText: {fontSize: 25, lineHeight: 29, color: palette.muted},
   controlsRow: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7},
-  filterSortButton: {flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderWidth: 1, borderColor: '#44586E', borderRadius: 10, backgroundColor: '#22364B'},
+  filterSortButton: {flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderWidth: 1, borderColor: '#44586E', borderRadius: 10, backgroundColor: '#22364B'},
   filterSortButtonActive: {borderColor: palette.amber, backgroundColor: '#3D3528'},
   filterSortButtonText: {flex: 1, fontSize: 12, fontWeight: '700', color: palette.white},
   resetControlsButton: {minHeight: 44, justifyContent: 'center', paddingHorizontal: 8},
