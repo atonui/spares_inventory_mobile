@@ -5,7 +5,7 @@ import {offlineStockStore} from './offlineStockStore';
 import type {InventoryRow} from '../../api/client';
 
 jest.mock('../../api/runtime', () => ({api: {getMe: jest.fn(), getInventory: jest.fn(), receiveStock: jest.fn(), issueStock: jest.fn(), getStores: jest.fn(), dispatchStock: jest.fn()}}));
-jest.mock('./offlineStockStore', () => ({offlineStockStore: {list: jest.fn()}}));
+jest.mock('./offlineStockStore', () => ({offlineStockStore: {list: jest.fn(), loadRecentWorkOrders: jest.fn(), saveRecentWorkOrder: jest.fn()}}));
 const item: InventoryRow = {id: 1, partId: 2, storeId: 3, partNumber: 'PART-1', description: 'Test part', storeName: 'Main', storeType: 'central', storeOwner: null, quantity: 5, minThreshold: 1, isAllocated: false, workOrder: null};
 
 beforeEach(() => {
@@ -13,6 +13,8 @@ beforeEach(() => {
   jest.mocked(api.getMe).mockResolvedValue({id: 7} as Awaited<ReturnType<typeof api.getMe>>);
   jest.mocked(api.getInventory).mockResolvedValue([item]);
   jest.mocked(offlineStockStore.list).mockResolvedValue([]);
+  jest.mocked(offlineStockStore.loadRecentWorkOrders).mockResolvedValue([]);
+  jest.mocked(offlineStockStore.saveRecentWorkOrder).mockImplementation(async (_userId, workOrder) => [workOrder]);
   jest.mocked(api.getStores).mockResolvedValue([{id: 3, name: 'Main', type: 'central'}, {id: 4, name: 'Empty store', type: 'central'}]);
 });
 

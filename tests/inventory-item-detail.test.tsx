@@ -42,9 +42,9 @@ describe('inventory item detail screen', () => {
   it('loads a mock inventory row by route ID and shows its details', async () => {
     const screen = await render(<InventoryItemDetailScreen />);
 
-    await waitFor(() => expect(screen.getByText('Stock details')).toBeTruthy());
-    expect(screen.getByText('Spares Tracker')).toBeTruthy();
-    expect(screen.getByText('110245012')).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Item details'})).toBeTruthy());
+    // The part number is shown in both the screen header and the item summary.
+    expect(screen.getAllByText('110245012')).toHaveLength(2);
     expect(screen.getByText('PCB THYRATRON GRID CONTROL')).toBeTruthy();
     expect(screen.getByLabelText('1 unit on hand')).toBeTruthy();
     expect(screen.getByText('On hand')).toBeTruthy();
@@ -73,8 +73,8 @@ describe('inventory item detail screen', () => {
 
     const screen = await render(<InventoryItemDetailScreen />);
 
-    await waitFor(() => expect(screen.getByText('Stock details')).toBeTruthy());
-    expect(screen.getByText('110245012')).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('header', {name: 'Item details'})).toBeTruthy());
+    expect(screen.getAllByText('110245012')).toHaveLength(2);
     expect(inventoryRequest).not.toHaveBeenCalled();
   });
 
@@ -88,7 +88,7 @@ describe('inventory item detail screen', () => {
     setInventorySnapshot([row]);
     const screen = await render(<InventoryItemDetailScreen />);
 
-    await waitFor(() => expect(screen.getByText('PART-92')).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText('PART-92')).toHaveLength(2));
     expect(screen.getByText('Out of stock')).toBeTruthy();
     expect(screen.queryByText('Low stock')).toBeNull();
   });
@@ -119,9 +119,9 @@ describe('inventory item detail screen', () => {
     setInventorySnapshot([row]);
     const screen = await render(<InventoryItemDetailScreen />);
 
-    await waitFor(() => expect(screen.getByText('PART-89')).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText('PART-89')).toHaveLength(2));
     expect(screen.queryByRole('button', {name: 'Receive stock'})).toBeNull();
-    expect(screen.getByText('Stock adjustments are limited to central and assigned stores.')).toBeTruthy();
+    expect(screen.getByText('You can view this item, but your role or store assignment doesn’t allow stock movements here.')).toBeTruthy();
   });
 
   it('allows an admin to adjust unallocated stock outside their assignment', async () => {
