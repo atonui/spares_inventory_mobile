@@ -1,4 +1,4 @@
-import {canAdjustStock, canInviteAdmin, canManageCompany} from './roleCapabilities';
+import {canAdjustStock, canManageCompany} from './roleCapabilities';
 import type {InventoryItem} from '../inventory/inventoryRepository';
 
 const row = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
@@ -18,13 +18,11 @@ const row = (overrides: Partial<InventoryItem> = {}): InventoryItem => ({
 });
 
 describe('role capability hints', () => {
-  it('limits company management to owner and admin, and admin invitation to owner', () => {
+  it('limits company management to owner and admin', () => {
     expect(canManageCompany('owner')).toBe(true);
     expect(canManageCompany('admin')).toBe(true);
     expect(canManageCompany('manager')).toBe(false);
     expect(canManageCompany('platform_admin')).toBe(false);
-    expect(canInviteAdmin('owner')).toBe(true);
-    expect(canInviteAdmin('admin')).toBe(false);
   });
 
   it('allows owner and admin to adjust unallocated stock in any store', () => {

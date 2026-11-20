@@ -146,6 +146,22 @@ test('native login ignores malformed optional account flags', async () => {
   assert.equal('saas_mode' in session.user, false);
 });
 
+test('profile parsing ignores saas_mode so the API can drop it', async () => {
+  const profile = {id: 7, email: 'member@example.test', name: 'Member', role: 'manager', territory: null};
+  for (const saasMode of [true, 'yes', undefined]) {
+    const client = createApiClient({
+      baseUrl: 'https://inventory.example',
+      fetchImpl: async () => jsonResponse({...profile, ...(saasMode === undefined ? {} : {saas_mode: saasMode})}),
+      sessionStore: {
+        async getSession() { return {access_token: 'access', refresh_token: 'refresh', expires_at: '2030-01-01T00:00:00Z'}; },
+        async setSession() {},
+        async clearSession() {},
+      },
+    });
+    assert.deepEqual(await client.getMe(), profile);
+  }
+});
+
 test('native login rejects incomplete or malformed success responses', async t => {
   const invalidResponses = [
     ['unsuccessful envelope', nativeLoginResponse({success: false})],
