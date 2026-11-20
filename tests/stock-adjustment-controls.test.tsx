@@ -204,4 +204,31 @@ describe('stock adjustment conflict handling', () => {
     expect(mockQueue).toHaveLength(1);
     expect(mockQueue[0]).toMatchObject({expectedQuantity: 4, newQuantity: 0});
   });
+
+  it('refreshes only the conflicted item instead of downloading all inventory', async () => {
+    mockQueue = [];
+    jest.mocked(offlineStockStore.markConflict).mockImplementation(async (operationId: string, error: string) => {
+      mockQueue = mockQueue.map(entry => entry.operationId === operationId ? {...entry, status: 'conflict', error} : entry);
+    });
+    jest.spyOn(api, 'adjustStock').mockRejectedValue(Object.assign(new Error('Stock changed'), {status: 409}));
+    const row = {id: 11, partId: 101, storeId: 1, partNumber: 'PART-11', description: 'Filter element',
+      storeName: 'Main', storeType: 'warehouse', storeOwner: null, quantity: 4,
+      minThreshold: 1, isAllocated: false, workOrder: null};
+    const getInventory = jest.spyOn(api, 'getInventory').mockResolvedValue([
+      {...row, id: 12, partNumber: 'PART-110', quantity: 50},
+      {...row, quantity: 9},
+    ]);
+    const onQuantityChange = jest.fn();
+    const screen = await render(<StockAdjustmentControls
+      item={row} userId={7} onQuantityChange={onQuantityChange} onRefresh={jest.fn(async () => 9)}
+    />);
+
+    await fireEvent.press(screen.getByRole('button', {name: 'Edit count'}));
+    await fireEvent.changeText(screen.getByLabelText('New stock quantity'), '6');
+    await fireEvent.press(screen.getByRole('button', {name: 'Save change'}));
+
+    await waitFor(() => expect(onQuantityChange).toHaveBeenLastCalledWith(9));
+    expect(getInventory).toHaveBeenCalledTimes(1);
+    expect(getInventory).toHaveBeenCalledWith({search: 'PART-11', storeId: 1});
+  });
 });
