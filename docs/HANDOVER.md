@@ -2,7 +2,7 @@
 
 **Repository:** `atonui/spares_inventory_mobile`  
 **Stack:** Expo SDK 58, React Native 0.88, React 19, TypeScript, Expo Router  
-**Prepared:** 2026-11-16
+**Prepared:** 2026-11-16 · **Updated:** 2026-11-20 (backend is PostgreSQL-only)
 
 This document describes the implementation visible in the repository at the time it was written and records operational context that is not fully captured by the design specs. The generated backend OpenAPI document is authoritative for what a deployed backend currently serves. Treat the deployment details below as repo configuration, not proof of what is configured in a particular EAS or Vercel project.
 
@@ -61,6 +61,8 @@ The user begins pairing from the already signed-in desktop account's Connect mob
 
 When approval returns a session, the app saves it, calls `/api/v1/me`, saves the profile for offline recovery, and loads inventory. This final step matters: a successful desktop approval alone does not complete the mobile signed-in state.
 
+Accounts are created only by invitation on the web app (`POST /api/users` returns 410), and admins cannot set user passwords; password changes go through account recovery on the web. The mobile app has no sign-up, invitation, or password flows and should not add them.
+
 The separate native login method is implemented in the API client, including CSRF acquisition, but the expected user-facing sign-in entry in current product flow is desktop pairing. Do not expose a new credential flow without aligning it with product and backend requirements.
 
 ### Restore and token lifecycle
@@ -74,6 +76,8 @@ Transient network errors can keep the existing session/profile and use saved dat
 Logout posts to `/api/v1/auth/logout`; local session credentials are cleared only after server confirmation. If the server responds 401/403, local access is cleared because it is already invalid. Before sign-out, the UI warns about queued/conflicted stock changes. The active offline user pointer and current inventory snapshot are cleared, but the queue is stored per user and is not automatically erased. This avoids silently deleting unsynced work; users can sign back in as that user to recover it.
 
 ## 4. Offline behavior
+
+The backend runs only on PostgreSQL (multi-tenant, with row-level security per organization) and has no SQLite code. SQLite appears in this app only as the on-device offline cache.
 
 Offline persistence is scoped by user ID, not by a client-controlled tenant. On native, Expo SQLite stores inventory snapshots, profile/directory data, and queued stock adjustments. On web, a local-storage adapter provides preview behavior; browser storage durability and transaction semantics differ from SQLite.
 
@@ -103,7 +107,7 @@ The scan route requests camera permission only after the user opens Scan. Expo C
 
 The scanner currently has success/not-found audio assets and optional haptic feedback, with a user setting to disable haptics. Audio player setup/playback failures are caught so visual results remain available. Device-level sound/vibration behavior can vary with OS settings and hardware; verify on actual devices.
 
-The current inventory API response has **no barcode/UPC field**, so the scanner cannot reliably resolve barcode-only identifiers. It is part-number based because part number is the stable identifier currently present in the mobile inventory contract. Supporting real barcode lookup requires the backend to add a barcode/UPC field to the inventory (and likely parts) response, define normalization and uniqueness/duplicate behavior, optionally support server-side search by that field, regenerate/deploy OpenAPI, then update client parsing, lookup, tests, and ambiguous-match UI. The desktop write path/import process must also populate that identifier. Until those pieces exist, do not claim that scanning any barcode resolves an item.
+The current inventory API response has **no barcode/UPC field**, so the scanner cannot reliably resolve barcode-only identifiers. It is part-number based because part number is the stable identifier currently present in the mobile inventory contract. Supporting real barcode lookup requires the backend to add a barcode/UPC field to the inventory (and likely parts) response, define normalization and uniqueness/duplicate behavior, optionally support server-side search by that field, regenerate/deploy OpenAPI, then update client parsing, lookup, tests, and ambiguous-match UI. The desktop write path/import process must also populate that identifier. Until those pieces exist, do not claim that scanning any barcode resolves an item. Part numbers are limited to 25 characters on the server, so a longer scanned value cannot match a part.
 
 ## 7. Builds and environments
 
@@ -137,7 +141,7 @@ Run from the repo root after installing dependencies (`npm ci`):
 | `npm run bundle:native` | Expo export for Android and iOS JavaScript bundles; catches Metro/platform bundling issues, not native device behavior. |
 | `SAAS_API_BASE_URL=https://<non-production-host> npm run check:mobile-api-contract` | Reads only `/api/v1/openapi.json`; checks required routes, inventory search/store query parameters, and bearer declarations. It does not authenticate or test data endpoints. Must target non-production SaaS/PostgreSQL. |
 
-Some shell environments parse the assignment differently; if needed, export `SAAS_API_BASE_URL` first, then run the checker. Never run live mobile validation against the legacy production SQLite service. Physical iOS/Android pairing, camera, haptics, keyboard, and layout validation still requires devices/builds; a successful JS export does not validate those behaviors.
+Some shell environments parse the assignment differently; if needed, export `SAAS_API_BASE_URL` first, then run the checker. Never run live mobile validation against the production API; use a separate non-production deployment. Physical iOS/Android pairing, camera, haptics, keyboard, and layout validation still requires devices/builds; a successful JS export does not validate those behaviors.
 
 The most recent user-reported verification before this handover (PR #46) was 14 suites / 71 tests, lint, typecheck, and Expo web export passing; `--clear` was needed after a stale Metro cache. Later merged changes have their own PR checks. **UNVERIFIED:** this handover has not rerun or audited the current CI state for the current main commit.
 
