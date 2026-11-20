@@ -16,7 +16,7 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     list: async () => mockQueue, enqueue: async () => undefined,
     remove: async (operationId: string) => {mockQueue = mockQueue.filter(entry => entry.operationId !== operationId);},
-    markConflict: async () => undefined,
+    markConflict: async () => undefined, markSending: async () => undefined,
     saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
     saveProfile: async () => undefined, loadProfile: async () => mockProfile,
     getActiveUserId: async () => 1, setActiveUserId: async () => undefined,

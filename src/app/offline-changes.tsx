@@ -2,9 +2,10 @@ import {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter} from 'expo-router';
-import {api} from '../api/runtime';
+import {ApiError} from '../api/client';
 import type {InventoryItem} from '../features/inventory/inventoryRepository';
-import {syncQueuedStock, type QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
+import {isAwaitingSync, type QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
+import {syncStockChanges} from '../features/inventory/stockSync';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 
@@ -51,7 +52,7 @@ export default function OfflineChangesScreen() {
     return offlineStockStore.subscribeQueueChanges(() => { void load(); });
   }, [load]);
 
-  const queued = queue.filter(change => change.status === 'queued');
+  const queued = queue.filter(isAwaitingSync);
   const conflicts = queue.filter(change => change.status === 'conflict');
 
   async function syncNow() {
@@ -60,11 +61,13 @@ export default function OfflineChangesScreen() {
     setError('');
     setSyncNotice('');
     try {
-      const result = await syncQueuedStock(offlineStockStore, userId, api.adjustStock);
+      const result = await syncStockChanges(userId);
       if (result.blocked) setSyncNotice('No connection to the server. Your changes remain saved on this device.');
       await load();
-    } catch {
-      setError('Could not sync changes. Check your connection and try again.');
+    } catch (reason) {
+      setError(reason instanceof ApiError && [401, 403].includes(reason.status)
+        ? 'Your access could not be confirmed. Sign in again to sync these changes; they remain saved on this device.'
+        : 'Could not sync changes. Check your connection and try again.');
     } finally {
       setSyncing(false);
     }

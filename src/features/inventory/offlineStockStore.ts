@@ -91,7 +91,7 @@ function isQueuedAdjustment(value: unknown): value is QueuedStockAdjustment {
   return typeof item.operationId === 'string' && typeof item.userId === 'number' &&
     typeof item.inventoryId === 'number' && typeof item.expectedQuantity === 'number' &&
     typeof item.newQuantity === 'number' && typeof item.createdAt === 'number' &&
-    (item.status === 'queued' || item.status === 'conflict') &&
+    (item.status === 'queued' || item.status === 'sending' || item.status === 'conflict') &&
     (item.error === null || typeof item.error === 'string');
 }
 
@@ -540,7 +540,7 @@ export const offlineStockStore: OfflineStockStorage = {
     const db = await database();
     const rows = await db.getAllAsync<{
       operation_id: string; user_id: number; inventory_id: number; expected_quantity: number;
-      new_quantity: number; created_at: number; status: 'queued' | 'conflict'; error: string | null;
+      new_quantity: number; created_at: number; status: 'queued' | 'sending' | 'conflict'; error: string | null;
     }>('SELECT * FROM stock_adjustments WHERE user_id=? ORDER BY created_at, rowid', userId);
     return rows.map(row => ({operationId: row.operation_id, userId: row.user_id,
       inventoryId: row.inventory_id, expectedQuantity: row.expected_quantity,
@@ -565,6 +565,17 @@ export const offlineStockStore: OfflineStockStorage = {
     }
     const db = await database();
     await db.runAsync("UPDATE stock_adjustments SET status='conflict',error=? WHERE operation_id=?", message, operationId);
+    notifyQueueChanged();
+  },
+  async markSending(operationId) {
+    if (Platform.OS === 'web') {
+      saveWebEntries(getWebEntries().map(item => item.operationId === operationId && item.status === 'queued'
+        ? {...item, status: 'sending'} : item));
+      notifyQueueChanged();
+      return;
+    }
+    const db = await database();
+    await db.runAsync("UPDATE stock_adjustments SET status='sending' WHERE operation_id=? AND status='queued'", operationId);
     notifyQueueChanged();
   },
 };

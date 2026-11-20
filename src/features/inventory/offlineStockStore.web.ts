@@ -17,7 +17,7 @@ function isQueuedAdjustment(value: unknown): value is QueuedStockAdjustment {
   return typeof item.operationId === 'string' && typeof item.userId === 'number' &&
     typeof item.inventoryId === 'number' && typeof item.expectedQuantity === 'number' &&
     typeof item.newQuantity === 'number' && typeof item.createdAt === 'number' &&
-    (item.status === 'queued' || item.status === 'conflict') &&
+    (item.status === 'queued' || item.status === 'sending' || item.status === 'conflict') &&
     (item.error === null || typeof item.error === 'string');
 }
 
@@ -254,6 +254,11 @@ export const offlineStockStore: OfflineStockStorage = {
   async markConflict(operationId, message) {
     saveWebEntries(getWebEntries().map(item => item.operationId === operationId
       ? {...item, status: 'conflict', error: message} : item));
+    notifyQueueChanged();
+  },
+  async markSending(operationId) {
+    saveWebEntries(getWebEntries().map(item => item.operationId === operationId && item.status === 'queued'
+      ? {...item, status: 'sending'} : item));
     notifyQueueChanged();
   },
 };

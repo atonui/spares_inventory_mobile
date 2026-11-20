@@ -26,6 +26,10 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
         entry.inventoryId === adjustment.inventoryId && entry.status === 'queued')), replacement];
     }),
     markConflict: jest.fn(),
+    markSending: jest.fn(async (operationId: string) => {
+      mockQueue = mockQueue.map(entry => entry.operationId === operationId && entry.status === 'queued'
+        ? {...entry, status: 'sending'} : entry);
+    }),
   },
 }));
 
@@ -105,7 +109,9 @@ describe('stock adjustment conflict handling', () => {
     expect(screen.getByRole('button', {name: 'Discard outdated changes'}).props.accessibilityState).toMatchObject({disabled: true});
   });
 
-  it('undoes an offline stock count by removing the queued operation', async () => {
+  // A failed send may still have reached the server, so undo queues a
+  // compensating count instead of deleting the sent operation.
+  it('undoes an unconfirmed stock count with a queued compensating adjustment', async () => {
     mockQueue = [];
     jest.spyOn(api, 'adjustStock').mockRejectedValue(new TypeError('offline'));
     const onQuantityChange = jest.fn();
@@ -127,8 +133,11 @@ describe('stock adjustment conflict handling', () => {
 
     await fireEvent.press(screen.getByRole('button', {name: 'Undo stock change'}));
 
-    await waitFor(() => expect(screen.getByText('Stock change undone.')).toBeTruthy());
-    expect(mockQueue).toHaveLength(0);
+    await waitFor(() => expect(screen.getByText('Undo saved on this device. It will sync when you’re back online.')).toBeTruthy());
+    expect(mockQueue).toEqual([
+      expect.objectContaining({expectedQuantity: 4, newQuantity: 6, status: 'sending'}),
+      expect.objectContaining({expectedQuantity: 6, newQuantity: 4}),
+    ]);
     expect(onQuantityChange).toHaveBeenLastCalledWith(4);
   });
 

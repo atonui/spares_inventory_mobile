@@ -42,7 +42,7 @@ jest.mock('expo-network', () => ({addNetworkStateListener: (listener: typeof moc
 jest.mock('../src/features/inventory/offlineStockStore', () => ({
   offlineStockStore: {
     list: async () => [], enqueue: async () => undefined, remove: async () => undefined,
-    markConflict: async () => undefined,
+    markConflict: async () => undefined, markSending: async () => undefined,
     saveInventorySnapshot: async () => undefined, loadInventorySnapshot: async () => null,
     getInventorySnapshotSavedAt: async () => Date.now(), subscribeQueueChanges: () => () => undefined,
     saveProfile: async () => undefined, loadProfile: async () => null,
