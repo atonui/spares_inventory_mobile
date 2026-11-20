@@ -9,6 +9,13 @@ import {offlineStockStore} from './offlineStockStore';
 type Mode = 'add' | 'count';
 type UndoableCount = {adjustment: QueuedStockAdjustment; previousQuantity: number};
 
+// Fetch only this item's store, filtered by part number, rather than every
+// inventory page. The search is a substring match, so pick the row by ID.
+async function fetchCurrentRow(item: InventoryRow): Promise<InventoryRow | undefined> {
+  const rows = await api.getInventory({search: item.partNumber, storeId: item.storeId});
+  return rows.find(row => row.id === item.id);
+}
+
 export function StockAdjustmentControls({item, userId, onQuantityChange, onRefresh, showAddStock = true}: {
   item: InventoryRow;
   userId: number;
@@ -72,7 +79,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
         setPendingCount(itemEntries.length);
         setHasConflict(itemEntries.some(entry => entry.status === 'conflict'));
         if (itemEntries.some(entry => entry.status === 'conflict')) setQuantityRefreshed(false);
-        const latest = (await api.getInventory()).find(row => row.id === item.id);
+        const latest = await fetchCurrentRow(item);
         if (latest) onQuantityChange(latest.quantity);
         if (itemEntries.some(entry => entry.status === 'conflict')) {
           setNotice('Stock changed before this count synced. Review the current quantity and edit it again.');
@@ -133,7 +140,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
         setUndoableCount(null);
         setNotice('Stock changed before this count synced. Refresh and review the current quantity.');
         try {
-          const latest = (await api.getInventory()).find(row => row.id === item.id);
+          const latest = await fetchCurrentRow(item);
           if (latest) onQuantityChange(latest.quantity);
         } catch { /* Keep the saved offline count visible until a refresh is possible. */ }
       } else if (sync.blocked || itemEntries.length > 0) {
@@ -182,7 +189,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
         if (itemEntries.some(entry => entry.status === 'conflict')) {
           setQuantityRefreshed(false);
           try {
-            const latest = (await api.getInventory()).find(row => row.id === item.id);
+            const latest = await fetchCurrentRow(item);
             if (latest) onQuantityChange(latest.quantity);
           } catch { /* Keep the queued undo visible until the current quantity can be refreshed. */ }
           setNotice('Could not undo because stock changed on the server. Review the current quantity.');
