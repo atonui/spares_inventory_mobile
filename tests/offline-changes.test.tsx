@@ -28,6 +28,7 @@ jest.mock('../src/features/inventory/offlineStockStore', () => ({
     ]),
     subscribeQueueChanges: jest.fn(() => () => undefined),
     remove: jest.fn(async () => undefined),
+    markSending: jest.fn(async () => undefined),
     enqueue: jest.fn(),
     markConflict: jest.fn(),
   },

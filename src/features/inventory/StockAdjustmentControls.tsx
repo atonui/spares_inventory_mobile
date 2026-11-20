@@ -2,12 +2,24 @@ import {useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import * as Network from 'expo-network';
 import {api} from '../../api/runtime';
-import type {InventoryRow} from '../../api/client';
-import {saveStockCount, syncQueuedStock, type QueuedStockAdjustment} from './offlineStockQueue';
+import {ApiError, type InventoryRow} from '../../api/client';
+import {isAwaitingSync, saveStockCount, type QueuedStockAdjustment} from './offlineStockQueue';
+import {syncStockChanges} from './stockSync';
 import {offlineStockStore} from './offlineStockStore';
 
 type Mode = 'add' | 'count';
 type UndoableCount = {adjustment: QueuedStockAdjustment; previousQuantity: number};
+
+// The change is already saved on the device. If the session is no longer
+// valid, keep it queued; the root session watcher handles signing out.
+async function syncSavedChange(userId: number) {
+  try {
+    return await syncStockChanges(userId);
+  } catch (reason) {
+    if (reason instanceof ApiError && [401, 403].includes(reason.status)) return {synced: 0, blocked: true};
+    throw reason;
+  }
+}
 
 export function StockAdjustmentControls({item, userId, onQuantityChange, onRefresh, showAddStock = true}: {
   item: InventoryRow;
@@ -65,8 +77,8 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       syncInFlight.current = true;
       void (async () => {
         const before = await offlineStockStore.list(userId);
-        if (!before.some(entry => entry.inventoryId === item.id && entry.status === 'queued')) return;
-        await syncQueuedStock(offlineStockStore, userId, api.adjustStock);
+        if (!before.some(entry => entry.inventoryId === item.id && isAwaitingSync(entry))) return;
+        await syncStockChanges(userId);
         const remaining = await offlineStockStore.list(userId);
         const itemEntries = remaining.filter(entry => entry.inventoryId === item.id);
         setPendingCount(itemEntries.length);
@@ -123,7 +135,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
       setMode(null);
       setValue('');
       setZeroCountConfirmationVisible(false);
-      const sync = await syncQueuedStock(offlineStockStore, userId, api.adjustStock);
+      const sync = await syncSavedChange(userId);
       const entries = await offlineStockStore.list(userId);
       const itemEntries = entries.filter(entry => entry.inventoryId === item.id);
       setPendingCount(itemEntries.length);
@@ -174,7 +186,7 @@ export function StockAdjustmentControls({item, userId, onQuantityChange, onRefre
           newQuantity: undo.previousQuantity,
         });
         onQuantityChange(undo.previousQuantity);
-        const sync = await syncQueuedStock(offlineStockStore, userId, api.adjustStock);
+        const sync = await syncSavedChange(userId);
         const remaining = await offlineStockStore.list(userId);
         const itemEntries = remaining.filter(entry => entry.inventoryId === item.id);
         setPendingCount(itemEntries.length);

@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react';
 import {ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useRouter} from 'expo-router';
-import type {QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
+import {isAwaitingSync, type QueuedStockAdjustment} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
 import {AppIcon} from '../features/navigation/AppIcon';
@@ -91,7 +91,7 @@ export default function SettingsScreen() {
     }
   }
 
-  const waitingCount = queue.filter(change => change.status === 'queued').length;
+  const waitingCount = queue.filter(isAwaitingSync).length;
   const conflictCount = queue.filter(change => change.status === 'conflict').length;
   const pendingCount = waitingCount + conflictCount;
 
