@@ -63,7 +63,7 @@ When approval returns a session, the app saves it, calls `/api/v1/me`, saves the
 
 Accounts are created only by invitation on the web app (`POST /api/users` returns 410), and admins cannot set user passwords; password changes go through account recovery on the web. The mobile app has no sign-up, invitation, or password flows and should not add them.
 
-The separate native login method is implemented in the API client, including CSRF acquisition, but the expected user-facing sign-in entry in current product flow is desktop pairing. Do not expose a new credential flow without aligning it with product and backend requirements.
+The separate native login method (`client.login()`, using `/api/v1/csrf-token` and `/api/v1/auth/native/login`) is implemented in the API client but deliberately not exposed in the UI; desktop pairing is the only user-facing sign-in. It is kept as a fallback for when a phone's camera cannot scan the pairing QR code. A possible future use is an emergency sign-in that an admin enables for one user for a short time after a support request. That would need backend support (a time-limited per-user flag, an admin action to set it, and an audit record) before any mobile UI is added. Do not remove the method or its routes, and do not expose it without that design.
 
 ### Restore and token lifecycle
 
@@ -107,7 +107,7 @@ The scan route requests camera permission only after the user opens Scan. Expo C
 
 The scanner currently has success/not-found audio assets and optional haptic feedback, with a user setting to disable haptics. Audio player setup/playback failures are caught so visual results remain available. Device-level sound/vibration behavior can vary with OS settings and hardware; verify on actual devices.
 
-The current inventory API response has **no barcode/UPC field**, so the scanner cannot reliably resolve barcode-only identifiers. It is part-number based because part number is the stable identifier currently present in the mobile inventory contract. Supporting real barcode lookup requires the backend to add a barcode/UPC field to the inventory (and likely parts) response, define normalization and uniqueness/duplicate behavior, optionally support server-side search by that field, regenerate/deploy OpenAPI, then update client parsing, lookup, tests, and ambiguous-match UI. The desktop write path/import process must also populate that identifier. Until those pieces exist, do not claim that scanning any barcode resolves an item. Part numbers are limited to 25 characters on the server, so a longer scanned value cannot match a part.
+The current inventory API response has **no barcode/UPC field**, so the scanner cannot reliably resolve barcode-only identifiers. It is part-number based because part number is the stable identifier currently present in the mobile inventory contract. Supporting real barcode lookup requires the backend to add a barcode/UPC field to the inventory (and likely parts) response, define normalization and uniqueness/duplicate behavior, optionally support server-side search by that field, regenerate/deploy OpenAPI, then update client parsing, lookup, tests, and ambiguous-match UI. The desktop write path/import process must also populate that identifier. Until those pieces exist, do not claim that scanning any barcode resolves an item. Part numbers are limited to 100 characters on the server (raised from 25 in atonui/spares_inventory#357), so a longer scanned value cannot match a part.
 
 ## 7. Builds and environments
 
