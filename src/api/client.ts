@@ -14,7 +14,6 @@ export type NativeUser = {
   role: string;
   territory: string | null;
   is_platform_admin?: boolean;
-  saas_mode?: boolean;
 };
 
 export type InventoryRow = InventoryItem;
@@ -137,8 +136,7 @@ function parseNativeUser(
       !isNonEmptyString(value.email) || !isNonEmptyString(value.name) ||
       !isNonEmptyString(value.role) ||
       !(value.territory === undefined || value.territory === null || typeof value.territory === 'string') ||
-      (validateOptionalFlags && !(value.is_platform_admin === undefined || typeof value.is_platform_admin === 'boolean')) ||
-      (validateOptionalFlags && !(value.saas_mode === undefined || typeof value.saas_mode === 'boolean'))) {
+      (validateOptionalFlags && !(value.is_platform_admin === undefined || typeof value.is_platform_admin === 'boolean'))) {
     throw new ApiError(errorMessage, 0);
   }
 
@@ -149,7 +147,6 @@ function parseNativeUser(
     role: value.role,
     territory: value.territory ?? null,
     ...(typeof value.is_platform_admin === 'boolean' ? {is_platform_admin: value.is_platform_admin} : {}),
-    ...(typeof value.saas_mode === 'boolean' ? {saas_mode: value.saas_mode} : {}),
   };
 }
 

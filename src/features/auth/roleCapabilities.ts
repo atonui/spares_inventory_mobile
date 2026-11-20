@@ -5,10 +5,6 @@ export function canManageCompany(role: string): boolean {
   return role === 'owner' || role === 'admin';
 }
 
-export function canInviteAdmin(role: string): boolean {
-  return role === 'owner';
-}
-
 /**
  * Client-side visibility hint matching backend/services/stock_access.py.
  * The mobile API still enforces this rule when an adjustment is submitted.
