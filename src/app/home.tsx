@@ -5,6 +5,7 @@ import {useFocusEffect, useRouter} from 'expo-router';
 import {useNetworkState} from 'expo-network';
 import {api, isMockMode} from '../api/runtime';
 import {ApiError, type OverviewStats} from '../api/client';
+import {isAwaitingSync} from '../features/inventory/offlineStockQueue';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {getConnectivityStatus} from '../features/network/connectivity';
 import {AppBottomNavigation} from '../features/navigation/AppBottomNavigation';
@@ -103,7 +104,7 @@ export default function HomeScreen() {
           offlineStockStore.list(userId), offlineStockStore.loadInventorySnapshot(userId),
         ]);
         if (active) setQueue({
-          queued: entries.filter(entry => entry.status === 'queued').length,
+          queued: entries.filter(isAwaitingSync).length,
           conflicts: entries.filter(entry => entry.status === 'conflict').length,
           hasSnapshot: savedInventory !== null,
         });

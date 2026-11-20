@@ -24,7 +24,8 @@ import type {PartRecord} from '../api/transferContract';
 import {clearInventorySnapshot, getInventorySnapshot, setInventorySnapshot} from '../features/inventory/inventorySnapshot';
 import {sortInventory, type InventorySort} from '../features/inventory/inventorySort';
 import {inventoryRowAccessibilityLabel} from '../features/inventory/inventoryAccessibility';
-import {applyQueuedStockCounts, syncQueuedStock} from '../features/inventory/offlineStockQueue';
+import {applyQueuedStockCounts, isAwaitingSync} from '../features/inventory/offlineStockQueue';
+import {syncStockChanges} from '../features/inventory/stockSync';
 import {offlineStockStore} from '../features/inventory/offlineStockStore';
 import {getConnectivityStatus} from '../features/network/connectivity';
 import DesktopPairing from '../features/auth/DesktopPairing';
@@ -112,7 +113,6 @@ export default function InventoryScreen() {
   const [checkingSignOut, setCheckingSignOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const pairingCancelledRef = useRef(false);
-  const syncInFlightRef = useRef<Promise<unknown> | null>(null);
   const hasInventorySnapshotRef = useRef(false);
   const serverFilterRequestRef = useRef(0);
   const inventoryFilter = parseInventoryFilter(routeFilterValue);
@@ -132,11 +132,7 @@ export default function InventoryScreen() {
     .map(row => row.partNumber)).size, [inventory, selectedStoreId]);
 
   const loadInventory = useCallback(async (userId: number) => {
-    if (!syncInFlightRef.current) {
-      syncInFlightRef.current = syncQueuedStock(offlineStockStore, userId, api.adjustStock)
-        .finally(() => { syncInFlightRef.current = null; });
-    }
-    await syncInFlightRef.current;
+    await syncStockChanges(userId);
     let baseRows: InventoryRow[];
     try {
       const queuedBeforeRefresh = await offlineStockStore.list(userId);
@@ -176,7 +172,7 @@ export default function InventoryScreen() {
     setServerFilteredInventory(null);
     setServerFilterCriteria(null);
     setSnapshotStatus({savedAt: await offlineStockStore.getInventorySnapshotSavedAt(userId),
-      queued: queue.filter(item => item.status === 'queued').length,
+      queued: queue.filter(isAwaitingSync).length,
       conflicts: queue.filter(item => item.status === 'conflict').length});
     setInventoryPagesLoading(false);
   }, []);
@@ -216,7 +212,7 @@ export default function InventoryScreen() {
           setInventorySnapshot(cachedRows);
           setSnapshotStatus({
             savedAt: await offlineStockStore.getInventorySnapshotSavedAt(currentUser.id),
-            queued: queuedAdjustments.filter(item => item.status === 'queued').length,
+            queued: queuedAdjustments.filter(isAwaitingSync).length,
             conflicts: queuedAdjustments.filter(item => item.status === 'conflict').length,
           });
         }
@@ -338,7 +334,7 @@ export default function InventoryScreen() {
     const updateQueuedCount = async () => {
       const queue = await offlineStockStore.list(user.id);
       setSnapshotStatus(current => ({...current,
-        queued: queue.filter(item => item.status === 'queued').length,
+        queued: queue.filter(isAwaitingSync).length,
         conflicts: queue.filter(item => item.status === 'conflict').length}));
     };
     return offlineStockStore.subscribeQueueChanges(() => { void updateQueuedCount(); });
